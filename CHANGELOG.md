@@ -2,6 +2,55 @@
 
 <!-- version list -->
 
+## v3.31.1 (2026-08-10)
+
+### Bug Fixes
+
+- **export**: Only export sections of the assay's own question set
+  ([`eda5d20`](https://github.com/johannehouweling/toxtempassistant/commit/eda5d20c7769964c53ad66bc88e3b6511c7e7269))
+
+### Chores
+
+- **deps**: Bump aiohttp from 3.14.1 to 3.14.3
+  ([`dbba0ec`](https://github.com/johannehouweling/toxtempassistant/commit/dbba0ecf51d2b6e2b20c98a847fd62f247c22697))
+
+- **deps**: Bump cryptography from 49.0.0 to 50.0.0
+  ([`40c311f`](https://github.com/johannehouweling/toxtempassistant/commit/40c311f20c24c61c02787ccdbcaff13f5336bd04))
+
+- **deps**: Bump langgraph-checkpoint from 4.0.2 to 4.1.1
+  ([`ad2c801`](https://github.com/johannehouweling/toxtempassistant/commit/ad2c801100dd8a0abe4fbeeb6021d0473e0ff6aa))
+
+- **deps**: Bump langsmith from 0.8.0 to 0.8.18
+  ([`e83826d`](https://github.com/johannehouweling/toxtempassistant/commit/e83826d88f03fe5e7ac9ba476b228ce971fc009e))
+
+- **deps**: Bump nltk from 3.9.4 to 3.10.0
+  ([`cfc472d`](https://github.com/johannehouweling/toxtempassistant/commit/cfc472d01b069492488d041bed29d841a886d38b))
+
+- **deps**: Bump pillow from 12.2.0 to 12.3.0
+  ([`e10f611`](https://github.com/johannehouweling/toxtempassistant/commit/e10f611e827bcb45208a915eef7e0535e6466f58))
+
+- **deps**: Bump pydantic-settings from 2.14.0 to 2.14.2
+  ([`60595e4`](https://github.com/johannehouweling/toxtempassistant/commit/60595e40a7edb66b8c050bd8c939149be1cf05d7))
+
+- **deps**: Bump pypdf from 6.13.3 to 6.14.2
+  ([`91c0cf4`](https://github.com/johannehouweling/toxtempassistant/commit/91c0cf456eaae1f9c61deb951e2bd3a772645802))
+
+- **deps**: Bump soupsieve from 2.8.3 to 2.8.4
+  ([`ce11916`](https://github.com/johannehouweling/toxtempassistant/commit/ce11916c00c8e746c89555fa64347278e2f7949d))
+
+- **deps-dev**: Bump bleach from 6.3.0 to 6.4.0
+  ([`4c34fd5`](https://github.com/johannehouweling/toxtempassistant/commit/4c34fd5994c2f98974516a47b22a0cc27db91ea1))
+
+- **deps-dev**: Bump gitpython from 3.1.50 to 3.1.57
+  ([`154175c`](https://github.com/johannehouweling/toxtempassistant/commit/154175c1aec3146e2b87ef68b11bc9ffb9f8b4fe))
+
+- **deps-dev**: Bump jupyterlab from 4.5.7 to 4.5.10
+  ([`1e66492`](https://github.com/johannehouweling/toxtempassistant/commit/1e66492d070da7850ace53abc803e2b9cfd84ea6))
+
+- **deps-dev**: Bump mistune from 3.2.1 to 3.3.0
+  ([`4eed994`](https://github.com/johannehouweling/toxtempassistant/commit/4eed9946cb65cc5849754a5fa1071132b851987d))
+
+
 ## v3.31.0 (2026-06-29)
 
 ### Bug Fixes

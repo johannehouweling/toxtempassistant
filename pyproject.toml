@@ -1,6 +1,6 @@
 [project]
 name = "toxtempassistant"
-version = "3.31.0"
+version = "3.31.1"
 description = "LLM-based web-app to assist users in drafting ToxTemp, a template for describing in-vitro toxicity test methods in compliance with GD211."
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
