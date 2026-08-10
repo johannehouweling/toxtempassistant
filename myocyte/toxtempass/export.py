@@ -302,9 +302,25 @@ def generate_json_from_assay(assay: Assay) -> dict | None:
             )
         export_data["questions_with_answers"] = questions_with_answers
 
-        # Add sections and subsections with questions and answers
+        # Add sections and subsections with questions and answers.
+        # Only walk the sections of this assay's questionnaire version —
+        # Section.objects.all() would also include every other QuestionSet in
+        # the DB, whose questions can never match this assay's answers and so
+        # would all render as "Answer not found in documents."
+        question_set_id = assay.question_set_id
+        if question_set_id is None:
+            # Legacy assays predate the question_set FK; derive it from the
+            # questions their answers point to.
+            question_set_id = assay.answers.values_list(
+                "question__subsection__section__question_set_id", flat=True
+            ).first()
+        answers_by_question_id = {
+            answer.question_id: answer for answer in assay.answers.all()
+        }
         sections = []
-        for section in Section.objects.all():
+        for section in Section.objects.filter(
+            question_set_id=question_set_id
+        ).prefetch_related("subsections__questions"):
             section_data = {
                 "section": json.loads(serialize("json", [section]))[0],
                 "subsections": [],
@@ -317,9 +333,8 @@ def generate_json_from_assay(assay: Assay) -> dict | None:
                 # Add questions and answers for this subsection
                 for question in subsection.questions.all():
                     # Find the corresponding answer, if any
-                    answer_text = ""
-                    for answer in assay.answers.filter(question=question):
-                        answer_text = answer.answer_text
+                    answer = answers_by_question_id.get(question.id)
+                    answer_text = answer.answer_text if answer else ""
                     subsection_data["questions_with_answers"].append(
                         {
                             "question": json.loads(serialize("json", [question]))[0],
