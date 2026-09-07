@@ -145,6 +145,7 @@ version_source = "commit"
 branch = "main"
 update_changelog = true
 version_toml = ["pyproject.toml:project.version"]
+patch_tags = ["fix", "perf", "chore"]
 
 [tool.semantic_release.changelog.default_templates]
 changelog_file = "CHANGELOG.md"
@@ -152,7 +153,6 @@ output_format = "md"
 
 [tool.semantic_release.remote.token]
 env = "GH_TOKEN"
-
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
