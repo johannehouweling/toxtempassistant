@@ -330,16 +330,18 @@ USE_TZ = True
 
 # Email
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
+EMAIL_HOST = os.getenv("SMTP_HOST", "")
+EMAIL_PORT = int(os.getenv("SMTP_PORT", "587"))
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv("GMAIL_ADDRESS", "")  # your@gmail.com
-EMAIL_HOST_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")  # 16-char app password
-DEFAULT_FROM_EMAIL = f"ToxTempAssistant <{os.environ['GMAIL_ADDRESS']}>"
-if not EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+EMAIL_HOST_USER = os.getenv("SMTP_USERNAME", "")
+EMAIL_HOST_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.getenv(
+    "SMTP_FROM_EMAIL", "toxtempassistant@rivm.nl"
+)
+if bool(EMAIL_HOST_USER) != bool(EMAIL_HOST_PASSWORD):
     _LOG.error("Email not configured!")
 
-EMAIL_SUBJECT_PREFIX = "[ToxTempAssistant ERROR] "
+EMAIL_SUBJECT_PREFIX = "[ToxTempAssistant] "
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
