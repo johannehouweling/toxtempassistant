@@ -145,6 +145,8 @@ version_source = "commit"
 branch = "main"
 update_changelog = true
 version_toml = ["pyproject.toml:project.version"]
+
+[tool.semantic_release.commit_parser_options]
 patch_tags = ["fix", "perf", "chore"]
 
 [tool.semantic_release.changelog.default_templates]
