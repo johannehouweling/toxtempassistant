@@ -2,6 +2,43 @@
 
 <!-- version list -->
 
+## v3.31.2 (2026-09-10)
+
+### Chores
+
+- **deps**: Bump nltk from 3.10.2 to 3.10.3
+  ([`9355f2e`](https://github.com/johannehouweling/toxtempassistant/commit/9355f2eb8717ddf666043087133ffaacbca46622))
+
+- **deps**: Bump pypdf from 6.14.2 to 6.16.1
+  ([`32815b9`](https://github.com/johannehouweling/toxtempassistant/commit/32815b9c51bf924a9bb1d7b07569accdaa1382c8))
+
+- **deps**: Bump sqlparse from 0.5.5 to 0.6.0
+  ([`7f1adb9`](https://github.com/johannehouweling/toxtempassistant/commit/7f1adb9fc2119ee4883edfdf9b2297dca723a80a))
+
+- **deps-dev**: Bump gitpython from 3.1.57 to 3.1.58
+  ([`e980de7`](https://github.com/johannehouweling/toxtempassistant/commit/e980de7fae7506dd0c3f0c00341f30a8646d1674))
+
+- **deps-dev**: Bump gitpython from 3.1.58 to 3.1.59
+  ([`432bf66`](https://github.com/johannehouweling/toxtempassistant/commit/432bf664f6b248ad6af6eb2802b0300670c1105d))
+
+- **deps-dev**: Bump mistune from 3.3.0 to 3.3.3
+  ([`41c1066`](https://github.com/johannehouweling/toxtempassistant/commit/41c1066861b6dccd3efcca1a91370c9dc2603b3e))
+
+- **deps-dev**: Bump tornado from 6.5.7 to 6.5.8
+  ([`c3a441b`](https://github.com/johannehouweling/toxtempassistant/commit/c3a441b1eeffa85e4116c85daadb01b4d348fccd))
+
+- **deps-dev**: Bump transformers from 5.6.2 to 5.10.1
+  ([`36fc7b9`](https://github.com/johannehouweling/toxtempassistant/commit/36fc7b9077c97a6d88ce47f24295812d867453a0))
+
+- **env**: Update email configuration to use RIVM SMTP settings
+  ([`f7e4b05`](https://github.com/johannehouweling/toxtempassistant/commit/f7e4b050f5ab72e363083a8d26f621fa9b057a5d))
+
+### Continuous Integration
+
+- Fix chore as release version
+  ([`e9a7934`](https://github.com/johannehouweling/toxtempassistant/commit/e9a7934274c37130be9950d9a58f868bd35a978b))
+
+
 ## v3.31.1 (2026-08-10)
 
 ### Bug Fixes
