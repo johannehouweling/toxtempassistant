@@ -352,7 +352,7 @@ docker run --rm \
   -e MINIO_USER=<MINIO_ROOT_USER> \
   -e MINIO_PASS=<MINIO_ROOT_PASSWORD> \
   --entrypoint /bin/sh \
-  minio/mc:latest \
+  quay.io/minio/mc:latest \
   -lc '
     mc alias set local http://minio:9000 "$MINIO_USER" "$MINIO_PASS" >/dev/null
     mc mirror --overwrite /backup local/
@@ -365,7 +365,7 @@ docker run --rm \
   -e MINIO_USER=<MINIO_ROOT_USER> \
   -e MINIO_PASS=<MINIO_ROOT_PASSWORD> \
   --entrypoint /bin/sh \
-  minio/mc:latest \
+  quay.io/minio/mc:latest \
   -lc '
     mc alias set local http://minio:9000 "$MINIO_USER" "$MINIO_PASS" >/dev/null
     mc mirror --overwrite /backup local/<bucket>
@@ -408,7 +408,7 @@ Five services across `docker-compose.yml` (single-host base) and `docker-stack.y
 | --- | --- | --- | --- |
 | `djangoapp` | `ghcr.io/johannehouweling/toxtempassistant:vX.Y.Z` | 1 | Gunicorn :8000, Traefik-exposed |
 | `postgres_for_django` | `postgres:17-alpine` | 1 | Stateful — single replica with gluster failover |
-| `minio` | `minio/minio:RELEASE.2025-09-07T16-13-09Z` | 1 | Single-node FS mode |
+| `minio` | `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` | 1 | Single-node FS mode |
 | `minio_init` | `ghcr.io/johannehouweling/toxtempassistant-minio-init:vX.Y.Z` | 1 one-shot | Creates bucket / user / policy on each deploy, then exits |
 | `backup` | `ghcr.io/johannehouweling/toxtempassistant-backup:vX.Y.Z` | 1 | Supercronic; writes to `/mnt/gluster/backups/toxtempassistant/` (cluster cron mirrors that to HiDrive) |
 
@@ -508,7 +508,7 @@ EOF
 
 TS=$(ls -t /tmp/restore | head -1)
 set -a; source /mnt/gluster/docker/toxtempassistant/config/.env; set +a
-docker run --rm --network toxtempass_data_network -v /tmp/restore/$TS/minio:/source:ro -v /tmp/mirror.sh:/mirror.sh:ro -e MINIO_ROOT_USER -e MINIO_ROOT_PASSWORD -e BUCKET=$AWS_STORAGE_BUCKET_NAME --entrypoint sh minio/mc:latest /mirror.sh
+docker run --rm --network toxtempass_data_network -v /tmp/restore/$TS/minio:/source:ro -v /tmp/mirror.sh:/mirror.sh:ro -e MINIO_ROOT_USER -e MINIO_ROOT_PASSWORD -e BUCKET=$AWS_STORAGE_BUCKET_NAME --entrypoint sh quay.io/minio/mc:latest /mirror.sh
 ```
 
 **3. Restore postgres dump:**
