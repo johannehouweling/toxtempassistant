@@ -7,6 +7,7 @@ from django.urls import reverse
 
 from toxtempass.models import Answer, Assay, AssayCost, LLMStatus, AssayView, Person
 from django.utils.dateparse import parse_datetime
+from django.utils.timezone import localtime
 from django.contrib.humanize.templatetags.humanize import naturaltime
 
 
@@ -199,7 +200,7 @@ class AssayTable(tables.Table):
             if hist and (latest is None or hist.history_date > latest):
                 latest = hist.history_date
         if latest:
-            return naturaltime(latest)
+            return localtime(latest).strftime("%Y-%m-%d")
         else:
             return mark_safe('<span class="text-muted">Never</span>')
 

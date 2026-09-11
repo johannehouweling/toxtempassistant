@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from django.test import RequestFactory
 from django.urls import reverse
@@ -5,6 +7,7 @@ from django.urls import reverse
 from toxtempass.models import AssayCost, LLMStatus
 from toxtempass.tables import AssayTable
 from toxtempass.tests.fixtures.factories import (
+    AnswerFactory,
     AssayFactory,
     PersonFactory,
     WorkspaceFactory,
@@ -147,3 +150,12 @@ def test_sortable_headers_show_sort_state(client):
     assert "bi-caret-down-fill" in html
     # Assay + Investigation stay sortable-but-inactive (Owner is superuser-only).
     assert html.count("bi-chevron-expand") == 2
+
+
+@pytest.mark.django_db
+def test_last_changed_renders_a_date_not_relative_time():
+    answer = AnswerFactory.create()
+
+    rendered = AssayTable([answer.assay]).render_last_changed(None, answer.assay)
+
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", rendered), rendered
