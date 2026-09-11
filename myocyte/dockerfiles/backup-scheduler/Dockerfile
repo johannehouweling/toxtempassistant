@@ -1,9 +1,10 @@
 FROM alpine:3.23
 
-# pg_dump matches the postgres:17-alpine server major version. mc is fetched
-# from the official MinIO release channel rather than alpine's `minio-mc`
-# package because the latter installs the binary as `mcli` (to avoid a name
+# pg_dump matches the postgres:17-alpine server major version. mc is copied
+# from the official MinIO image rather than alpine's `minio-mc` package
+# because the latter installs the binary as `mcli` (to avoid a name
 # collision with midnight-commander), and our script invokes `mc`.
+# (dl.min.io and Docker Hub's minio/* are gone; quay.io still serves it.)
 RUN apk add --no-cache \
     bash \
     coreutils \
@@ -18,8 +19,7 @@ RUN apk add --no-cache \
     curl \
     moreutils
 
-RUN curl -fsSLo /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc \
- && chmod +x /usr/local/bin/mc
+COPY --from=quay.io/minio/mc:latest /usr/bin/mc /usr/local/bin/mc
 
 # Latest releases available at https://github.com/aptible/supercronic/releases
 ENV SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/download/v0.2.43/supercronic-linux-amd64 \
