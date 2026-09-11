@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v3.33.0 (2026-09-11)
+
+### Bug Fixes
+
+- **ci**: Pull MinIO images from quay.io
+  ([`a422396`](https://github.com/johannehouweling/toxtempassistant/commit/a422396952c0637aa449863fb6c42ae813d7725a))
+
+- **overview**: Keep rounded corners on the row actions menu button
+  ([`387c169`](https://github.com/johannehouweling/toxtempassistant/commit/387c1694d6a635f772f21227b4e549e6081728f5))
+
+### Features
+
+- **overview**: Show last change as a date instead of relative time
+  ([`1ae59e9`](https://github.com/johannehouweling/toxtempassistant/commit/1ae59e941ff72a8912bc971cb1a4437ae37d6dd0))
+
+
 ## v3.32.0 (2026-09-11)
 
 ### Chores
