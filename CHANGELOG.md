@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v3.32.0 (2026-09-11)
+
+### Chores
+
+- Ignore zip archives
+  ([`a6db305`](https://github.com/johannehouweling/toxtempassistant/commit/a6db305c9d3be603d026c1faff522353c306a75c))
+
+### Features
+
+- **overview**: Admin demo filter, sort-state icons, and row action menu
+  ([`e14c67c`](https://github.com/johannehouweling/toxtempassistant/commit/e14c67c392654ee4e4dc6008ccbe960deb01b131))
+
+
 ## v3.31.2 (2026-09-10)
 
 ### Chores
