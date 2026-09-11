@@ -125,28 +125,27 @@ class AssayTable(tables.Table):
                     <span class="ms-1 d-none d-lg-inline">View</span>
                 </a>
             {% endif %}
-            <div class="btn-group">
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions">
-                    <i class="bi bi-three-dots" aria-hidden="true"></i>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    {% comment %}Route exports through feedback_export() so the feedback modal gates them here too — same path the editing page (answer.html) uses; the partial is included once on overview.html. The toggle is never disabled: Delete lives in this menu and must stay reachable for errored/busy/scheduled assays, so only the export items are disabled.{% endcomment %}
-                    <li><h6 class="dropdown-header">Export</h6></li>
-                    {% for export_type in export_types %}
-                    <li><a class="dropdown-item{% if record.status in export_blocked %} disabled{% endif %}" {% if record.status in export_blocked %}aria-disabled="true" {% endif %}href="#" onclick="feedback_export('{% url 'export_assay' assay_id=record.id export_type=export_type %}', {{ record.id }}); return false;">{{ export_type|upper }}</a></li>
-                    {% endfor %}
-                    <li><hr class="dropdown-divider"></li>
-                    <li>
-                        <a class="dropdown-item text-danger js-delete-link"
-                           href="#"
-                           role="button"
-                           data-delete-url="{% url 'delete_assay' record.id %}?from=overview"
-                           data-confirm-msg="Are you sure you want to delete this assay and associated data? This action cannot be undone.">
-                            <i class="bi bi-trash me-2" aria-hidden="true"></i>Delete
-                        </a>
-                    </li>
-                </ul>
-            </div>
+            {# Menu before its toggle (Bootstrap finds it as the previous sibling) so the toggle is the group's last child and keeps its rounded right corners. #}
+            <ul class="dropdown-menu dropdown-menu-end">
+                {% comment %}Route exports through feedback_export() so the feedback modal gates them here too — same path the editing page (answer.html) uses; the partial is included once on overview.html. The toggle is never disabled: Delete lives in this menu and must stay reachable for errored/busy/scheduled assays, so only the export items are disabled.{% endcomment %}
+                <li><h6 class="dropdown-header">Export</h6></li>
+                {% for export_type in export_types %}
+                <li><a class="dropdown-item{% if record.status in export_blocked %} disabled{% endif %}" {% if record.status in export_blocked %}aria-disabled="true" {% endif %}href="#" onclick="feedback_export('{% url 'export_assay' assay_id=record.id export_type=export_type %}', {{ record.id }}); return false;">{{ export_type|upper }}</a></li>
+                {% endfor %}
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <a class="dropdown-item text-danger js-delete-link"
+                       href="#"
+                       role="button"
+                       data-delete-url="{% url 'delete_assay' record.id %}?from=overview"
+                       data-confirm-msg="Are you sure you want to delete this assay and associated data? This action cannot be undone.">
+                        <i class="bi bi-trash me-2" aria-hidden="true"></i>Delete
+                    </a>
+                </li>
+            </ul>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions">
+                <i class="bi bi-three-dots" aria-hidden="true"></i>
+            </button>
         </div>
         """,
         extra_context={
