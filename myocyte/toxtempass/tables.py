@@ -7,6 +7,7 @@ from django.urls import reverse
 
 from toxtempass.models import Answer, Assay, AssayCost, LLMStatus, AssayView, Person
 from django.utils.dateparse import parse_datetime
+from django.utils.timezone import localtime
 from django.contrib.humanize.templatetags.humanize import naturaltime
 
 
@@ -38,7 +39,7 @@ class AssayTable(tables.Table):
         linkify=False,
         attrs={
             "th": {"class": "no-link-header d-none d-lg-table-cell"},
-            "td": {"class": "align-middle d-none d-lg-table-cell text-break"},
+            "td": {"class": "align-middle d-none d-lg-table-cell"},
         },
     )
 
@@ -49,7 +50,7 @@ class AssayTable(tables.Table):
         linkify=False,
         attrs={
             "th": {"class": "no-link-header d-none d-lg-table-cell"},
-            "td": {"class": "align-middle d-none d-lg-table-cell text-break"},
+            "td": {"class": "align-middle d-none d-lg-table-cell"},
         },
     )
 
@@ -60,7 +61,7 @@ class AssayTable(tables.Table):
         linkify=False,
         attrs={
             "th": {"class": "no-link-header"},
-            "td": {"class": "align-middle text-break"},
+            "td": {"class": "align-middle"},
         },
     )
 
@@ -76,7 +77,7 @@ class AssayTable(tables.Table):
     )
 
     progress = tables.Column(
-        verbose_name="Answers Accepted",
+        verbose_name="Progress",
         orderable=False,
         empty_values=(),
         attrs={"td": {"class": "align-middle"}},
@@ -199,7 +200,7 @@ class AssayTable(tables.Table):
             if hist and (latest is None or hist.history_date > latest):
                 latest = hist.history_date
         if latest:
-            return naturaltime(latest)
+            return localtime(latest).strftime("%Y-%m-%d")
         else:
             return mark_safe('<span class="text-muted">Never</span>')
 
@@ -305,7 +306,7 @@ class AssayTable(tables.Table):
             ' data-bs-html="true"'
             ' data-bs-title="Cost breakdown"'
             ' data-bs-content="{content}"'
-            ' class="badge bg-secondary text-decoration-underline cursor-pointer"'
+            ' class="text-decoration-underline text-nowrap"'
             ' style="cursor:pointer">'
             "{total}"
             "</span>",
@@ -339,7 +340,7 @@ class AssayTable(tables.Table):
         # header to show each sortable column's sort state.
         template_name = "assay_table.html"
         attrs = {
-            "class": "table table-striped table-hover",
+            "class": "table table-striped table-hover text-nowrap",
             "wrapper_class": "table-responsive",
         }
         # If you want default ordering, add for example:
