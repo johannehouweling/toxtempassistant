@@ -1,7 +1,8 @@
 import pytest
 from django.test import RequestFactory
+from django.urls import reverse
 
-from toxtempass.models import AssayCost
+from toxtempass.models import AssayCost, LLMStatus
 from toxtempass.tables import AssayTable
 from toxtempass.tests.fixtures.factories import (
     AssayFactory,
@@ -111,3 +112,38 @@ class TestAssayTableCostColumn:
         assert "gpt-4o-mini" in rendered
         assert "gpt-4o" in rendered
         assert "€0.1413" in rendered
+
+
+@pytest.mark.django_db
+class TestAssayTableActionColumn:
+    @pytest.mark.parametrize(
+        "status,blocked",
+        [
+            (LLMStatus.DONE, False),
+            (LLMStatus.ERROR, True),
+            (LLMStatus.BUSY, True),
+            (LLMStatus.SCHEDULED, True),
+        ],
+    )
+    def test_delete_always_reachable_and_exports_gated_by_status(self, status, blocked):
+        assay = AssayFactory.create(status=status)
+
+        rendered = str(AssayTable([assay]).rows[0].get_cell("action"))
+
+        # Delete shares the overflow menu with the exports, so it must survive every
+        # status — especially error, the usual reason to delete an assay.
+        assert "js-delete-link" in rendered
+        assert rendered.count("feedback_export(") == 7
+        assert rendered.count('aria-disabled="true"') == (7 if blocked else 0)
+
+
+@pytest.mark.django_db
+def test_sortable_headers_show_sort_state(client):
+    client.force_login(PersonFactory.create())
+
+    html = client.get(reverse("overview"), {"sort": "-study"}).content.decode()
+
+    assert 'aria-sort="descending"' in html
+    assert "bi-caret-down-fill" in html
+    # Assay + Investigation stay sortable-but-inactive (Owner is superuser-only).
+    assert html.count("bi-chevron-expand") == 2

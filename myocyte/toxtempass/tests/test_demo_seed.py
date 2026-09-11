@@ -238,3 +238,28 @@ def test_clean_rejects_template_without_question_set():
     assay.demo_template = True
     with pytest.raises(ValidationError):
         assay.clean()
+
+
+@pytest.mark.django_db
+def test_admin_can_hide_demos_and_non_admin_cannot(client):
+    """?hide_demo hides demo assays for superusers only; for anyone else it is ignored."""
+    _create_demo_template()
+    admin = PersonFactory(is_superuser=True, is_staff=True)
+    user = PersonFactory()
+    admin_demo = Assay.objects.get(demo_lock=True, study__investigation__owner=admin)
+    user_demo = Assay.objects.get(demo_lock=True, study__investigation__owner=user)
+
+    client.force_login(admin)
+    response = client.get(reverse("overview"))
+    assert admin_demo in response.context["object_list"]
+    assert "Hide demos" in response.content.decode()
+
+    response = client.get(reverse("overview"), {"sort": "assay", "hide_demo": "1"})
+    assert admin_demo not in response.context["object_list"]
+    # The "Demos hidden" link keeps the active sort and drops hide_demo on the way back.
+    assert 'href="?sort=assay"' in response.content.decode()
+
+    client.force_login(user)
+    response = client.get(reverse("overview"), {"hide_demo": "1"})
+    assert user_demo in response.context["object_list"], "non-admins ignore ?hide_demo"
+    assert "Hide demos" not in response.content.decode()

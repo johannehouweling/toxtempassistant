@@ -1661,10 +1661,14 @@ class AssayListView(SingleTableView):
         # Show every accessible assay that has a questionnaire. The demo copy is
         # NOT auto-hidden when real work exists — it stays in the list (sorting to
         # the bottom as the oldest entry) and disappears only if the user deletes
-        # it themselves.
-        return combined_qs.filter(question_set__isnull=False).order_by(
-            "-submission_date"
-        )
+        # it themselves. Admins can opt out per-request via ?hide_demo, which is
+        # a view filter only: nothing is deleted and other users are unaffected.
+        qs = combined_qs.filter(question_set__isnull=False)
+        if self.request.GET.get("hide_demo") and is_admin(user):
+            qs = qs.filter(
+                demo_lock=False, demo_template=False, demo_source__isnull=True
+            )
+        return qs.order_by("-submission_date")
 
     def get_context_data(self, **kwargs) -> dict:
         """Inject context."""

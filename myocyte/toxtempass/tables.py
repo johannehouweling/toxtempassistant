@@ -125,32 +125,34 @@ class AssayTable(tables.Table):
                 </a>
             {% endif %}
             <div class="btn-group">
-                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle {% if record.status == LLMStatus.ERROR.value or record.status == LLMStatus.BUSY.value or record.status == LLMStatus.SCHEDULED.value %}disabled{% endif %}" data-bs-toggle="dropdown">
-                    <i class="bi bi-file-earmark-arrow-down"></i>
-                    <span class="ms-1 d-none d-lg-inline">Export</span>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions">
+                    <i class="bi bi-three-dots" aria-hidden="true"></i>
                 </button>
-                <ul class="dropdown-menu">
-                    {% comment %}Route through feedback_export() so the feedback modal gates exports here too — same path the editing page (answer.html) uses. The partial is included once on overview.html.{% endcomment %}
-                    <li><a class="dropdown-item" href="#" onclick="feedback_export('{% url 'export_assay' assay_id=record.id export_type='json' %}', {{ record.id }}); return false;">JSON</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="feedback_export('{% url 'export_assay' assay_id=record.id export_type='md' %}', {{ record.id }}); return false;">MD</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="feedback_export('{% url 'export_assay' assay_id=record.id export_type='pdf' %}', {{ record.id }}); return false;">PDF</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="feedback_export('{% url 'export_assay' assay_id=record.id export_type='xml' %}', {{ record.id }}); return false;">XML</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="feedback_export('{% url 'export_assay' assay_id=record.id export_type='docx' %}', {{ record.id }}); return false;">DOCX</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="feedback_export('{% url 'export_assay' assay_id=record.id export_type='html' %}', {{ record.id }}); return false;">HTML</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="feedback_export('{% url 'export_assay' assay_id=record.id export_type='tex' %}', {{ record.id }}); return false;">TEX</a></li>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    {% comment %}Route exports through feedback_export() so the feedback modal gates them here too — same path the editing page (answer.html) uses; the partial is included once on overview.html. The toggle is never disabled: Delete lives in this menu and must stay reachable for errored/busy/scheduled assays, so only the export items are disabled.{% endcomment %}
+                    <li><h6 class="dropdown-header">Export</h6></li>
+                    {% for export_type in export_types %}
+                    <li><a class="dropdown-item{% if record.status in export_blocked %} disabled{% endif %}" {% if record.status in export_blocked %}aria-disabled="true" {% endif %}href="#" onclick="feedback_export('{% url 'export_assay' assay_id=record.id export_type=export_type %}', {{ record.id }}); return false;">{{ export_type|upper }}</a></li>
+                    {% endfor %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item text-danger js-delete-link"
+                           href="#"
+                           role="button"
+                           data-delete-url="{% url 'delete_assay' record.id %}?from=overview"
+                           data-confirm-msg="Are you sure you want to delete this assay and associated data? This action cannot be undone.">
+                            <i class="bi bi-trash me-2" aria-hidden="true"></i>Delete
+                        </a>
+                    </li>
                 </ul>
             </div>
-            <a class="btn btn-sm btn-outline-danger js-delete-link"
-               href="#"
-               role="button"
-               data-delete-url="{% url 'delete_assay' record.id %}?from=overview"
-               data-confirm-msg="Are you sure you want to delete this assay and associated data? This action cannot be undone.">
-                <i class="bi bi-x-lg"></i>
-                <span class="ms-1 d-none d-lg-inline">Delete</span>
-            </a>
         </div>
         """,
-        extra_context={"LLMStatus": LLMStatus},
+        extra_context={
+            "LLMStatus": LLMStatus,
+            "export_types": ("json", "md", "pdf", "xml", "docx", "html", "tex"),
+            "export_blocked": (LLMStatus.ERROR, LLMStatus.BUSY, LLMStatus.SCHEDULED),
+        },
         verbose_name="Actions",
         orderable=False,
         attrs={"th": {"class": "no-link-header"}, "td": {"class": "align-middle"}},
@@ -333,8 +335,9 @@ class AssayTable(tables.Table):
             "cost",
             "action",
         )
-        # Use the Bootstrap5 template so it picks up your existing styling
-        # template_name = "django_tables2/bootstrap5.html" THis is now a global setting
+        # Extends the global django_tables2/bootstrap5.html, overriding only the
+        # header to show each sortable column's sort state.
+        template_name = "assay_table.html"
         attrs = {
             "class": "table table-striped table-hover",
             "wrapper_class": "table-responsive",
