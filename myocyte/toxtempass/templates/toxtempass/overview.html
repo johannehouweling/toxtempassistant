@@ -6,7 +6,21 @@
 {% block title %}Your Assays &amp; Stats{% endblock %}
 
 {% block content %}
-  <h1>Assay Overview</h1>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Assay Overview</h1>
+    {% if user.is_superuser %}
+      {# View filter only; the gate that matters is is_admin() in AssayListView.get_queryset. #}
+      {% if request.GET.hide_demo %}
+        <a class="btn btn-sm btn-secondary" href="{% querystring hide_demo=None page=None %}">
+          <i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Demos hidden
+        </a>
+      {% else %}
+        <a class="btn btn-sm btn-outline-secondary" href="{% querystring hide_demo=1 page=None %}">
+          <i class="bi bi-eye me-1" aria-hidden="true"></i>Hide demos
+        </a>
+      {% endif %}
+    {% endif %}
+  </div>
 
   {# django-tables2 will pass a “table” object into the context #}
   

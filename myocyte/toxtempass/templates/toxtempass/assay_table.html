@@ -1,0 +1,20 @@
+{% extends "django_tables2/bootstrap5.html" %}
+{% load django_tables2 %}
+{# AssayTable only: the stock bootstrap5 header plus a sort-state icon on orderable columns. #}
+{% block table.thead %}
+{% if table.show_header %}
+<thead {{ table.attrs.thead.as_html }}>
+<tr>
+{% for column in table.columns %}
+    <th {{ column.attrs.th.as_html }} scope="col"{% if column.is_ordered %} aria-sort="{% if column.order_by_alias.is_descending %}descending{% else %}ascending{% endif %}"{% endif %}>
+        {% if column.orderable %}
+            <a href="{% querystring_replace table.prefixed_order_by_field=column.order_by_alias.next %}">{{ column.header }}{% if column.is_ordered %}<i class="bi bi-caret-{% if column.order_by_alias.is_descending %}down{% else %}up{% endif %}-fill ms-1" aria-hidden="true"></i>{% else %}<i class="bi bi-chevron-expand ms-1 text-body-tertiary" aria-hidden="true"></i>{% endif %}</a>
+        {% else %}
+            {{ column.header }}
+        {% endif %}
+    </th>
+{% endfor %}
+</tr>
+</thead>
+{% endif %}
+{% endblock table.thead %}
