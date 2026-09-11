@@ -62,6 +62,10 @@ output/
 backups/
 .claude/
 
+# Local archives (e.g. macOS "Compress" snapshots of evaluation folders). These
+# bundle the ignored input_files/ and output/ data, so git must never see them.
+*.zip
+
 # Real-world evaluation input documents (unpublished data).
 # Ignore every document but keep the folder structure tracked via .gitkeep files.
 myocyte/toxtempass/evaluation/real_world/input_files/**
