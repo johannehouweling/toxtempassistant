@@ -3,8 +3,8 @@ from io import BytesIO
 
 from django import forms
 from django.contrib import admin, messages
-from django.db.models import Q
-from django.http import FileResponse, HttpResponseRedirect
+from django.db.models import Q, QuerySet
+from django.http import FileResponse, HttpRequest, HttpResponseRedirect
 from django.urls import path, reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
@@ -32,7 +32,16 @@ from toxtempass.models import (
     Section,
     Study,
     Subsection,
-    FileAsset
+    FileAsset,
+    Workspace,
+    WorkspaceInvestigation,
+    WorkspaceMember,
+)
+from toxtempass.workspace_perms import (
+    grant_investigation_to_members,
+    grant_shared_investigations_to_member,
+    revoke_investigation_from_members,
+    revoke_shared_investigations_from_member,
 )
 
 logger = logging.getLogger(__name__)
@@ -737,3 +746,214 @@ class AssayCostAdmin(admin.ModelAdmin):
             return mark_safe('<span style="color:#888">—</span>')
         return format_html('<b>{sym}{total}</b>', sym=obj.cost_unit_symbol, total=f"{total:.6f}")
     total_cost_display.short_description = "Total cost"
+
+
+# ── Workspaces ────────────────────────────────────────────────────────────────
+# Registered so there is somewhere to see who is in a workspace and what is
+# shared into it — and to tell same-named investigations apart by owner, which
+# the app UI cannot do.
+#
+# Every write here goes through toxtempass.workspace_perms, the same rules the
+# views use. A bare ModelAdmin would write the WorkspaceInvestigation row
+# WITHOUT the view_investigation grants, leaving members with a share that
+# grants them nothing. Deletes are worse: they must preserve the investigation
+# owner's baseline perm and anyone retaining access via another workspace.
+
+
+class WorkspaceMemberInline(admin.TabularInline):
+    model = WorkspaceMember
+    extra = 0
+    autocomplete_fields = ("user",)
+    readonly_fields = ("joined_at",)
+
+
+class WorkspaceInvestigationInline(admin.TabularInline):
+    model = WorkspaceInvestigation
+    extra = 0
+    # raw_id, not a dropdown: duplicate investigation titles are exactly the
+    # problem this admin exists to untangle, and a <select> of identically
+    # named rows is unusable.
+    raw_id_fields = ("investigation", "added_by")
+    readonly_fields = ("added_at",)
+
+
+@admin.register(Workspace)
+class WorkspaceAdmin(admin.ModelAdmin):
+    list_display = ("name", "owner", "member_count", "investigation_count", "created_at")
+    search_fields = ("name", "owner__email", "owner__first_name", "owner__last_name")
+    raw_id_fields = ("owner",)
+    readonly_fields = ("created_at", "updated_at")
+    inlines = (WorkspaceMemberInline, WorkspaceInvestigationInline)
+
+    @admin.display(description="Members")
+    def member_count(self, obj: Workspace) -> int:
+        """Count the people in this workspace."""
+        return obj.memberships.count()
+
+    @admin.display(description="Investigations")
+    def investigation_count(self, obj: Workspace) -> int:
+        """Count the investigations shared into this workspace."""
+        return obj.shared_investigations.count()
+
+    def save_formset(
+        self,
+        request: HttpRequest,
+        form: forms.ModelForm,
+        formset: forms.BaseInlineFormSet,
+        change: bool,
+    ) -> None:
+        """Apply the permission side effects the views apply.
+
+        Django saves inlines through here, so adding/removing a member or a
+        shared investigation in this page has to mirror add_workspace_member /
+        remove_workspace_member / add_workspace_assay / remove_workspace_assay.
+        """
+        if formset.model not in (WorkspaceMember, WorkspaceInvestigation):
+            super().save_formset(request, form, formset, change)
+            return
+
+        workspace = form.instance
+        # Deletions first, while the rows still exist: the revoke rules read
+        # them to work out who retains access.
+        for obj in formset.deleted_objects:
+            if isinstance(obj, WorkspaceInvestigation):
+                obj.delete()
+                revoked = revoke_investigation_from_members(workspace, obj.investigation)
+                messages.info(
+                    request,
+                    f"Unshared “{obj.investigation}” — revoked view access for "
+                    f"{revoked} member(s); the owner and anyone with access via "
+                    f"another workspace kept theirs.",
+                )
+            else:  # WorkspaceMember
+                revoked = revoke_shared_investigations_from_member(workspace, obj.user)
+                obj.delete()
+                messages.info(
+                    request,
+                    f"Removed {obj.user} — revoked {revoked} investigation "
+                    f"permission(s).",
+                )
+        formset.deleted_objects = []
+
+        instances = formset.save(commit=False)
+        for obj in instances:
+            is_new = obj.pk is None
+            if isinstance(obj, WorkspaceInvestigation) and obj.added_by_id is None:
+                obj.added_by = request.user
+            obj.save()
+            if not is_new:
+                continue
+            if isinstance(obj, WorkspaceInvestigation):
+                granted = grant_investigation_to_members(workspace, obj.investigation)
+                messages.success(
+                    request,
+                    f"Shared “{obj.investigation}” (owner: {obj.investigation.owner}) "
+                    f"with {granted} member(s).",
+                )
+            else:  # WorkspaceMember
+                granted = grant_shared_investigations_to_member(workspace, obj.user)
+                messages.success(
+                    request,
+                    f"Added {obj.user} and granted {granted} investigation "
+                    f"permission(s).",
+                )
+        formset.save_m2m()
+
+    def delete_model(self, request: HttpRequest, obj: Workspace) -> None:
+        """Revoke every workspace-derived perm before the cascade removes the rows."""
+        self._revoke_all(obj)
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet) -> None:
+        """Bulk delete bypasses delete_model, so repeat the cleanup here."""
+        for workspace in queryset:
+            self._revoke_all(workspace)
+        super().delete_queryset(request, queryset)
+
+    @staticmethod
+    def _revoke_all(workspace: Workspace) -> None:
+        for link in workspace.shared_investigations.select_related("investigation"):
+            revoke_investigation_from_members(workspace, link.investigation)
+
+
+@admin.register(WorkspaceInvestigation)
+class WorkspaceInvestigationAdmin(admin.ModelAdmin):
+    """Flat view of every share — the one place duplicate titles are separable."""
+
+    list_display = ("workspace", "investigation", "investigation_owner", "added_at")
+    list_filter = ("workspace",)
+    search_fields = ("workspace__name", "investigation__title")
+    raw_id_fields = ("workspace", "investigation", "added_by")
+    readonly_fields = ("added_at",)
+
+    @admin.display(description="Investigation owner", ordering="investigation__owner")
+    def investigation_owner(self, obj: WorkspaceInvestigation) -> Person:
+        """Owner of the shared investigation — what separates same-named rows."""
+        return obj.investigation.owner
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: WorkspaceInvestigation,
+        form: forms.ModelForm,
+        change: bool,
+    ) -> None:
+        """Share, then grant view access to every current member."""
+        is_new = obj.pk is None
+        if obj.added_by_id is None:
+            obj.added_by = request.user
+        super().save_model(request, obj, form, change)
+        if is_new:
+            granted = grant_investigation_to_members(obj.workspace, obj.investigation)
+            messages.success(request, f"Granted view access to {granted} member(s).")
+
+    def delete_model(self, request: HttpRequest, obj: WorkspaceInvestigation) -> None:
+        """Unshare, then revoke where the owner/cross-workspace rules allow."""
+        workspace, investigation = obj.workspace, obj.investigation
+        super().delete_model(request, obj)
+        revoked = revoke_investigation_from_members(workspace, investigation)
+        messages.info(request, f"Revoked view access from {revoked} member(s).")
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet) -> None:
+        """Bulk delete bypasses delete_model; repeat the cleanup here."""
+        pairs = [(o.workspace, o.investigation) for o in queryset]
+        super().delete_queryset(request, queryset)
+        for workspace, investigation in pairs:
+            revoke_investigation_from_members(workspace, investigation)
+
+
+@admin.register(WorkspaceMember)
+class WorkspaceMemberAdmin(admin.ModelAdmin):
+    list_display = ("workspace", "user", "role", "joined_at")
+    list_filter = ("role", "workspace")
+    search_fields = ("workspace__name", "user__email")
+    raw_id_fields = ("workspace", "user")
+    readonly_fields = ("joined_at",)
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: WorkspaceMember,
+        form: forms.ModelForm,
+        change: bool,
+    ) -> None:
+        """Add the member, then grant everything already shared here."""
+        is_new = obj.pk is None
+        super().save_model(request, obj, form, change)
+        if is_new:
+            granted = grant_shared_investigations_to_member(obj.workspace, obj.user)
+            messages.success(
+                request, f"Granted {granted} investigation permission(s)."
+            )
+
+    def delete_model(self, request: HttpRequest, obj: WorkspaceMember) -> None:
+        """Revoke the member's workspace-derived perms, then remove them."""
+        revoked = revoke_shared_investigations_from_member(obj.workspace, obj.user)
+        super().delete_model(request, obj)
+        messages.info(request, f"Revoked {revoked} investigation permission(s).")
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet) -> None:
+        """Bulk delete bypasses delete_model; repeat the cleanup here."""
+        for member in queryset:
+            revoke_shared_investigations_from_member(member.workspace, member.user)
+        super().delete_queryset(request, queryset)
