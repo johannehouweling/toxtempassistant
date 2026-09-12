@@ -37,7 +37,36 @@ REWRITE_MAX_COSINE = 0.75   # semantic cosine below this ⇒ meaning changed ⇒
 COSMETIC_MIN_LEXICAL = 0.9  # surface (char) ratio at/above this ⇒ cosmetic tweak
 GROWTH_FACTOR = 1.2         # length multiple for expand (final) / trim (baseline)
 
+# An abstention that is *almost* the sentinel (a mangled paste, transposed characters) is
+# still an abstention. Only short texts are fuzzy-matched: prose that merely ends with the
+# sentinel is a real answer, not an abstention.
+NOT_FOUND_MIN_RATIO = 0.85   # difflib ratio at/above this ⇒ a mangled sentinel
+NOT_FOUND_MAX_LEN_FACTOR = 2  # only texts up to this multiple of the sentinel are fuzzed
+
 CosineFn = Callable[[str, str], float]
+
+
+def _norm(text: str) -> str:
+    """Lowercase, strip surrounding whitespace and trailing punctuation."""
+    return str(text).strip().lower().rstrip(".,;:! ")
+
+
+def is_not_found(text: str, sentinel: str) -> bool:
+    """Report whether ``text`` is the standardised abstention (N_trivial in the paper).
+
+    Equality after normalisation, plus a fuzzy fallback for short mangled variants.
+    Deliberately NOT a substring test: an answer that contains substantive prose and
+    happens to end with the sentinel is a real expert answer, and counting it as an
+    abstention understates the gold set.
+    """
+    t, ref = _norm(text), _norm(sentinel)
+    if not ref:
+        return False
+    if t == ref:
+        return True
+    if len(t) <= NOT_FOUND_MAX_LEN_FACTOR * len(ref):
+        return SequenceMatcher(None, t, ref).ratio() >= NOT_FOUND_MIN_RATIO
+    return False
 
 
 def _is_abstain(text: str, not_found_str: str) -> bool:

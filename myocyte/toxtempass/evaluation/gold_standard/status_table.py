@@ -17,9 +17,16 @@ import pandas as pd
 import plotly.graph_objects as go
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))  # import the sibling FLAT: the package needs Django
+from edit_analysis import is_not_found  # noqa: E402  (needs sys.path first)
+
 ANALYSIS_DIR = HERE / "output" / "_analysis"      # gold CSVs live here
 PLOTTING_DIR = HERE / "output" / "_plotting"      # figures written here
 QUESTIONNAIRE = 77  # "Each ToxTemp consists of 77 questions" (paper, Fig. 4 caption)
+
+# Mirrors ``toxtempass.config.not_found_string``, copied because importing it would
+# drag in Django settings and this module is deliberately standalone (pure pandas).
+NOT_FOUND = "Answer not found in documents."
 
 # Column labels, in the paper's vocabulary (Manuscript TEBT-2025-0014).
 EXPERT = "Expert answers (N<sub>non-trivial</sub>)"
@@ -59,11 +66,18 @@ def _institute(email: str) -> str:
 
 def build(csv_path: Path) -> tuple[str, str]:
     """Return (markdown_table, summary_line) for the gold CSV."""
-    df = pd.read_csv(csv_path).fillna("")
+    # keep_default_na=False: answers written literally as "NA" / "n/a" are real expert
+    # answers, and pandas' default NA parsing would silently turn them into blanks.
+    df = pd.read_csv(csv_path, keep_default_na=False)
+    # Re-derive the abstention flag from the text rather than trusting the CSV column: the
+    # extract that produced this file used a substring test, which mislabels prose that
+    # ends with the sentinel and misses mangled sentinels. audit.py now shares this test,
+    # so a fresh extract agrees with what is rendered here.
+    df["is_nf"] = df["gold_answer"].map(lambda t: is_not_found(t, NOT_FOUND))
+    df["is_blank"] = df["gold_answer"].astype(str).str.strip() == ""
     df["institute"] = df["owner_email"].map(_institute)
     for aid, inst in ASSAY_INSTITUTE.items():
         df.loc[df["assay_id"] == aid, "institute"] = inst
-    df["is_nf"] = df["is_not_found"].astype(str).str.lower().isin(["true", "1", "1.0"])
 
     rows = []
     # Group by assay_id (NOT title): two same-titled assays at one institute are distinct
@@ -71,6 +85,10 @@ def build(csv_path: Path) -> tuple[str, str]:
     for _aid, g in df.groupby("assay_id"):
         accepted = len(g)
         nf = int(g["is_nf"].sum())
+        # An accepted answer with no text is a question the expert left unanswered, so it
+        # belongs in N_missing — matching assess_ground_truth.py, which already subtracts
+        # empty accepted answers from its gold count.
+        blank = int(g["is_blank"].sum())
         first = g.iloc[0]
         rows.append(
             {
@@ -83,9 +101,9 @@ def build(csv_path: Path) -> tuple[str, str]:
                 # The three sum to QUESTIONNAIRE by construction, so a reader can check
                 # the row. The old "Reviewed (%)" was N_non-trivial + N_trivial over 77,
                 # which counted abstentions as coverage and had no paper counterpart.
-                EXPERT: accepted - nf,
+                EXPERT: accepted - nf - blank,
                 TRIVIAL: nf,
-                MISSING: QUESTIONNAIRE - accepted,
+                MISSING: QUESTIONNAIRE - accepted + blank,
             }
         )
     tbl = pd.DataFrame(rows).sort_values(
@@ -107,13 +125,19 @@ def build(csv_path: Path) -> tuple[str, str]:
     n_inst = df["institute"].nunique()
     n_people = df["owner_email"].nunique()
     total_acc = len(df)
-    total_gold = int((~df["is_nf"]).sum())
     total_nf = int(df["is_nf"].sum())
+    total_blank = int((df["is_blank"] & ~df["is_nf"]).sum())
+    total_gold = total_acc - total_nf - total_blank
+    # Every accepted answer is accounted for: gold + not-found + blank == accepted.
+    blank_note = (
+        f" and {total_blank} accepted but left empty" if total_blank else ""
+    )
     summary = (
         f"**{total_gold} expert-validated answers** across **{n_assays} assays**, "
         f"**{n_people} scientists**, **{n_inst} institutes**. {total_acc} accepted "
-        f"in total; {total_nf} are the standardised 'answer not found in documents'. "
-        f"The three counts sum to {QUESTIONNAIRE}, the ToxTemp question count."
+        f"in total: {total_nf} are the standardised 'answer not found in "
+        f"documents'{blank_note}. The three counts sum to {QUESTIONNAIRE}, the "
+        f"ToxTemp question count."
     )
     return md, summary, tbl
 

@@ -27,6 +27,7 @@ from toxtempass import config
 from toxtempass.evaluation.gold_standard.edit_analysis import (
     CosineFn,
     analyze_answer_history,
+    is_not_found,
 )
 from toxtempass.evaluation.post_processing import embeddings as emb
 from toxtempass.evaluation.post_processing.similarity import cosine
@@ -207,7 +208,7 @@ def run(opts: dict | None = None) -> dict:
             a = analyze_answer_history(r.pop("history_rows"), gold, NOT_FOUND, cosine_fn)
             r.update(
                 {
-                    "is_not_found": NOT_FOUND.strip().lower() in gold.lower(),
+                    "is_not_found": is_not_found(gold, NOT_FOUND),
                     "baseline_kind": a["baseline_kind"],
                     "delta_exact": a["delta_exact"],
                     "baseline_answer": a["baseline_answer"],
