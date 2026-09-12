@@ -53,10 +53,9 @@ def test_workspace_tab_filters_and_counts(qset):
     assert unfiltered.status_code == 200
     titles = {a.title for a in unfiltered.context["table"].data}
     assert titles == {"Shared assay", "Private assay"}
-    (tab,) = unfiltered.context["workspace_tabs"]
-    assert tab["pk"] == workspace.pk
-    assert tab["name"] == workspace.name
-    assert tab["count"] == 1
+    assert unfiltered.context["workspace_tabs"] == [
+        {"pk": workspace.pk, "name": workspace.name}
+    ]
 
     # Filtered: only the investigation shared into that workspace.
     filtered = client.get(url, {"workspace": workspace.pk})
@@ -93,11 +92,9 @@ def test_joined_workspace_appears_with_zero_count(qset):
     client.force_login(user)
     response = client.get(reverse("overview"))
 
-    (tab,) = response.context["workspace_tabs"]
-    assert tab["pk"] == workspace.pk
-    assert tab["name"] == workspace.name
-    assert tab["count"] == 0
-    assert tab["progress"] == {"total": 0, "accepted": 0, "pct": 0}
+    assert response.context["workspace_tabs"] == [
+        {"pk": workspace.pk, "name": workspace.name}
+    ]
 
 
 @pytest.mark.django_db
@@ -125,29 +122,8 @@ def test_search_matches_assay_study_and_investigation_titles(qset):
 
 
 @pytest.mark.django_db
-def test_search_narrows_workspace_tab_counts(qset):
-    """A tab badge always matches what that tab would show under the search."""
-    user = PersonFactory.create()
-    hit = _assay(user, qset, "Deiodinase assay")
-    miss = _assay(user, qset, "LDH release")
-
-    workspace = WorkspaceFactory.create(owner=user)
-    for assay in (hit, miss):
-        WorkspaceInvestigationFactory.create(
-            workspace=workspace, investigation=assay.study.investigation
-        )
-
-    client = Client()
-    client.force_login(user)
-    response = client.get(reverse("overview"), {"q": "deiodinase"})
-
-    assert response.context["workspace_tabs"][0]["count"] == 1
-    assert response.context["search_query"] == "deiodinase"
-
-
-@pytest.mark.django_db
-def test_tab_row_survives_a_search_that_matches_one_workspace(qset):
-    """Searching must not delete the navigation you are searching from."""
+def test_picker_survives_a_search_that_matches_one_workspace(qset):
+    """Searching must not delete the picker you are searching from."""
     user = PersonFactory.create()
     hit = _assay(user, qset, "Deiodinase assay")
     miss = _assay(user, qset, "LDH release")
@@ -161,5 +137,5 @@ def test_tab_row_survives_a_search_that_matches_one_workspace(qset):
     client.force_login(user)
     response = client.get(reverse("overview"), {"q": "deiodinase"})
 
-    tabs = {t["name"]: t["count"] for t in response.context["workspace_tabs"]}
-    assert tabs == {"Thyroid": 1, "Kidney": 0}
+    names = [t["name"] for t in response.context["workspace_tabs"]]
+    assert names == ["Kidney", "Thyroid"]
