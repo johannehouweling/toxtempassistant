@@ -31,6 +31,8 @@ from toxtempass.tests.fixtures.factories import (
     PersonFactory,
     QuestionFactory,
     StudyFactory,
+    WorkspaceFactory,
+    WorkspaceMemberFactory,
 )
 
 
@@ -61,6 +63,9 @@ class StatsRangeTests(TestCase):
         self.assertEqual(humanize_seconds(45), "45s")
         self.assertEqual(humanize_seconds(125), "2m 05s")
         self.assertEqual(humanize_seconds(7320), "2h 02m")
+        # Elapsed spans calendar time, so days must not collapse into hours.
+        self.assertEqual(humanize_seconds(86400 * 9 + 3600 * 4), "9d 4h")
+        self.assertEqual(humanize_seconds(86400 * 2), "2d")
 
 
 class StatsAggregationTests(TestCase):
@@ -299,6 +304,40 @@ class StatsAggregationTests(TestCase):
         )
         self.assertEqual(band["questions"], 2)
 
+    def test_solo_workspace_is_not_counted_as_shared(self):
+        """Workspace.save() adds the owner, so one member means nobody joined."""
+        WorkspaceFactory.create(owner=self.user)
+        collab = build_stats("all")["collaboration"]
+        self.assertEqual(collab["workspaces_created"], 1)
+        self.assertEqual(collab["shared_workspaces"], 0)
+        self.assertEqual(collab["collaborating_users"], 0)
+
+    def test_workspace_with_a_second_member_is_shared(self):
+        workspace = WorkspaceFactory.create(owner=self.user)
+        WorkspaceMemberFactory.create(workspace=workspace, user=self.other)
+        collab = build_stats("all")["collaboration"]
+        self.assertEqual(collab["shared_workspaces"], 1)
+        self.assertEqual(collab["collaborating_users"], 2)
+
+    def test_cross_institution_needs_two_named_employers(self):
+        # self.user is Utrecht, self.other is RIVM.
+        crossing = WorkspaceFactory.create(owner=self.user)
+        WorkspaceMemberFactory.create(workspace=crossing, user=self.other)
+
+        # Same institution on both sides is not a crossing.
+        colleague = PersonFactory.create(organization="Utrecht University")
+        internal = WorkspaceFactory.create(owner=self.user)
+        WorkspaceMemberFactory.create(workspace=internal, user=colleague)
+
+        # A blank organisation must not manufacture one either.
+        unknown = PersonFactory.create(organization="")
+        blank = WorkspaceFactory.create(owner=self.user)
+        WorkspaceMemberFactory.create(workspace=blank, user=unknown)
+
+        collab = build_stats("all")["collaboration"]
+        self.assertEqual(collab["shared_workspaces"], 3)
+        self.assertEqual(collab["cross_institution_workspaces"], 1)
+
     def test_section_progress_is_empty_without_a_question_set(self):
         Assay.objects.update(question_set=None)
         progress = build_stats("all")["section_progress"]
@@ -404,6 +443,17 @@ class StatsViewTests(TestCase):
         self.client.force_login(self.user)
         resp = self.client.get(reverse("stats_dashboard"))
         self.assertEqual(resp.status_code, 302)
+
+    def test_offcanvas_link_is_staff_only(self):
+        """The link is cosmetic — the view decorator is the real gate — but a
+        regression here would advertise the page to every signed-in user."""
+        url = reverse("stats_dashboard")
+
+        self.client.force_login(self.user)
+        self.assertNotContains(self.client.get(reverse("overview")), f'href="{url}"')
+
+        self.client.force_login(self.admin)
+        self.assertContains(self.client.get(reverse("overview")), f'href="{url}"')
 
     def test_staff_sees_dashboard(self):
         self.client.force_login(self.admin)

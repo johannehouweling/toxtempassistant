@@ -24,6 +24,7 @@ from django.db.models import (
     Avg,
     Count,
     F,
+    Max,
     Q,
     QuerySet,
     Sum,
@@ -170,12 +171,20 @@ def _median(values: list[int | float]) -> float | None:
 
 
 def humanize_seconds(seconds: float | None) -> str:
-    """Render a duration as ``4h 12m`` / ``38m`` / ``45s`` (``—`` when unknown)."""
+    """Render a duration as ``9d 4h`` / ``4h 12m`` / ``38m`` / ``45s``.
+
+    Days matter because the elapsed figure spans calendar time — without them a
+    two-week ToxTemp reads as "336h 00m", which nobody can parse at a glance.
+    ``None`` renders as an em dash.
+    """
     if seconds is None:
         return "—"
     seconds = int(seconds)
-    hours, rest = divmod(seconds, 3600)
+    days, rest = divmod(seconds, 86400)
+    hours, rest = divmod(rest, 3600)
     minutes, secs = divmod(rest, 60)
+    if days:
+        return f"{days}d {hours}h" if hours else f"{days}d"
     if hours:
         return f"{hours}h {minutes:02d}m"
     if minutes:
@@ -756,6 +765,35 @@ def llm_usage(rng: StatsRange) -> dict[str, Any]:
     }
 
 
+def _elapsed_completion(completed: QuerySet[Assay]) -> list[float]:
+    """Wall-clock seconds from creating a ToxTemp to accepting its last answer.
+
+    Nothing records a completion timestamp, so this reads the latest history row
+    on an accepted answer as the moment the ToxTemp was signed off. Accepting
+    calls save(), which writes a history row, so the approximation is close —
+    but a later edit to an already-accepted answer moves that row forward, which
+    can only stretch the figure. Treat it as an upper bound, and read it beside
+    the hands-on time rather than instead of it.
+    """
+    created = dict(completed.values_list("pk", "submission_date"))
+    if not created:
+        return []
+
+    rows = (
+        Answer.history.model.objects.filter(assay__in=created, accepted=True)
+        .values("assay_id")
+        .annotate(signed_off=Max("history_date"))
+    )
+    out = []
+    for row in rows:
+        start = created.get(row["assay_id"])
+        if start and row["signed_off"]:
+            seconds = (row["signed_off"] - start).total_seconds()
+            if seconds > 0:
+                out.append(seconds)
+    return out
+
+
 def engagement(rng: StatsRange) -> dict[str, Any]:
     """Active-time, recency and view/download counters for the window."""
     assays = _scoped(real_assays(), "submission_date", rng)
@@ -765,11 +803,15 @@ def engagement(rng: StatsRange) -> dict[str, Any]:
         AssayTimeLog.objects.filter(assay__in=assay_ids).aggregate(s=Sum("seconds"))["s"]
         or 0
     )
+    # Assay.completion_time_seconds is the sum of AssayTimeLog.seconds across
+    # every collaborator, captured when the last answer was first accepted — so
+    # it is hands-on effort, not how long the ToxTemp sat open.
     completion_times = list(
         _completed_assays(assays)
         .exclude(completion_time_seconds=None)
         .values_list("completion_time_seconds", flat=True)
     )
+    elapsed = _elapsed_completion(_completed_assays(assays))
 
     now = timezone.now()
     active = {
@@ -784,6 +826,9 @@ def engagement(rng: StatsRange) -> dict[str, Any]:
         "active_hours": round(seconds / 3600.0, 1),
         "median_completion_seconds": _median(completion_times),
         "median_completion_display": humanize_seconds(_median(completion_times)),
+        "median_elapsed_seconds": _median(elapsed),
+        "median_elapsed_display": humanize_seconds(_median(elapsed)),
+        "elapsed_samples": len(elapsed),
         "completion_samples": len(completion_times),
         "active_users": active,
         "assay_views": AssayView.objects.filter(assay__in=assay_ids).count(),
@@ -849,24 +894,46 @@ def file_stats(rng: StatsRange) -> dict[str, Any]:
 
 
 def collaboration(rng: StatsRange) -> dict[str, Any]:
-    """Workspace counts and sharing reach for the window."""
+    """Workspace counts and sharing reach for the window.
+
+    ``Workspace.save()`` adds the owner as a member the moment a workspace is
+    created, so a one-member workspace is one nobody has been invited to. Only
+    workspaces with a second member count as shared here — counting every row
+    would report every private workspace as collaboration.
+    """
     qs = _scoped(Workspace.objects.all(), "created_at", rng)
-    n = qs.count()
-    members = WorkspaceMember.objects.filter(workspace__in=qs.values("pk")).count()
-    shared = WorkspaceInvestigation.objects.filter(
-        workspace__in=qs.values("pk")
-    ).count()
+    created = qs.count()
+
+    shared_ids = list(
+        qs.annotate(n_members=Count("memberships", distinct=True))
+        .filter(n_members__gt=1)
+        .values_list("pk", flat=True)
+    )
+    memberships = WorkspaceMember.objects.filter(workspace__in=shared_ids)
+
+    # A workspace spans institutions when its members name more than one
+    # employer. Blank organisations are ignored rather than treated as their own
+    # institution, so an unfilled profile cannot manufacture a crossing.
+    per_workspace: dict[int, set[str]] = {}
+    for workspace_id, org in memberships.values_list(
+        "workspace_id", "user__organization"
+    ):
+        if org:
+            per_workspace.setdefault(workspace_id, set()).add(org)
+    cross_institution = sum(1 for orgs in per_workspace.values() if len(orgs) > 1)
+
+    n_shared = len(shared_ids)
+    n_memberships = memberships.count()
     return {
-        "workspaces": n,
-        "members": members,
-        "shared_investigations": shared,
-        "avg_members": round(members / n, 1) if n else None,
-        "collaborating_users": WorkspaceMember.objects.filter(
-            workspace__in=qs.values("pk")
-        )
-        .values("user")
-        .distinct()
-        .count(),
+        "workspaces_created": created,
+        "shared_workspaces": n_shared,
+        "cross_institution_workspaces": cross_institution,
+        "members": n_memberships,
+        "avg_members": round(n_memberships / n_shared, 1) if n_shared else None,
+        "shared_investigations": WorkspaceInvestigation.objects.filter(
+            workspace__in=shared_ids
+        ).count(),
+        "collaborating_users": memberships.values("user").distinct().count(),
     }
 
 

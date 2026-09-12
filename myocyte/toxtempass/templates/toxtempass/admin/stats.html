@@ -117,6 +117,11 @@ Config rather than written twice.
   .readout tbody td { border-bottom: 1px solid var(--rule); padding: .5rem 0; }
   .readout tbody tr:last-child td { border-bottom: 0; }
   .readout td.num, .readout th.num { text-align: right; font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  /* A long institution name was starving the numeric columns until their
+     headers wrapped into run-on words. The name column takes what is left after
+     the numbers have their room, and wraps inside itself instead. */
+  .readout th.num, .readout td.num { white-space: nowrap; width: 1%; padding-left: 1rem; }
+  .readout td.name, .readout th.name { width: auto; overflow-wrap: anywhere; }
   /* Inline scale in the institutions table: the row is its own bar chart, so
      the panel does not need a second chart repeating the same numbers. */
   .readout .rowbar { display: block; height: 3px; width: var(--w); min-width: 2px;
@@ -206,7 +211,10 @@ Config rather than written twice.
         <div class="col-6">
           <div class="stat">
             <div class="fig fig-lg">{{ stats.engagement.median_completion_display }}</div>
-            <div class="stat-label">typical time to finish one</div>
+            <div class="stat-label" data-bs-toggle="tooltip"
+                 title="Hands-on time: the active minutes every collaborator spent in the editor, summed, for a median finished ToxTemp. Not how long it sat open — that is {{ stats.engagement.median_elapsed_display }} end to end.">
+              hands-on time to finish one <i class="bi bi-info-circle" aria-hidden="true"></i>
+            </div>
           </div>
         </div>
         <div class="col-6">
@@ -264,7 +272,7 @@ Config rather than written twice.
           <table class="w-100">
             <thead>
               <tr>
-                <th scope="col">Institution</th>
+                <th scope="col" class="name">Institution</th>
                 <th scope="col" class="num">Users</th>
                 <th scope="col" class="num">ToxTemps</th>
                 <th scope="col" class="num">Completed</th>
@@ -273,7 +281,7 @@ Config rather than written twice.
             <tbody>
               {% for row in stats.organisations %}
               <tr>
-                <td>
+                <td class="name">
                   {{ row.organisation }}
                   <span class="rowbar" style="--w: {{ row.share }}%"></span>
                 </td>
@@ -292,12 +300,21 @@ Config rather than written twice.
       <div class="col-12 col-lg-4 split">
         <div class="panel-bd">
           <div class="mb-4">
-            <div class="fig fig-md">{{ stats.collaboration.workspaces|intcomma }}</div>
-            <div class="unit">shared workspaces</div>
+            <div class="fig fig-md">{{ stats.collaboration.shared_workspaces|intcomma }}</div>
+            <div class="unit" data-bs-toggle="tooltip"
+                 title="Workspaces with more than one member. A workspace nobody has been invited to is not counted — {{ stats.collaboration.workspaces_created|intcomma }} were created in total.">
+              shared workspaces <i class="bi bi-info-circle" aria-hidden="true"></i>
+            </div>
           </div>
           <div>
             <div class="fig fig-md">{{ stats.collaboration.collaborating_users|intcomma }}</div>
-            <div class="unit">users collaborating across institutions</div>
+            <div class="unit">people in a shared workspace</div>
+            {% if stats.collaboration.cross_institution_workspaces %}
+            <div class="note mt-2">
+              {{ stats.collaboration.cross_institution_workspaces|intcomma }} of those
+              workspaces span more than one institution.
+            </div>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -410,7 +427,7 @@ Config rather than written twice.
           <table class="w-100 mt-3">
             <thead>
               <tr>
-                <th scope="col">Model</th>
+                <th scope="col" class="name">Model</th>
                 <th scope="col" class="num">Tokens read</th>
                 <th scope="col" class="num">Tokens written</th>
                 <th scope="col" class="num">Total cost</th>
@@ -419,7 +436,7 @@ Config rather than written twice.
             <tbody>
               {% for row in stats.llm.by_model %}
               <tr>
-                <td class="text-break">{{ row.model }}</td>
+                <td class="name">{{ row.model }}</td>
                 <td class="num">{{ row.input_tokens|intcomma }}</td>
                 <td class="num">{{ row.output_tokens|intcomma }}</td>
                 <td class="num">{{ stats.llm.currency }}{{ row.cost_total|floatformat:2 }}</td>
