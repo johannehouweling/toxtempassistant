@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.36.0 (2026-09-12)
+
+### Features
+
+- **overview**: Add a "Not in a workspace" filter option
+  ([`fc93ff3`](https://github.com/johannehouweling/toxtempassistant/commit/fc93ff3d5b6b9272c08f0536cf0bea29de02d848))
+
+
 ## v3.35.3 (2026-09-12)
 
 ### Bug Fixes
