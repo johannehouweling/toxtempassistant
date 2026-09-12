@@ -2,7 +2,7 @@
 {% load humanize %}
 
 {% comment %}
-Staff-only usage readout.
+Staff-only usage stats.
 
 Everything rendered here comes from toxtempass.stats.build_stats(), which emits
 aggregates only. Do NOT add a widget that surfaces a user's name, e-mail, ORCID
@@ -11,13 +11,13 @@ is that this template cannot leak what it never receives.
 
 On the style block: the project convention is Bootstrap utilities over custom
 CSS, and the structure below still uses Bootstrap's grid and spacing. The rules
-here are the page's visual language (typeface, ink, hairline panels, the
-completion strip), which Bootstrap has no vocabulary for. Everything is scoped
+here are the page's visual language (typeface, ink, hairline panels, the summary
+dials), which Bootstrap has no vocabulary for. Everything is scoped
 under .readout so it cannot reach any other page, and every colour comes from
 Config rather than being written twice.
 {% endcomment %}
 
-{% block title %}Usage readout — ToxTempAssistant{% endblock %}
+{% block title %}Usage stats — ToxTempAssistant{% endblock %}
 
 {% block content %}
 {{ chart_data|json_script:"kpiChartData" }}
@@ -63,24 +63,25 @@ Config rather than being written twice.
     .readout .split { border-top: 0; border-left: 1px solid var(--rule); }
   }
 
-  /* The completion strip: one mark per ToxTemp, sorted most-complete first. */
-  .readout .strip { display: flex; flex-wrap: wrap; gap: 2px; align-items: stretch; }
-  .readout .strip > i { flex: 1 1 5px; max-width: 24px; height: 46px; border-radius: 1px; transform-origin: bottom; }
-  .readout .strip > i.m0 { background: var(--m0); }
-  .readout .strip > i.m1 { background: var(--m1); }
-  .readout .strip > i.m2 { background: var(--m2); }
-  .readout .strip > i.m3 { background: var(--m3); }
-  @keyframes markIn { from { transform: scaleY(.12); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
-  .readout .strip > i { animation: markIn .3s cubic-bezier(.2,.7,.3,1) backwards; animation-delay: calc(var(--i) * 1.4ms); }
-  .readout .key { display: inline-flex; align-items: center; gap: .4rem; }
-  .readout .key::before { content: ""; width: .6rem; height: .9rem; border-radius: 1px; background: currentColor; }
-  .readout .key.m0 { color: var(--m0); } .readout .key.m1 { color: var(--m1); }
-  .readout .key.m2 { color: var(--m2); } .readout .key.m3 { color: var(--m3); }
-  .readout .key > span { color: var(--ink); }
-
-  /* Measure bars: a rate with its own value beside it, no card around it. */
-  .readout .meter { height: 6px; background: var(--rule); border-radius: 1px; overflow: hidden; }
-  .readout .meter > span { display: block; height: 100%; border-radius: 1px; background: var(--m3); }
+  /* Summary dials. The arc is a semicircle of radius 50, so its length is
+     pi*50 = 157.08 — the dash offset walks that length back by the rate. */
+  .readout .gauge svg { display: block; width: 100%; max-width: 9rem; margin: 0 auto; height: auto; }
+  .readout .gauge path { fill: none; stroke-width: 8; stroke-linecap: round; }
+  .readout .gauge .gauge-track { stroke: var(--rule); }
+  .readout .gauge .gauge-value {
+    stroke: var(--m3);
+    stroke-dasharray: 157.08;
+    stroke-dashoffset: calc(157.08px * (1 - var(--p, 0) / 100));
+    transition: stroke-dashoffset .5s cubic-bezier(.2,.7,.3,1);
+  }
+  .readout .gauge .gauge-num { font-family: "IBM Plex Mono", ui-monospace, monospace;
+                               font-size: 21px; font-weight: 300; fill: var(--ink); }
+  .readout .gauge .gauge-pct { font-family: "IBM Plex Mono", ui-monospace, monospace;
+                               font-size: 11px; fill: var(--ink-2); }
+  .readout .gauge .note { max-width: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .readout .gauge .gauge-value { transition: none; }
+  }
 
   .readout table { font-size: .875rem; }
   .readout thead th { font-weight: 500; color: var(--ink-2); border-bottom: 1px solid var(--rule); padding-bottom: .4rem; }
@@ -102,9 +103,6 @@ Config rather than being written twice.
   .readout .seg a[aria-current="page"]:hover { color: #fff; }
   .readout a:focus-visible, .readout .seg a:focus-visible { outline: 2px solid var(--m3); outline-offset: 2px; }
 
-  @media (prefers-reduced-motion: reduce) {
-    .readout .strip > i { animation: none; }
-  }
 </style>
 
 <div class="readout">
@@ -112,7 +110,7 @@ Config rather than being written twice.
   {# ── Masthead ─────────────────────────────────────────────────────────── #}
   <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 pb-3 mb-4"
        style="border-bottom: 1px solid var(--rule)">
-    <h1 class="h4 mb-0" style="letter-spacing:-.02em">Usage readout</h1>
+    <h1 class="h4 mb-0" style="letter-spacing:-.02em">Usage stats</h1>
     <div class="d-flex flex-wrap align-items-center gap-3">
       <div class="seg d-flex">
         {% for key, label in stats.ranges %}
@@ -126,58 +124,40 @@ Config rather than being written twice.
     </div>
   </div>
 
-  {# ── Hero: every ToxTemp, one mark ────────────────────────────────────── #}
+  {# ── Summary ──────────────────────────────────────────────────────────── #}
+  {# Each dial is a rate with a real denominator; the three raw counts below
+     have none, so they stay plain figures rather than faking an arc. Cost is
+     deliberately absent — it has its own panel. #}
   <div class="panel">
+    <div class="panel-hd"><h2>Summary</h2></div>
     <div class="panel-bd">
-      <h2 class="h6 mb-1" style="font-weight:600">Every ToxTemp, one mark</h2>
-      <p class="note mb-3">Sorted by how much of the template its authors have accepted.</p>
-
-      {% if stats.completion.marks %}
-      <div class="strip mb-3" role="img"
-           aria-label="{{ stats.completion.total }} ToxTemps, {{ stats.completion.legend.0.count }} complete, {{ stats.completion.legend.1.count }} over half accepted, {{ stats.completion.legend.2.count }} under half accepted, {{ stats.completion.legend.3.count }} not started">
-        {% for mark in stats.completion.marks %}<i class="m{{ mark }}" style="--i:{{ forloop.counter0 }}"></i>{% endfor %}
+      <div class="row row-cols-2 row-cols-lg-4 g-4 text-center">
+        <div class="col">
+          {% include "toxtempass/admin/_gauge.html" with value=stats.headline.completed_assays.period total=stats.headline.assays.period pct=stats.headline.completed_assays.pct label="ToxTemps completed" denom="started" %}
+        </div>
+        <div class="col">
+          {% include "toxtempass/admin/_gauge.html" with value=stats.answers.accepted total=stats.answers.total pct=stats.answers.accepted_pct label="Answers accepted" denom="questions" %}
+        </div>
+        <div class="col">
+          {% include "toxtempass/admin/_gauge.html" with value=stats.answers.edited total=stats.answers.total pct=stats.answers.edited_pct label="Answers edited" denom="questions" note="saved more than once" %}
+        </div>
+        <div class="col">
+          {% include "toxtempass/admin/_gauge.html" with value=stats.answers.not_found total=stats.answers.answered pct=stats.answers.not_found_pct label="Answers not found" denom="draft answers" note="lower is better" %}
+        </div>
       </div>
-      <div class="d-flex flex-wrap gap-4 mb-0">
-        {% for entry in stats.completion.legend %}
-        <span class="key m{{ entry.key }}" style="font-size:.8125rem">
-          <span><span class="val">{{ entry.count|intcomma }}</span> {{ entry.label }}</span>
-        </span>
-        {% endfor %}
-      </div>
-      {% if stats.completion.truncated %}
-      <p class="note mt-2 mb-0">Showing the {{ stats.completion.marks|length }} most complete of {{ stats.completion.total|intcomma }}.</p>
-      {% endif %}
-      {% else %}
-      <p class="note mb-0">No ToxTemps in this period yet.</p>
-      {% endif %}
     </div>
 
-    {# Summary statistics across the ToxTemps in the strip above. Every figure
-       here is scoped to the same period as the strip, so the counts and the
-       marks always agree. Cost is deliberately absent — it has its own panel. #}
     <div class="panel-hd border-bottom-0" style="border-top:1px solid var(--rule)">
       <div class="row g-4">
-        <div class="col-6 col-md">
+        <div class="col-12 col-md-4">
           <div class="fig fig-md">{{ stats.headline.assays.period|intcomma }}</div>
           <div class="unit">ToxTemps started</div>
         </div>
-        <div class="col-6 col-md">
-          <div class="fig fig-md">{{ stats.headline.completed_assays.period|intcomma }}</div>
-          <div class="unit">ToxTemps completed</div>
-        </div>
-        <div class="col-6 col-md">
+        <div class="col-12 col-md-4">
           <div class="fig fig-md">{{ stats.answers.answered|intcomma }}</div>
-          <div class="unit">draft answers</div>
+          <div class="unit">draft answers written</div>
         </div>
-        <div class="col-6 col-md">
-          <div class="fig fig-md">{{ stats.answers.accepted|intcomma }}</div>
-          <div class="unit">answers accepted</div>
-        </div>
-        <div class="col-6 col-md">
-          <div class="fig fig-md">{{ stats.answers.not_found|intcomma }}</div>
-          <div class="unit">answers not found</div>
-        </div>
-        <div class="col-6 col-md">
+        <div class="col-12 col-md-4">
           <div class="fig fig-md">{{ stats.files.count|intcomma }}</div>
           <div class="unit">context documents uploaded</div>
         </div>
@@ -193,6 +173,20 @@ Config rather than being written twice.
         <div class="panel-bd">
           <p class="note mb-3">Users with an account and ToxTemps started, counted cumulatively.</p>
           <div style="height:250px"><canvas id="chartGrowth"></canvas></div>
+          <div class="row g-4 mt-0">
+            <div class="col-4">
+              <div class="fig fig-md">{{ stats.headline.organisations.total|intcomma }}</div>
+              <div class="unit">institutions</div>
+            </div>
+            <div class="col-4">
+              <div class="fig fig-md">{{ stats.collaboration.workspaces|intcomma }}</div>
+              <div class="unit">shared workspaces</div>
+            </div>
+            <div class="col-4">
+              <div class="fig fig-md">{{ stats.collaboration.collaborating_users|intcomma }}</div>
+              <div class="unit">users collaborating</div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="col-12 col-lg-5 split">
@@ -230,51 +224,42 @@ Config rather than being written twice.
     </div>
   </div>
 
-  {# ── Does the drafting help ───────────────────────────────────────────── #}
+  {# ── Drafting ─────────────────────────────────────────────────────────── #}
   <div class="panel">
-    <div class="panel-hd"><h2>Drafting</h2></div>
+    <div class="panel-hd">
+      <h2>Drafting</h2>
+      {% if stats.question_sets %}
+      <p class="note mb-0 mt-1">
+        ToxTemp questionnaire {{ stats.question_sets|length|pluralize:"version,versions" }} in use:
+        {% for row in stats.question_sets %}{{ row.label }} ({{ row.count|intcomma }} ToxTemp{{ row.count|pluralize }}){% if not forloop.last %}, {% endif %}{% endfor %}
+      </p>
+      {% endif %}
+    </div>
     <div class="row g-0">
       <div class="col-12 col-lg-7">
         <div class="panel-bd">
-          <p class="note mb-4">
-            Across {{ stats.answers.total|intcomma }} questions the model has answered.
-            A high keep rate and a low “not found” rate together mean the drafts are
-            landing close enough to be worth editing.
+          <p class="note mb-3">How far ToxTemps get once they are started.</p>
+          <table class="w-100">
+            <thead><tr><th scope="col">Stage</th><th scope="col" class="num">ToxTemps</th><th scope="col" class="num">Share</th></tr></thead>
+            <tbody>
+              {% for stage in stats.funnel %}
+              <tr>
+                <td>{{ stage.label }}</td>
+                <td class="num">{{ stage.count|intcomma }}</td>
+                <td class="num">{% if stage.pct %}{{ stage.pct }}%{% else %}—{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <p class="note mt-3 mb-0">
+            Acceptance, edit and not-found rates for the {{ stats.answers.total|intcomma }}
+            individual questions are the dials in the summary above.
           </p>
-
-          <div class="mb-4">
-            <div class="d-flex align-items-baseline justify-content-between gap-3 mb-1">
-              <span>Answers accepted by their author</span>
-              <span class="text-nowrap"><span class="val">{{ stats.answers.accepted|intcomma }}</span> <span class="unit">{{ stats.answers.accepted_pct|default:"0" }}%</span></span>
-            </div>
-            <div class="meter"><span style="width: {{ stats.answers.accepted_pct|default:0 }}%"></span></div>
-            <p class="note mt-1 mb-0">of {{ stats.answers.total|intcomma }} questions</p>
-          </div>
-
-          <div class="mb-4">
-            <div class="d-flex align-items-baseline justify-content-between gap-3 mb-1">
-              <span>Answers edited before being accepted</span>
-              <span class="text-nowrap"><span class="val">{{ stats.answers.edited|intcomma }}</span> <span class="unit">{{ stats.answers.edited_pct|default:"0" }}%</span></span>
-            </div>
-            <div class="meter"><span style="width: {{ stats.answers.edited_pct|default:0 }}%"></span></div>
-            <p class="note mt-1 mb-0">saved more than once</p>
-          </div>
-
-          <div class="mb-0">
-            <div class="d-flex align-items-baseline justify-content-between gap-3 mb-1">
-              <span>Answers not found in the context documents</span>
-              <span class="text-nowrap"><span class="val">{{ stats.answers.not_found|intcomma }}</span> <span class="unit">{{ stats.answers.not_found_pct|default:"0" }}%</span></span>
-            </div>
-            <div class="meter"><span style="width: {{ stats.answers.not_found_pct|default:0 }}%"></span></div>
-            <p class="note mt-1 mb-0">of {{ stats.answers.answered|intcomma }} draft answers — lower is better</p>
-          </div>
         </div>
       </div>
 
       <div class="col-12 col-lg-5 split">
         <div class="panel-bd">
-          {# Completed counts already lead the summary block above, so this
-             column carries the one figure that appears nowhere else. #}
           <div class="mb-4">
             <div class="fig fig-lg">{{ stats.engagement.median_completion_display }}</div>
             <div class="unit">typical time to finish a ToxTemp</div>
@@ -289,36 +274,31 @@ Config rather than being written twice.
           {% else %}
           <p class="note mb-0">No usefulness ratings submitted in this period.</p>
           {% endif %}
-
-          <table class="w-100 mt-4">
-            <thead><tr><th scope="col">How far ToxTemps get</th><th scope="col" class="num">Count</th><th scope="col" class="num">Share</th></tr></thead>
-            <tbody>
-              {% for stage in stats.funnel %}
-              <tr>
-                <td>{{ stage.label }}</td>
-                <td class="num">{{ stage.count|intcomma }}</td>
-                <td class="num">{% if stage.pct %}{{ stage.pct }}%{% else %}—{% endif %}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
   </div>
 
-  {# ── Cost ─────────────────────────────────────────────────────────────── #}
+  {# ── LLM costs ────────────────────────────────────────────────────────── #}
   <div class="panel">
-    <div class="panel-hd"><h2>Cost</h2></div>
+    <div class="panel-hd"><h2>LLM costs</h2></div>
     <div class="row g-0">
       <div class="col-12 col-lg-7">
         <div class="panel-bd">
-          <p class="note mb-3">What each model has been charged for, split into what it read and what it wrote.</p>
+          <p class="note mb-3">
+            What each model was billed for. Tokens are the units models charge in —
+            roughly three quarters of a word each.
+          </p>
           {% if stats.llm.by_model %}
           <div style="height:200px"><canvas id="chartCost"></canvas></div>
           <table class="w-100 mt-3">
             <thead>
-              <tr><th scope="col">Model</th><th scope="col" class="num">Read</th><th scope="col" class="num">Wrote</th><th scope="col" class="num">Cost</th></tr>
+              <tr>
+                <th scope="col">Model</th>
+                <th scope="col" class="num">Tokens read</th>
+                <th scope="col" class="num">Tokens written</th>
+                <th scope="col" class="num">Total cost</th>
+              </tr>
             </thead>
             <tbody>
               {% for row in stats.llm.by_model %}
@@ -329,40 +309,32 @@ Config rather than being written twice.
                 <td class="num">{{ stats.llm.currency }}{{ row.cost_total|floatformat:2 }}</td>
               </tr>
               {% endfor %}
+              <tr style="border-top:1px solid var(--rule)">
+                <td>All models, {{ stats.llm.runs|intcomma }} drafting run{{ stats.llm.runs|pluralize }}</td>
+                <td class="num">{{ stats.llm.input_tokens|intcomma }}</td>
+                <td class="num">{{ stats.llm.output_tokens|intcomma }}</td>
+                <td class="num">{{ stats.llm.currency }}{{ stats.llm.cost_total|floatformat:2 }}</td>
+              </tr>
             </tbody>
           </table>
-          <p class="note mt-2 mb-0">Token counts in thousands of words read and written. A model showing tokens but no cost is missing its price tag in the deployment config.</p>
+          <p class="note mt-2 mb-0">A model showing tokens but no cost is missing its price tag in the deployment config.</p>
           {% else %}
           <p class="note mb-0">No drafting runs recorded in this period.</p>
           {% endif %}
         </div>
       </div>
       <div class="col-12 col-lg-5 split">
+        {# Totals live in the table on the left; this column carries only what
+           is not already there. #}
         <div class="panel-bd">
           <div class="mb-4">
             <div class="fig fig-lg">{{ stats.llm.currency }}{{ stats.llm.cost_per_assay|floatformat:3|default:"0.000" }}</div>
             <div class="unit">per ToxTemp drafted</div>
           </div>
-          <table class="w-100">
-            <tbody>
-              <tr><td>Drafting runs</td><td class="num">{{ stats.llm.runs|intcomma }}</td></tr>
-              <tr><td>Words read</td><td class="num">{{ stats.llm.input_tokens|intcomma }}</td></tr>
-              <tr><td>Words written</td><td class="num">{{ stats.llm.output_tokens|intcomma }}</td></tr>
-              <tr><td>Documents stored</td><td class="num">{{ stats.files.megabytes|intcomma }} MB</td></tr>
-              <tr><td>Shared workspaces</td><td class="num">{{ stats.collaboration.workspaces|intcomma }}</td></tr>
-              <tr><td>Users collaborating</td><td class="num">{{ stats.collaboration.collaborating_users|intcomma }}</td></tr>
-            </tbody>
-          </table>
-          {% if stats.question_sets %}
-          <p class="note mt-3 mb-1">Questionnaire version in use</p>
-          <table class="w-100">
-            <tbody>
-              {% for row in stats.question_sets %}
-              <tr><td>{{ row.label }}</td><td class="num">{{ row.count|intcomma }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          {% endif %}
+          <div>
+            <div class="fig fig-md">{{ stats.files.megabytes|intcomma }}<span class="unit"> MB</span></div>
+            <div class="unit">of context documents stored</div>
+          </div>
         </div>
       </div>
     </div>

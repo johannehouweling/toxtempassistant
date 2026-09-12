@@ -1,0 +1,21 @@
+{% load humanize %}
+{% comment %}
+One dial for a rate that has a real denominator. Include as:
+
+  {% include "toxtempass/admin/_gauge.html" with value=N total=M pct=P label="…" denom="…" note="…" %}
+
+`value` is the count the figure shows, `pct` drives the arc, and `denom` names
+what `total` counts. Never use this for a bare count — an arc with no honest
+denominator is decoration.
+{% endcomment %}
+<div class="gauge">
+  <svg viewBox="0 0 120 82" role="img"
+       aria-label="{{ label }}: {{ value|intcomma }} of {{ total|intcomma }} {{ denom }}, {{ pct|default:0 }} percent">
+    <path class="gauge-track" d="M10,60 A50,50 0 0 1 110,60"/>
+    <path class="gauge-value" d="M10,60 A50,50 0 0 1 110,60" style="--p: {{ pct|default:0 }}"/>
+    <text class="gauge-num" x="60" y="52" text-anchor="middle">{{ value|intcomma }}</text>
+    <text class="gauge-pct" x="60" y="76" text-anchor="middle">{{ pct|default:0 }}%</text>
+  </svg>
+  <div class="mt-1">{{ label }}</div>
+  <div class="note">of {{ total|intcomma }} {{ denom }}{% if note %} — {{ note }}{% endif %}</div>
+</div>

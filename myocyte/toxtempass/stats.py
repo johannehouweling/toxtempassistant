@@ -238,6 +238,10 @@ def headline(rng: StatsRange) -> dict[str, Any]:
         "completed_assays": {
             "total": completed.count(),
             "period": _scoped(completed, "submission_date", rng).count(),
+            "pct": _pct(
+                _scoped(completed, "submission_date", rng).count(),
+                _scoped(assays, "submission_date", rng).count(),
+            ),
         },
         "acceptance_rate": _pct(n_accepted, n_answers),
         "llm_cost": {
