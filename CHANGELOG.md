@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v3.35.1 (2026-09-12)
+
+### Bug Fixes
+
+- **stats**: Correct the workspace metrics and name the time figure precisely
+  ([`da10863`](https://github.com/johannehouweling/toxtempassistant/commit/da10863ac59d6d1ff900e9d0cd61ae34b456e554))
+
+- **stats**: Strip leaked template comments, cache the payload for a day
+  ([`75e22fa`](https://github.com/johannehouweling/toxtempassistant/commit/75e22faeecdd836dc2eec7d54bbc3f7736c0ff7b))
+
+
 ## v3.35.0 (2026-09-12)
 
 ### Bug Fixes
