@@ -19,6 +19,7 @@ from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import (
     Avg,
     Count,
@@ -942,6 +943,36 @@ def build_stats(range_key: str | None = None) -> dict[str, Any]:
         "collaboration": collaboration(rng),
         "question_sets": question_set_mix(rng),
     }
+
+
+def cached_stats(
+    range_key: str | None = None, *, refresh: bool = False
+) -> dict[str, Any]:
+    """Return :func:`build_stats` for ``range_key``, recomputed at most daily.
+
+    A full build is roughly thirty aggregate queries over every answer in the
+    database. Nothing here moves fast enough to be worth paying that on each
+    page view, so the payload is cached for ``Config.stats_cache_seconds`` and
+    the ``generated_at`` it carries becomes the "as of" time shown on the page.
+
+    ``refresh=True`` skips the read and recomputes, which is what the dashboard's
+    recalculate control does.
+    """
+    key = f"{config.stats_cache_key_prefix}{resolve_range(range_key).key}"
+    if not refresh:
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+    stats = build_stats(range_key)
+    cache.set(key, stats, config.stats_cache_seconds)
+    return stats
+
+
+def clear_stats_cache() -> None:
+    """Drop every cached range, so the next read of any of them recomputes."""
+    cache.delete_many(
+        [f"{config.stats_cache_key_prefix}{key}" for key in config.stats_ranges]
+    )
 
 
 def to_json_payload(stats: dict[str, Any]) -> dict[str, Any]:

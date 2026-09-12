@@ -127,6 +127,10 @@ Config rather than written twice.
   .readout .seg a:first-child { border-radius: 4px 0 0 4px; }
   .readout .seg a:last-child { border-radius: 0 4px 4px 0; }
   .readout .seg a[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  /* Sits in the same control as the range tabs but reads as secondary: no
+     label, icon only, and it never takes the selected state. */
+  .readout .seg-refresh { color: var(--ink-3); padding-inline: .55rem; }
+  .readout .seg-refresh:hover { color: var(--brand); }
   .readout .seg a:hover { color: var(--ink); }
   .readout .seg a[aria-current="page"]:hover { color: #fff; }
   .readout a:focus-visible, .readout .seg a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -143,6 +147,12 @@ Config rather than written twice.
         {% for key, label in stats.ranges %}
         <a href="?range={{ key }}" {% if key == stats.range.key %}aria-current="page"{% endif %}>{{ label }}</a>
         {% endfor %}
+        <a class="seg-refresh" href="?range={{ stats.range.key }}&amp;refresh=1"
+           data-bs-toggle="tooltip"
+           title="Figures are from {{ stats.generated_at|naturaltime }}. They are rebuilt once a day — click to recalculate now."
+           aria-label="Recalculate now">
+          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+        </a>
       </div>
       <div class="d-flex gap-3">
         <a class="note text-decoration-underline" href="{% url 'stats_export_csv' %}?range={{ stats.range.key }}">Download CSV</a>
@@ -152,9 +162,9 @@ Config rather than written twice.
   </div>
 
   {# ── Summary ──────────────────────────────────────────────────────────── #}
-  {# The inked card carries the headline count; the four beside it are the
+  {% comment %} The inked card carries the headline count; the four beside it are the
      numbers a reader who has never seen the app can still weigh. Hierarchy is
-     fill and scale — every card has the same border, radius and no shadow. #}
+     fill and scale — every card has the same border, radius and no shadow. {% endcomment %}
   <div class="row g-3">
     <div class="col-12 col-lg-5">
       <div class="stat stat-brand">
@@ -168,8 +178,8 @@ Config rather than written twice.
             <i class="b2" style="width: {{ stats.headline.assays.in_progress_pct }}%"></i>
             <i class="b3" style="width: {{ stats.headline.assays.untouched_pct }}%"></i>
           </div>
-          {# Every band gets a key: with one omitted the numbers look like they
-             do not add up, because the reader has nothing to subtract. #}
+          {% comment %} Every band gets a key: with one omitted the numbers look like they
+             do not add up, because the reader has nothing to subtract. {% endcomment %}
           <div class="d-flex flex-wrap gap-4 mt-3">
             <span class="key b1"><span><b>{{ stats.headline.completed_assays.period|intcomma }}</b> complete</span></span>
             <span class="key b2"><span><b>{{ stats.headline.assays.in_progress|intcomma }}</b> in progress</span></span>
@@ -203,9 +213,9 @@ Config rather than written twice.
           <div class="stat">
             <div class="fig fig-lg">{{ stats.progress.accepted|floatformat:0 }}<sub>%</sub></div>
             <div class="stat-label">of answers accepted by an expert</div>
-            {# Each key states its own band, not the cumulative total: the b2
+            {% comment %} Each key states its own band, not the cumulative total: the b2
                segment is drafted-minus-accepted, so labelling it with the full
-               drafted figure would point a swatch at the wrong width. #}
+               drafted figure would point a swatch at the wrong width. {% endcomment %}
             <div class="bar mt-3" role="img"
                  aria-label="{{ stats.progress.accepted }} percent accepted, {{ stats.progress.awaiting }} percent drafted but not yet accepted, {{ stats.progress.undrafted }} percent with no draft">
               <i class="b1" style="width: {{ stats.progress.accepted }}%"></i>
@@ -223,10 +233,10 @@ Config rather than written twice.
   </div>
 
   {# ── Growth ───────────────────────────────────────────────────────────── #}
-  {# Full width: a cumulative curve is the growth story, and it reads as growth
+  {% comment %} Full width: a cumulative curve is the growth story, and it reads as growth
      only when it has room to rise. Areas rather than bare lines so the
      accumulation has mass, and the last value of each series is labelled on
-     the curve itself — the endpoint is the payoff. #}
+     the curve itself — the endpoint is the payoff. {% endcomment %}
   <div class="panel">
     <div class="panel-hd">
       <h2>Growth</h2>
@@ -238,8 +248,8 @@ Config rather than written twice.
   </div>
 
   {# ── Institutions ─────────────────────────────────────────────────────── #}
-  {# The named list is the credibility signal for a reader who does not know
-     the app, so it leads the panel and is not put behind a scrollbox. #}
+  {% comment %} The named list is the credibility signal for a reader who does not know
+     the app, so it leads the panel and is not put behind a scrollbox. {% endcomment %}
   <div class="panel">
     <div class="panel-hd">
       <h2>Institutions using ToxTempAssistant</h2>
@@ -395,8 +405,8 @@ Config rather than written twice.
             roughly three quarters of a word each.
           </p>
           {% if stats.llm.by_model %}
-          {# No chart here: with a handful of models the bar repeated the table
-             sitting under it, so the table carries it alone. #}
+          {% comment %} No chart here: with a handful of models the bar repeated the table
+             sitting under it, so the table carries it alone. {% endcomment %}
           <table class="w-100 mt-3">
             <thead>
               <tr>
@@ -430,8 +440,8 @@ Config rather than written twice.
         </div>
       </div>
       <div class="col-12 col-lg-5 split">
-        {# Totals live in the table on the left; this column carries only what
-           is not already there. #}
+        {% comment %} Totals live in the table on the left; this column carries only what
+           is not already there. {% endcomment %}
         <div class="panel-bd">
           <div class="mb-4">
             <div class="fig fig-lg">{{ stats.llm.currency }}{{ stats.llm.cost_per_assay|floatformat:3|default:"0.000" }}</div>

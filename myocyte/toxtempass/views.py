@@ -92,7 +92,12 @@ from toxtempass.models import (
     Workspace,
     WorkspaceMember,
 )
-from toxtempass.stats import build_stats, to_csv_rows, to_json_payload
+from toxtempass.stats import (
+    cached_stats,
+    clear_stats_cache,
+    to_csv_rows,
+    to_json_payload,
+)
 from toxtempass.tables import AssayTable
 from toxtempass.utilities import (
     add_user_alert,
@@ -643,7 +648,16 @@ def toggle_beta_admitted(request: HttpRequest) -> HttpResponse:
 @staff_member_required(login_url="/login/")
 def stats_dashboard(request: HttpRequest) -> HttpResponse:
     """Render the staff-only KPI dashboard."""
-    stats = build_stats(request.GET.get("range"))
+    range_key = request.GET.get("range")
+    if request.GET.get("refresh"):
+        # Drop every range, not just this one — "recalculate" should mean the
+        # whole page is current, and the other windows are cheap to rebuild on
+        # demand. Redirect so a reload does not clear the cache again.
+        clear_stats_cache()
+        target = reverse("stats_dashboard")
+        return redirect(f"{target}?range={range_key}" if range_key else target)
+
+    stats = cached_stats(range_key)
     return render(
         request,
         "toxtempass/admin/stats.html",
@@ -675,7 +689,7 @@ def stats_dashboard(request: HttpRequest) -> HttpResponse:
 @require_GET
 def stats_data(request: HttpRequest) -> JsonResponse:
     """Return the same aggregates as the dashboard as JSON."""
-    payload = to_json_payload(build_stats(request.GET.get("range")))
+    payload = to_json_payload(cached_stats(request.GET.get("range")))
     return JsonResponse(payload)
 
 
@@ -683,7 +697,7 @@ def stats_data(request: HttpRequest) -> JsonResponse:
 @require_GET
 def stats_export_csv(request: HttpRequest) -> HttpResponse:
     """Stream the aggregated KPI tables as a CSV attachment."""
-    stats = build_stats(request.GET.get("range"))
+    stats = cached_stats(request.GET.get("range"))
     response = HttpResponse(content_type="text/csv")
     stamp = stats["generated_at"].strftime("%Y%m%d-%H%M")
     filename = f"toxtempassistant-kpi-{stats['range'].key}-{stamp}.csv"

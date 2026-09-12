@@ -225,6 +225,11 @@ class Config:
     # not an operations monitor, so the cumulative total is the headline and the
     # shorter windows exist for reporting-period cuts.
     stats_default_range = "all"
+    # How long a built payload is reused before the next read recomputes it.
+    # A full build is ~30 aggregate queries over every answer in the database,
+    # and none of these figures move fast enough to need recomputing per view.
+    stats_cache_seconds = 86400  # one day
+    stats_cache_key_prefix = "toxtempass:stats:"
     # Row label pooling users who never filled in Person.organization. Blank
     # organisations are pooled rather than listed so the row is not read as an
     # institution in its own right.

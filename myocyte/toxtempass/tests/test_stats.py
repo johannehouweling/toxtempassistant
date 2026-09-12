@@ -4,7 +4,10 @@ import csv
 import datetime as dt
 import io
 
-from django.test import TestCase
+from django.core.cache import cache
+from django.db import connection
+from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -12,6 +15,8 @@ from toxtempass import config
 from toxtempass.models import Assay, AssayCost, Feedback, LLMStatus, Person
 from toxtempass.stats import (
     build_stats,
+    cached_stats,
+    clear_stats_cache,
     humanize_seconds,
     real_assays,
     resolve_range,
@@ -320,8 +325,63 @@ class StatsAggregationTests(TestCase):
         self.assertEqual(build_stats("30d")["headline"]["assays"]["period"], 2)
 
 
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
+class StatsCacheTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.user = PersonFactory.create(organization="RIVM")
+        _assay_for(self.user)
+
+    def test_second_read_comes_from_cache(self):
+        first = cached_stats("all")
+        _assay_for(self.user)  # would change the answer if it recomputed
+        second = cached_stats("all")
+        self.assertEqual(second["headline"]["assays"]["period"], 1)
+        self.assertEqual(second["generated_at"], first["generated_at"])
+
+    def test_refresh_recomputes_and_replaces_the_cached_copy(self):
+        cached_stats("all")
+        _assay_for(self.user)
+        refreshed = cached_stats("all", refresh=True)
+        self.assertEqual(refreshed["headline"]["assays"]["period"], 2)
+        # The refreshed payload is now what a plain read returns.
+        self.assertEqual(cached_stats("all")["headline"]["assays"]["period"], 2)
+
+    def test_ranges_are_cached_independently(self):
+        cached_stats("all")
+        with self.assertNumQueries(0):
+            cached_stats("all")
+
+        # A different window has its own key, so it still has to build once.
+        # CaptureQueriesContext rather than connection.queries_log, which only
+        # fills when DEBUG is on and is empty under the test settings.
+        with CaptureQueriesContext(connection) as queries:
+            cached_stats("12m")
+        self.assertGreater(len(queries), 0)
+
+        with self.assertNumQueries(0):
+            cached_stats("12m")
+
+    def test_clear_drops_every_range(self):
+        cached_stats("all")
+        cached_stats("12m")
+        _assay_for(self.user)
+        clear_stats_cache()
+        self.assertEqual(cached_stats("all")["headline"]["assays"]["period"], 2)
+        self.assertEqual(cached_stats("12m")["headline"]["assays"]["period"], 2)
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+)
 class StatsViewTests(TestCase):
     def setUp(self):
+        # The views read through the cache, which outlives a single test method,
+        # so without this each test would be asserting against whatever payload
+        # the previous one happened to build.
+        cache.clear()
         self.admin = AdminFactory.create()
         # Deliberately unusual identifiers so the privacy assertion below cannot
         # pass (or fail) by coincidence against ordinary page copy.
@@ -359,6 +419,24 @@ class StatsViewTests(TestCase):
         # so assert on the *other* user's identifiers, which must not be present.
         self.assertNotIn(self.user.email, body)
         self.assertNotIn(self.user.last_name, body)
+
+    def test_refresh_clears_the_cache_and_redirects(self):
+        self.client.force_login(self.admin)
+        self.client.get(reverse("stats_dashboard"), {"range": "all"})
+        _assay_for(self.user)
+
+        # Without a refresh the page still shows the cached figure.
+        body = self.client.get(reverse("stats_dashboard"), {"range": "all"}).content
+        self.assertIn(b">1</div>", body)
+
+        resp = self.client.get(
+            reverse("stats_dashboard"), {"range": "all", "refresh": "1"}
+        )
+        self.assertEqual(resp.status_code, 302)
+        # Redirects back without the refresh flag, so a reload is not a re-clear.
+        self.assertNotIn("refresh", resp["Location"])
+        self.assertIn("range=all", resp["Location"])
+        self.assertIn(b">2</div>", self.client.get(resp["Location"]).content)
 
     def test_json_endpoint_returns_aggregates(self):
         self.client.force_login(self.admin)
