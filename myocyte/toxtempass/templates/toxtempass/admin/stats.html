@@ -112,14 +112,7 @@ Config rather than being written twice.
   {# ── Masthead ─────────────────────────────────────────────────────────── #}
   <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 pb-3 mb-4"
        style="border-bottom: 1px solid var(--rule)">
-    <div>
-      <h1 class="h4 mb-1" style="letter-spacing:-.02em">Usage readout</h1>
-      <p class="note mb-0">
-        {% if stats.range.is_all_time %}Everything since launch{% else %}{{ stats.range.label }}{% endif %},
-        as of {{ stats.generated_at|date:"j F Y, H:i" }}. Aggregates only — no personal data,
-        and the demo ToxTemp every new account receives is left out throughout.
-      </p>
-    </div>
+    <h1 class="h4 mb-0" style="letter-spacing:-.02em">Usage readout</h1>
     <div class="d-flex flex-wrap align-items-center gap-3">
       <div class="seg d-flex">
         {% for key, label in stats.ranges %}
