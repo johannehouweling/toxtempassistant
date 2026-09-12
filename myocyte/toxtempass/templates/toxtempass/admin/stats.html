@@ -165,9 +165,12 @@ Config rather than written twice.
             <i class="b2" style="width: {{ stats.headline.assays.in_progress_pct }}%"></i>
             <i class="b3" style="width: {{ stats.headline.assays.untouched_pct }}%"></i>
           </div>
+          {# Every band gets a key: with one omitted the numbers look like they
+             do not add up, because the reader has nothing to subtract. #}
           <div class="d-flex flex-wrap gap-4 mt-3">
             <span class="key b1"><span><b>{{ stats.headline.completed_assays.period|intcomma }}</b> complete</span></span>
             <span class="key b2"><span><b>{{ stats.headline.assays.in_progress|intcomma }}</b> in progress</span></span>
+            <span class="key b3"><span><b>{{ stats.headline.assays.untouched|intcomma }}</b> none accepted yet</span></span>
           </div>
         </div>
       </div>
@@ -197,14 +200,18 @@ Config rather than written twice.
           <div class="stat">
             <div class="fig fig-lg">{{ stats.progress.accepted|floatformat:0 }}<sub>%</sub></div>
             <div class="stat-label">of answers accepted by an expert</div>
+            {# Each key states its own band, not the cumulative total: the b2
+               segment is drafted-minus-accepted, so labelling it with the full
+               drafted figure would point a swatch at the wrong width. #}
             <div class="bar mt-3" role="img"
-                 aria-label="{{ stats.progress.accepted }} percent accepted, {{ stats.progress.awaiting }} percent drafted but not yet accepted">
+                 aria-label="{{ stats.progress.accepted }} percent accepted, {{ stats.progress.awaiting }} percent drafted but not yet accepted, {{ stats.progress.undrafted }} percent with no draft">
               <i class="b1" style="width: {{ stats.progress.accepted }}%"></i>
               <i class="b2" style="width: {{ stats.progress.awaiting }}%"></i>
               <i class="b3" style="width: {{ stats.progress.undrafted }}%"></i>
             </div>
-            <div class="mt-2">
-              <span class="key b2"><span><b>{{ stats.progress.drafted }}%</b> drafted by the model</span></span>
+            <div class="d-flex flex-wrap gap-3 mt-2">
+              <span class="key b2"><span><b>{{ stats.progress.awaiting }}%</b> awaiting sign-off</span></span>
+              <span class="key b3"><span><b>{{ stats.progress.undrafted }}%</b> no draft</span></span>
             </div>
           </div>
         </div>

@@ -239,6 +239,33 @@ class StatsAggregationTests(TestCase):
         self.assertEqual(progress["awaiting"], 25.0)
         self.assertEqual(progress["undrafted"], 0.0)
 
+    def test_assay_bands_sum_to_the_created_count(self):
+        """The three bands on the headline card must reconcile to the total.
+
+        They are rendered as one bar with a key each, so if they do not add up
+        a reader doing the subtraction sees a number that is simply wrong.
+        """
+        _assay_for(self.user, question_set=self.question_set)  # no answers
+        for key in ("all", "12m"):
+            with self.subTest(range=key):
+                head = build_stats(key)["headline"]
+                self.assertEqual(
+                    head["completed_assays"]["period"]
+                    + head["assays"]["in_progress"]
+                    + head["assays"]["untouched"],
+                    head["assays"]["period"],
+                )
+
+    def test_assay_band_percentages_sum_to_a_hundred(self):
+        head = build_stats("all")["headline"]
+        self.assertAlmostEqual(
+            head["completed_assays"]["pct"]
+            + head["assays"]["in_progress_pct"]
+            + head["assays"]["untouched_pct"],
+            100.0,
+            places=1,
+        )
+
     def test_progress_bands_always_sum_to_a_hundred(self):
         for key in ("all", "12m"):
             with self.subTest(range=key):
