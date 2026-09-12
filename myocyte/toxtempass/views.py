@@ -1699,6 +1699,9 @@ class AssayListView(SingleTableView):
     table_class = AssayTable
     template_name = "toxtempass/overview.html"
     paginate_by = 7
+    # Sentinel for ?workspace= meaning "in no workspace"; not a pk, so it can
+    # never collide with one.
+    UNASSIGNED = "none"
 
     def dispatch(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
         """Gate users who have requested beta access but are not yet admitted.
@@ -1762,7 +1765,9 @@ class AssayListView(SingleTableView):
         # ?workspace=<pk> narrows to assays whose parent investigation is shared
         # into that workspace. Restricted to workspaces the user belongs to, so an
         # arbitrary pk cannot be used to probe which workspaces exist.
-        if self.selected_workspace_pk is not None:
+        if self.unassigned_only:
+            qs = qs.filter(study__investigation__shared_in_workspaces__isnull=True)
+        elif self.selected_workspace_pk is not None:
             qs = qs.filter(
                 study__investigation__shared_in_workspaces__workspace_id=(
                     self.selected_workspace_pk
@@ -1802,6 +1807,15 @@ class AssayListView(SingleTableView):
         pk = int(raw)
         return pk if pk in self.member_workspace_ids else None
 
+    @cached_property
+    def unassigned_only(self) -> bool:
+        """True for ``?workspace=none`` — assays shared into no workspace at all.
+
+        Picking a workspace hides everything outside it, which left no way to
+        ask the opposite question: what have I not shared with anyone yet?
+        """
+        return self.request.GET.get("workspace") == self.UNASSIGNED
+
 
     def get_context_data(self, **kwargs) -> dict:
         """Inject context."""
@@ -1812,6 +1826,8 @@ class AssayListView(SingleTableView):
         context["LLMStatus"] = LLMStatus
         context.update(get_workspace_list(self.request))
         context["selected_workspace_pk"] = self.selected_workspace_pk
+        context["unassigned_only"] = self.unassigned_only
+        context["unassigned_value"] = self.UNASSIGNED
         context["search_query"] = self.search_query
         context["workspace_tabs"] = self.workspace_tabs
         # Tour management is now handled by JavaScript localStorage

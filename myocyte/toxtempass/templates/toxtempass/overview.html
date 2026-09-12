@@ -40,6 +40,7 @@
                 name="workspace"
                 onchange="this.form.submit()">
           <option value="">All workspaces</option>
+          <option value="{{ unassigned_value }}"{% if unassigned_only %} selected{% endif %}>Not in a workspace</option>
           {% for ws in workspace_tabs %}
             <option value="{{ ws.pk }}"{% if selected_workspace_pk == ws.pk %} selected{% endif %}>{{ ws.name }}</option>
           {% endfor %}

@@ -184,3 +184,39 @@ def test_normal_user_still_sees_only_their_own_workspaces(qset):
 
     assert [t["name"] for t in response.context["workspace_tabs"]] == ["Mine"]
     assert mine.pk
+
+
+@pytest.mark.django_db
+def test_unassigned_filter_shows_only_assays_in_no_workspace(qset):
+    """?workspace=none answers "what have I not shared with anyone yet?"."""
+    user = PersonFactory.create()
+    shared = _assay(user, qset, "Shared assay")
+    _assay(user, qset, "Unshared assay")
+
+    workspace = WorkspaceFactory.create(owner=user)
+    WorkspaceInvestigationFactory.create(
+        workspace=workspace, investigation=shared.study.investigation
+    )
+
+    client = Client()
+    client.force_login(user)
+    response = client.get(reverse("overview"), {"workspace": "none"})
+
+    assert [a.title for a in response.context["table"].data] == ["Unshared assay"]
+    assert response.context["unassigned_only"] is True
+    # The sentinel is not a pk, so the workspace filter stays off.
+    assert response.context["selected_workspace_pk"] is None
+
+
+@pytest.mark.django_db
+def test_unassigned_filter_composes_with_search(qset):
+    """The sentinel narrows alongside ?q= rather than replacing it."""
+    user = PersonFactory.create()
+    _assay(user, qset, "Deiodinase assay")
+    _assay(user, qset, "LDH release")
+
+    client = Client()
+    client.force_login(user)
+    response = client.get(reverse("overview"), {"workspace": "none", "q": "ldh"})
+
+    assert [a.title for a in response.context["table"].data] == ["LDH release"]
