@@ -139,3 +139,48 @@ def test_picker_survives_a_search_that_matches_one_workspace(qset):
 
     names = [t["name"] for t in response.context["workspace_tabs"]]
     assert names == ["Kidney", "Thyroid"]
+
+
+@pytest.mark.django_db
+def test_superuser_sees_every_workspace(qset):
+    """A superuser can filter by any workspace, matching the assay list.
+
+    guardian's get_objects_for_user already shows superusers every assay, so
+    restricting the picker to their own memberships would show them assays
+    from workspaces they cannot select.
+    """
+    admin = PersonFactory.create(is_superuser=True, is_staff=True)
+    stranger = PersonFactory.create()
+    theirs = WorkspaceFactory.create(owner=stranger, name="Someone else")
+    mine = WorkspaceFactory.create(owner=admin, name="Admin own")
+
+    client = Client()
+    client.force_login(admin)
+    response = client.get(reverse("overview"))
+
+    names = [t["name"] for t in response.context["workspace_tabs"]]
+    assert names == ["Admin own", "Someone else"]
+
+    # ...and may actually filter by the one they do not belong to.
+    assert (
+        client.get(reverse("overview"), {"workspace": theirs.pk}).context[
+            "selected_workspace_pk"
+        ]
+        == theirs.pk
+    )
+    assert mine.pk  # both exist; the ordering assertion above covers naming
+
+
+@pytest.mark.django_db
+def test_normal_user_still_sees_only_their_own_workspaces(qset):
+    """The superuser bypass must not leak workspaces to everyone else."""
+    user = PersonFactory.create()
+    WorkspaceFactory.create(owner=PersonFactory.create(), name="Not mine")
+    mine = WorkspaceFactory.create(owner=user, name="Mine")
+
+    client = Client()
+    client.force_login(user)
+    response = client.get(reverse("overview"))
+
+    assert [t["name"] for t in response.context["workspace_tabs"]] == ["Mine"]
+    assert mine.pk
