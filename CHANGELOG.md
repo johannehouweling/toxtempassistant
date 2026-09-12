@@ -2,6 +2,50 @@
 
 <!-- version list -->
 
+## v3.34.0 (2026-09-12)
+
+### Bug Fixes
+
+- **stats**: Key every band so the figures reconcile
+  ([`0419a2e`](https://github.com/johannehouweling/toxtempassistant/commit/0419a2e56a80916ebf2aa56079a98cc3621c023f))
+
+### Code Style
+
+- **stats**: Drop the masthead note line
+  ([`b82dfcc`](https://github.com/johannehouweling/toxtempassistant/commit/b82dfcc486fb5b7ccfdbd72e441a69f9a36c4932))
+
+### Features
+
+- **stats**: Add staff-only KPI dashboard at /stats
+  ([`0d25f27`](https://github.com/johannehouweling/toxtempassistant/commit/0d25f27fdf81885f14da0b52e23a904092a12144))
+
+- **stats**: Cards instead of dials, and a grounding metric
+  ([`2a5b10c`](https://github.com/johannehouweling/toxtempassistant/commit/2a5b10cee0c42904cba68716cd71cfb87b132770))
+
+- **stats**: Lead with institutions and users for a stakeholder audience
+  ([`86fe713`](https://github.com/johannehouweling/toxtempassistant/commit/86fe7130e7ea1aaf4aff36ff2eab6db2894ba8e0))
+
+- **stats**: Make the summary block ToxTemp statistics, not mixed headlines
+  ([`1565a67`](https://github.com/johannehouweling/toxtempassistant/commit/1565a67fd0172da5ec0e55f89b76a450eeb3b7f2))
+
+- **stats**: Pair the dials and cut what they made redundant
+  ([`6c92cf6`](https://github.com/johannehouweling/toxtempassistant/commit/6c92cf6aaaf9b1f94a8caffd4890edf8f818383c))
+
+- **stats**: Plain summary figures, progress dial, and per-section progress
+  ([`c82c5b1`](https://github.com/johannehouweling/toxtempassistant/commit/c82c5b163a4fdbef390b8dff2bf652ce58e77461))
+
+- **stats**: Restyle the readout and reframe it for stakeholders
+  ([`a6f297f`](https://github.com/johannehouweling/toxtempassistant/commit/a6f297f8044665c27551725f1cf84777fc4e9ee5))
+
+- **stats**: Summary dials, and fix the misleading cost column headers
+  ([`893f0c0`](https://github.com/johannehouweling/toxtempassistant/commit/893f0c06e43c2923798671186889e69519d0a90e))
+
+### Refactoring
+
+- **stats**: Use the app's own colours, and give growth its own chart
+  ([`595d7fb`](https://github.com/johannehouweling/toxtempassistant/commit/595d7fb3a0a1e8e0ece99ceadbf66a24107351d8))
+
+
 ## v3.33.0 (2026-09-11)
 
 ### Bug Fixes
