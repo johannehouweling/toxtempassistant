@@ -58,21 +58,27 @@
   {% if workspace_tabs %}
     {# Per-workspace scan view: filters the same table, so sorting, paging and #}
     {# the row actions keep working. Server validates ?workspace= against the  #}
-    {# user's memberships in AssayListView.selected_workspace_pk.              #}
+    {# user's memberships in AssayListView.selected_workspace_pk, so you only  #}
+    {# ever see tabs for workspaces you created or joined.                     #}
     <ul class="nav nav-pills flex-wrap gap-1 mb-3" aria-label="Filter assays by workspace">
       <li class="nav-item">
-        <a class="nav-link{% if not selected_workspace_pk %} active{% endif %}"
+        <a class="nav-link d-inline-flex align-items-center gap-2{% if not selected_workspace_pk %} active{% endif %}"
            {% if not selected_workspace_pk %}aria-current="page"{% endif %}
-           href="{% querystring workspace=None page=None %}">All</a>
+           href="{% querystring workspace=None page=None %}">
+          <span>All</span>
+          <span class="badge rounded-pill text-bg-secondary">{{ overall_progress.accepted }}/{{ overall_progress.total }}</span>
+        </a>
       </li>
       {% for ws in workspace_tabs %}
         <li class="nav-item">
           <a class="nav-link d-inline-flex align-items-center gap-2{% if selected_workspace_pk == ws.pk %} active{% endif %}"
              {% if selected_workspace_pk == ws.pk %}aria-current="page"{% endif %}
-             href="{% querystring workspace=ws.pk page=None %}">
+             href="{% querystring workspace=ws.pk page=None %}"
+             data-bs-toggle="tooltip"
+             title="{{ ws.count }} assay{{ ws.count|pluralize }} &middot; {{ ws.progress.accepted }} of {{ ws.progress.total }} answers accepted ({{ ws.progress.pct }}%)">
             <i class="bi bi-share" aria-hidden="true"></i>
             <span class="text-break">{{ ws.name }}</span>
-            <span class="badge rounded-pill text-bg-secondary">{{ ws.count }}</span>
+            <span class="badge rounded-pill text-bg-secondary">{{ ws.progress.accepted }}/{{ ws.progress.total }}</span>
           </a>
         </li>
       {% endfor %}
