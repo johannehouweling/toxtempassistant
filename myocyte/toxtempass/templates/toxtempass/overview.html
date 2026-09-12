@@ -39,11 +39,9 @@
                 id="id_workspace_filter"
                 name="workspace"
                 onchange="this.form.submit()">
-          <option value="">All workspaces &middot; {{ overall_progress.accepted }}/{{ overall_progress.total }}</option>
+          <option value="">All workspaces</option>
           {% for ws in workspace_tabs %}
-            <option value="{{ ws.pk }}"{% if selected_workspace_pk == ws.pk %} selected{% endif %}>
-              {{ ws.name }} &middot; {{ ws.progress.accepted }}/{{ ws.progress.total }}
-            </option>
+            <option value="{{ ws.pk }}"{% if selected_workspace_pk == ws.pk %} selected{% endif %}>{{ ws.name }}</option>
           {% endfor %}
         </select>
       {% endif %}

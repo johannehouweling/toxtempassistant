@@ -20,7 +20,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetView as DjangoPasswordResetView
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.db import models, transaction
-from django.db.models import Count, QuerySet, Sum
+from django.db.models import QuerySet, Sum
 from django.http import (
     FileResponse,
     HttpRequest,
@@ -1696,14 +1696,8 @@ class AssayListView(SingleTableView):
             return redirect(reverse("beta_wait"))
         return super().dispatch(request, *args, **kwargs)
 
-    def accessible_assays(self, apply_search: bool = True) -> QuerySet[Assay]:
-        """Every Assay the user may view, before the study and workspace filters.
-
-        Shared by ``get_queryset`` and the tab counts so both see the same set.
-        ``apply_search=False`` skips the ``?q=`` filter — used to decide which
-        tabs exist, so a search that happens to match one study does not make
-        the whole tab row disappear underneath the user.
-        """
+    def accessible_assays(self) -> QuerySet[Assay]:
+        """Return every Assay the user may view, before the workspace filter."""
         user = self.request.user
         accessible_investigations = get_objects_for_user(
             user,
@@ -1740,7 +1734,7 @@ class AssayListView(SingleTableView):
         # ?q= matches the three titles the table shows, so what you type is
         # searched against what you can see. Applied here rather than in
         # get_queryset so the workspace tab counts narrow with the search.
-        if apply_search and self.search_query:
+        if self.search_query:
             qs = qs.filter(
                 models.Q(title__icontains=self.search_query)
                 | models.Q(study__title__icontains=self.search_query)
@@ -1797,61 +1791,23 @@ class AssayListView(SingleTableView):
         context["selected_workspace_pk"] = self.selected_workspace_pk
         context["search_query"] = self.search_query
         context["workspace_tabs"] = self.workspace_tabs
-        context["overall_progress"] = self.progress_for(self.accessible_assays())
         # Tour management is now handled by JavaScript localStorage
         # No backend flags needed
         return context
 
     @cached_property
     def workspace_tabs(self) -> list[dict]:
-        """One tab per workspace the user belongs to, with its progress.
+        """The workspaces the user may filter by, in name order.
 
         Membership comes from WorkspaceMember, and ``Workspace.save`` gives the
-        creator an OWNER row — so a user sees tabs for workspaces they created
-        or joined, and no others. Which tabs exist is decided before the search
-        so the row stays put while you type; the badges reflect the search.
-        Workspaces with nothing shared into them are kept — an empty workspace
-        is information too.
+        creator an OWNER row — so a user sees their own workspaces, created or
+        joined, and no others.
         """
-        if not self.member_workspace_ids:
-            return []
-        searched = self.accessible_assays()
-        workspaces = Workspace.objects.filter(pk__in=self.member_workspace_ids).order_by(
-            "name"
+        return list(
+            Workspace.objects.filter(pk__in=self.member_workspace_ids)
+            .order_by("name")
+            .values("pk", "name")
         )
-        tabs = []
-        for ws in workspaces:
-            in_ws = searched.filter(
-                study__investigation__shared_in_workspaces__workspace_id=ws.pk
-            ).distinct()
-            tabs.append(
-                {
-                    "pk": ws.pk,
-                    "name": ws.name,
-                    "count": in_ws.count(),
-                    "progress": self.progress_for(in_ws),
-                }
-            )
-        return tabs
-
-    @staticmethod
-    def progress_for(assays: QuerySet[Assay]) -> dict:
-        """Roll up answers-accepted across a set of assays.
-
-        One aggregate over Answer rather than per-assay counts, so a tab row
-        costs one query no matter how many studies there are.
-        """
-        totals = Answer.objects.filter(assay__in=assays).aggregate(
-            total=Count("pk"),
-            accepted=Count("pk", filter=models.Q(accepted=True)),
-        )
-        total = totals["total"] or 0
-        accepted = totals["accepted"] or 0
-        return {
-            "total": total,
-            "accepted": accepted,
-            "pct": round(accepted / total * 100) if total else 0,
-        }
 
 
 
