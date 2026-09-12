@@ -25,9 +25,28 @@
   {# Search across the assay, study and investigation titles. GET keeps the URL #}
   {# shareable; hidden inputs carry the other view filters through a submit.    #}
   <form method="get" role="search" class="mb-3" aria-label="Search assays">
-    {% if selected_workspace_pk %}<input type="hidden" name="workspace" value="{{ selected_workspace_pk }}">{% endif %}
     {% if request.GET.hide_demo %}<input type="hidden" name="hide_demo" value="{{ request.GET.hide_demo }}">{% endif %}
     <div class="input-group">
+      {% if workspace_tabs %}
+        {# Workspace picker sits in the search bar so the two filters read as #}
+        {# one control; they compose. Server validates ?workspace= against    #}
+        {# the user's memberships, so you only ever see your own workspaces.  #}
+        <label class="input-group-text" for="id_workspace_filter">
+          <i class="bi bi-share" aria-hidden="true"></i>
+          <span class="visually-hidden">Workspace</span>
+        </label>
+        <select class="form-select flex-grow-0 w-auto"
+                id="id_workspace_filter"
+                name="workspace"
+                onchange="this.form.submit()">
+          <option value="">All workspaces &middot; {{ overall_progress.accepted }}/{{ overall_progress.total }}</option>
+          {% for ws in workspace_tabs %}
+            <option value="{{ ws.pk }}"{% if selected_workspace_pk == ws.pk %} selected{% endif %}>
+              {{ ws.name }} &middot; {{ ws.progress.accepted }}/{{ ws.progress.total }}
+            </option>
+          {% endfor %}
+        </select>
+      {% endif %}
       {# type=text, not type=search: WebKit draws its own clear ✕ inside a #}
       {# search input, which would sit next to the bi-x-lg button below.   #}
       <input type="text"
@@ -55,35 +74,6 @@
     </div>
   </form>
 
-  {% if workspace_tabs %}
-    {# Per-workspace scan view: filters the same table, so sorting, paging and #}
-    {# the row actions keep working. Server validates ?workspace= against the  #}
-    {# user's memberships in AssayListView.selected_workspace_pk, so you only  #}
-    {# ever see tabs for workspaces you created or joined.                     #}
-    <ul class="nav nav-pills flex-wrap gap-1 mb-3" aria-label="Filter assays by workspace">
-      <li class="nav-item">
-        <a class="nav-link d-inline-flex align-items-center gap-2{% if not selected_workspace_pk %} active{% endif %}"
-           {% if not selected_workspace_pk %}aria-current="page"{% endif %}
-           href="{% querystring workspace=None page=None %}">
-          <span>All</span>
-          <span class="badge rounded-pill text-bg-secondary">{{ overall_progress.accepted }}/{{ overall_progress.total }}</span>
-        </a>
-      </li>
-      {% for ws in workspace_tabs %}
-        <li class="nav-item">
-          <a class="nav-link d-inline-flex align-items-center gap-2{% if selected_workspace_pk == ws.pk %} active{% endif %}"
-             {% if selected_workspace_pk == ws.pk %}aria-current="page"{% endif %}
-             href="{% querystring workspace=ws.pk page=None %}"
-             data-bs-toggle="tooltip"
-             title="{{ ws.count }} assay{{ ws.count|pluralize }} &middot; {{ ws.progress.accepted }} of {{ ws.progress.total }} answers accepted ({{ ws.progress.pct }}%)">
-            <i class="bi bi-share" aria-hidden="true"></i>
-            <span class="text-break">{{ ws.name }}</span>
-            <span class="badge rounded-pill text-bg-secondary">{{ ws.progress.accepted }}/{{ ws.progress.total }}</span>
-          </a>
-        </li>
-      {% endfor %}
-    </ul>
-  {% endif %}
 
   {# django-tables2 will pass a “table” object into the context #}
 
