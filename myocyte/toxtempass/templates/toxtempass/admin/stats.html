@@ -63,25 +63,30 @@ Config rather than being written twice.
     .readout .split { border-top: 0; border-left: 1px solid var(--rule); }
   }
 
-  /* Average-progress dial: two concentric semicircles, radius 54 and 36, so
-     the arc lengths are pi*54 = 169.65 and pi*36 = 113.10. The dash offset
-     walks each length back by its own rate. */
-  .readout .dial svg { display: block; width: 100%; max-width: 14rem; margin: 0 auto; height: auto; }
+  /* Paired dials: two concentric semicircles, radius 54 and 38, so the arc
+     lengths are pi*54 = 169.65 and pi*38 = 119.38. The dash offset walks each
+     length back by its own rate. Outer ring is always the looser criterion. */
+  .readout .dial svg { display: block; width: 100%; max-width: 11.5rem; margin: 0 auto; height: auto; }
   .readout .dial path { fill: none; stroke-linecap: round; }
   .readout .dial .dial-track { stroke: var(--rule); stroke-width: 11; }
   .readout .dial .dial-track-inner { stroke-width: 9; }
-  .readout .dial .dial-drafted {
+  .readout .dial .dial-outer {
     stroke: var(--m1); stroke-width: 11;
     stroke-dasharray: 169.65;
     stroke-dashoffset: calc(169.65px * (1 - var(--p, 0) / 100));
   }
-  .readout .dial .dial-accepted {
+  .readout .dial .dial-inner {
     stroke: var(--m3); stroke-width: 9;
-    stroke-dasharray: 113.10;
-    stroke-dashoffset: calc(113.10px * (1 - var(--p, 0) / 100));
+    stroke-dasharray: 119.38;
+    stroke-dashoffset: calc(119.38px * (1 - var(--p, 0) / 100));
   }
   .readout .dial .dial-num { font-family: "IBM Plex Mono", ui-monospace, monospace;
-                             font-size: 24px; font-weight: 300; fill: var(--ink); }
+                             font-weight: 300; fill: var(--ink); }
+  /* Legend under a dial: swatch, value, label — one line each, left-aligned
+     under a centred dial so the two rings read top-to-bottom in ring order. */
+  .readout .dial-key { display: inline-block; text-align: left; }
+  .readout .dial-key span { display: block; font-size: .8125rem; color: var(--ink-2); }
+  .readout .dial-key b { font-weight: 500; color: var(--ink); }
 
   /* Stacked progress bar: accepted | drafted-not-accepted | undrafted.
      The three widths always sum to 100, so no track is needed behind them. */
@@ -138,43 +143,38 @@ Config rather than being written twice.
   </div>
 
   {# ── Summary ──────────────────────────────────────────────────────────── #}
+  {# Two counts and two paired dials. Each dial nests a stricter measure inside
+     a looser one over the same denominator, so the gap between the rings is
+     the work in flight. #}
   <div class="panel">
     <div class="panel-hd"><h2>Summary</h2></div>
-    <div class="row g-0">
-      <div class="col-12 col-lg-7">
-        <div class="panel-bd">
-          <div class="row g-4">
-            <div class="col-6">
-              <div class="fig fig-lg">{{ stats.headline.organisations.period|intcomma }}</div>
-              <div class="unit">institutions</div>
-            </div>
-            <div class="col-6">
-              <div class="fig fig-lg">{{ stats.headline.users.period|intcomma }}</div>
-              <div class="unit">registered users</div>
-            </div>
-            <div class="col-6">
-              <div class="fig fig-lg">{{ stats.headline.assays.period|intcomma }}</div>
-              <div class="unit">ToxTemps created</div>
-            </div>
-            <div class="col-6">
-              <div class="fig fig-lg">{{ stats.headline.completed_assays.period|intcomma }}</div>
-              <div class="unit">ToxTemps completed</div>
-            </div>
+    <div class="panel-bd">
+      <div class="row align-items-center g-4 text-center text-lg-start">
+        <div class="col-6 col-lg-3">
+          <div class="fig fig-lg">{{ stats.headline.organisations.period|intcomma }}</div>
+          <div class="unit">institutions</div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="fig fig-lg">{{ stats.headline.users.period|intcomma }}</div>
+          <div class="unit">registered users</div>
+        </div>
+
+        <div class="col-6 col-lg-3 text-center">
+          {% include "toxtempass/admin/_dial.html" with outer=stats.headline.assays.worked_on_pct inner=stats.headline.completed_assays.pct centre=stats.headline.completed_assays.fraction centre_size=19 %}
+          <div class="dial-key mt-2">
+            <span><i class="swatch b-accepted"></i><b>{{ stats.headline.completed_assays.period|intcomma }}</b> complete</span>
+            <span><i class="swatch b-awaiting"></i><b>{{ stats.headline.assays.worked_on|intcomma }}</b> being worked on</span>
+            <span><i class="swatch b-undrafted"></i>of <b>{{ stats.headline.assays.period|intcomma }}</b> ToxTemps created</span>
           </div>
         </div>
-      </div>
 
-      <div class="col-12 col-lg-5 split">
-        {# Each ToxTemp is scored on its own questionnaire and the scores are
-           then averaged, so a long questionnaire does not outweigh a short one. #}
-        <div class="panel-bd text-center">
-          {% include "toxtempass/admin/_dial.html" with drafted=stats.progress.drafted accepted=stats.progress.accepted %}
-          <div class="mt-2">Average progress per ToxTemp</div>
-          <div class="d-inline-flex flex-column align-items-start mt-2">
-            <span class="note"><i class="swatch b-accepted"></i>{{ stats.progress.accepted }}% accepted by an expert</span>
-            <span class="note"><i class="swatch b-awaiting"></i>{{ stats.progress.drafted }}% drafted by the model</span>
+        <div class="col-6 col-lg-3 text-center">
+          {% include "toxtempass/admin/_dial.html" with outer=stats.progress.drafted inner=stats.progress.accepted centre=stats.progress.accepted|floatformat:0|add:"%" %}
+          <div class="dial-key mt-2">
+            <span><i class="swatch b-accepted"></i><b>{{ stats.progress.accepted }}%</b> expert-accepted</span>
+            <span><i class="swatch b-awaiting"></i><b>{{ stats.progress.drafted }}%</b> drafted by the model</span>
+            <span><i class="swatch b-undrafted"></i>average answer progress</span>
           </div>
-          <p class="note mb-0 mt-2">across {{ stats.progress.assays|intcomma }} ToxTemp{{ stats.progress.assays|pluralize }}</p>
         </div>
       </div>
     </div>
@@ -295,47 +295,34 @@ Config rather than being written twice.
     </div>
     <div class="row g-0">
       <div class="col-12 col-lg-7">
+        {# The stage-by-stage table that used to sit here is now the ToxTemps
+           dial in the summary, which says the same thing in one shape. #}
         <div class="panel-bd">
-          {# Both figures moved off the summary: they answer "is the model
-             helping", which is a drafting question, not a headline one. #}
-          <div class="row g-4 mb-4">
-            <div class="col-6">
+          <div class="row g-4">
+            <div class="col-6 col-md-4">
+              <div class="fig fig-md">{{ stats.engagement.median_completion_display }}</div>
+              <div class="unit">typical time to finish one</div>
+            </div>
+            <div class="col-6 col-md-4">
               <div class="fig fig-md">{{ stats.answers.edited|intcomma }}<span class="unit"> · {{ stats.answers.edited_pct|default:"0" }}%</span></div>
               <div class="unit">answers edited after drafting</div>
             </div>
-            <div class="col-6">
+            <div class="col-6 col-md-4">
               <div class="fig fig-md">{{ stats.answers.not_found|intcomma }}<span class="unit"> · {{ stats.answers.not_found_pct|default:"0" }}%</span></div>
-              <div class="unit">answers not found in the context documents</div>
+              <div class="unit">answers not found in the documents</div>
             </div>
           </div>
-
-          <p class="note mb-3">How far ToxTemps get once they are started.</p>
-          <table class="w-100">
-            <thead><tr><th scope="col">Stage</th><th scope="col" class="num">ToxTemps</th><th scope="col" class="num">Share</th></tr></thead>
-            <tbody>
-              {% for stage in stats.funnel %}
-              <tr>
-                <td>{{ stage.label }}</td>
-                <td class="num">{{ stage.count|intcomma }}</td>
-                <td class="num">{% if stage.pct %}{{ stage.pct }}%{% else %}—{% endif %}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          <p class="note mt-3 mb-0">
+          <p class="note mt-4 mb-0">
             Rates are over the {{ stats.answers.total|intcomma }} individual questions
-            across every ToxTemp in the period.
+            across every ToxTemp in the period. A high edit rate and a low
+            not-found rate together mean the drafts land close enough to be worth
+            keeping.
           </p>
         </div>
       </div>
 
       <div class="col-12 col-lg-5 split">
         <div class="panel-bd">
-          <div class="mb-4">
-            <div class="fig fig-lg">{{ stats.engagement.median_completion_display }}</div>
-            <div class="unit">typical time to finish a ToxTemp</div>
-          </div>
-
           {% if stats.feedback.rated %}
           <p class="mb-1">
             User rating <span class="val">{{ stats.feedback.mean }}</span><span class="unit"> / 5</span>
@@ -361,7 +348,8 @@ Config rather than being written twice.
             roughly three quarters of a word each.
           </p>
           {% if stats.llm.by_model %}
-          <div style="height:200px"><canvas id="chartCost"></canvas></div>
+          {# No chart here: with a handful of models the bar repeated the table
+             sitting under it, so the table carries it alone. #}
           <table class="w-100 mt-3">
             <thead>
               <tr>
@@ -434,14 +422,6 @@ Config rather than being written twice.
   const grid = { color: P.grid, drawTicks: false };
   const noGrid = { display: false };
 
-  // Horizontal-bar panels grow with their row count rather than squeezing N
-  // bars into a fixed box; the extra 44px is the axis band under the plot.
-  function fit(id, rows, perRow) {
-    const el = document.getElementById(id);
-    if (el) el.parentElement.style.height = Math.max(130, rows * perRow + 44) + 'px';
-    return el;
-  }
-
   // ── Reach, cumulative ─────────────────────────────────────────────────────
   // Two series on one shared count axis — never a second y-scale.
   new Chart(document.getElementById('chartGrowth'), {
@@ -464,36 +444,6 @@ Config rather than being written twice.
       },
     },
   });
-
-  // ── Cost by model ─────────────────────────────────────────────────────────
-  // Stacked read/write cost; the 2px panel-coloured border is the spacer
-  // between segments, not an outline around the marks.
-  if (D.models.length) {
-    new Chart(fit('chartCost', D.models.length, 38), {
-      type: 'bar',
-      data: {
-        labels: D.models.map(m => m.model),
-        datasets: [
-          { label: 'Reading', data: D.models.map(m => m.cost_input),
-            backgroundColor: P.series[0], borderColor: P.surface, borderWidth: 2 },
-          { label: 'Writing', data: D.models.map(m => m.cost_output),
-            backgroundColor: P.series[1], borderColor: P.surface, borderWidth: 2 },
-        ],
-      },
-      options: {
-        indexAxis: 'y',
-        plugins: {
-          tooltip: { displayColors: true,
-            callbacks: { label: c => `${c.dataset.label} ${D.currency}${Number(c.parsed.x).toFixed(2)}` } },
-        },
-        scales: {
-          x: { stacked: true, beginAtZero: true, grid: grid, border: { display: false },
-               ticks: { callback: v => D.currency + v } },
-          y: { stacked: true, grid: noGrid, border: { display: false } },
-        },
-      },
-    });
-  }
 
   // ── Usefulness ratings ────────────────────────────────────────────────────
   const ratings = document.getElementById('chartRatings');

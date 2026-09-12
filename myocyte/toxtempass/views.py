@@ -652,7 +652,6 @@ def stats_dashboard(request: HttpRequest) -> HttpResponse:
             # record of uptake, not a monitor.
             "chart_data": {
                 "growth": stats["growth"],
-                "models": stats["llm"]["by_model"][: config.stats_top_n],
                 "ratings": stats["feedback"]["bins"],
                 "palette": {
                     "series": list(config.stats_chart_series),

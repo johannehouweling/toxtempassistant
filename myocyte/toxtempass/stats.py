@@ -230,6 +230,14 @@ def headline(rng: StatsRange) -> dict[str, Any]:
         _scoped(named, "date_joined", rng).values("organization").distinct().count()
     )
 
+    in_period = _scoped(assays, "submission_date", rng)
+    n_period = in_period.count()
+    # A ToxTemp somebody has accepted at least one answer on is being worked on,
+    # as opposed to one that was created and left. It is the outer ring of the
+    # ToxTemps dial, with "completed" as the inner ring inside it.
+    n_worked_on = in_period.filter(answers__accepted=True).distinct().count()
+    n_completed = _scoped(completed, "submission_date", rng).count()
+
     return {
         "users": {
             "total": persons.count(),
@@ -240,15 +248,17 @@ def headline(rng: StatsRange) -> dict[str, Any]:
         "organisations": {"total": n_orgs, "period": n_orgs_period},
         "assays": {
             "total": assays.count(),
-            "period": _scoped(assays, "submission_date", rng).count(),
+            "period": n_period,
+            "worked_on": n_worked_on,
+            "worked_on_pct": _pct(n_worked_on, n_period),
         },
         "completed_assays": {
             "total": completed.count(),
-            "period": _scoped(completed, "submission_date", rng).count(),
-            "pct": _pct(
-                _scoped(completed, "submission_date", rng).count(),
-                _scoped(assays, "submission_date", rng).count(),
-            ),
+            "period": n_completed,
+            "pct": _pct(n_completed, n_period),
+            # Pre-built so the template does not have to concatenate an int and
+            # a string — Django's `add` filter silently returns "" for that.
+            "fraction": f"{n_completed}/{n_period}",
         },
         "acceptance_rate": _pct(n_accepted, n_answers),
         "llm_cost": {

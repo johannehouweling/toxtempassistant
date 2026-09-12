@@ -1,21 +1,26 @@
 {% comment %}
-Two concentric semicircle arcs over one denominator: the outer ring is how much
-has been drafted, the inner ring how much an expert has accepted. Accepted is
-always a subset of drafted, so the nesting is the point — a reader can see the
-gap between "the model wrote something" and "a person signed it off".
+Two concentric semicircle arcs over one denominator. The outer ring is always
+the looser criterion and the inner ring the stricter one nested inside it, so
+the gap between them reads as work in flight.
 
-Include as:
-  {% include "toxtempass/admin/_dial.html" with drafted=X accepted=Y %}
+  {% include "toxtempass/admin/_dial.html" with outer=94 inner=48 centre="48%" %}
 
-Radii are 50 and 36, so the arc lengths are pi*50 = 157.08 and pi*36 = 113.10.
+`centre_size` overrides the middle figure's size — pass a smaller one for a
+fraction like "12/59", which needs more room than a percentage.
+
+The SVG is aria-hidden: every caller puts a .dial-key legend directly beneath
+it that states both rings in text, so announcing the graphic too would just
+read the same numbers twice.
+
+Radii are 54 and 38, so the arc lengths are pi*54 = 169.65 and pi*38 = 119.38.
 {% endcomment %}
 <div class="dial">
-  <svg viewBox="0 0 120 74" role="img"
-       aria-label="Average progress per ToxTemp: {{ drafted|default:0 }} percent drafted, {{ accepted|default:0 }} percent accepted by an expert">
+  <svg viewBox="0 0 120 74" aria-hidden="true" focusable="false">
     <path class="dial-track" d="M6,60 A54,54 0 0 1 114,60"/>
-    <path class="dial-drafted" d="M6,60 A54,54 0 0 1 114,60" style="--p: {{ drafted|default:0 }}"/>
-    <path class="dial-track dial-track-inner" d="M24,60 A36,36 0 0 1 96,60"/>
-    <path class="dial-accepted" d="M24,60 A36,36 0 0 1 96,60" style="--p: {{ accepted|default:0 }}"/>
-    <text class="dial-num" x="60" y="54" text-anchor="middle">{{ accepted|default:0|floatformat:0 }}%</text>
+    <path class="dial-outer" d="M6,60 A54,54 0 0 1 114,60" style="--p: {{ outer|default:0 }}"/>
+    <path class="dial-track dial-track-inner" d="M22,60 A38,38 0 0 1 98,60"/>
+    <path class="dial-inner" d="M22,60 A38,38 0 0 1 98,60" style="--p: {{ inner|default:0 }}"/>
+    <text class="dial-num" x="60" y="54" text-anchor="middle"
+          style="font-size: {{ centre_size|default:24 }}px">{{ centre }}</text>
   </svg>
 </div>
