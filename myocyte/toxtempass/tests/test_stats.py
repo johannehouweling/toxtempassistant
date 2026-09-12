@@ -212,6 +212,15 @@ class StatsAggregationTests(TestCase):
         self.assertEqual(legend["over half accepted"], 1)  # self.partial, 1 of 2
         self.assertEqual(sum(legend.values()), marks["total"])
 
+    def test_completion_total_matches_the_headline_period_count(self):
+        """The strip and the figure beside it must never disagree."""
+        for key in ("all", "12m", "30d"):
+            with self.subTest(range=key):
+                stats = build_stats(key)
+                self.assertEqual(
+                    stats["completion"]["total"], stats["headline"]["assays"]["period"]
+                )
+
     def test_completion_marks_are_capped(self):
         marks = build_stats("all")["completion"]
         self.assertLessEqual(len(marks["marks"]), config.stats_unit_marks_max)

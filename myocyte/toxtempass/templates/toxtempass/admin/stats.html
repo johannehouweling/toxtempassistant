@@ -152,27 +152,34 @@ Config rather than being written twice.
       {% endif %}
     </div>
 
+    {# Summary statistics across the ToxTemps in the strip above. Every figure
+       here is scoped to the same period as the strip, so the counts and the
+       marks always agree. Cost is deliberately absent — it has its own panel. #}
     <div class="panel-hd border-bottom-0" style="border-top:1px solid var(--rule)">
       <div class="row g-4">
         <div class="col-6 col-md">
-          <div class="fig fig-md">{{ stats.headline.users.total|intcomma }}</div>
-          <div class="unit">people</div>
-        </div>
-        <div class="col-6 col-md">
-          <div class="fig fig-md">{{ stats.headline.organisations.total|intcomma }}</div>
-          <div class="unit">institutions</div>
-        </div>
-        <div class="col-6 col-md">
-          <div class="fig fig-md">{{ stats.headline.assays.total|intcomma }}</div>
+          <div class="fig fig-md">{{ stats.headline.assays.period|intcomma }}</div>
           <div class="unit">ToxTemps started</div>
         </div>
         <div class="col-6 col-md">
-          <div class="fig fig-md">{{ stats.files.count|intcomma }}</div>
-          <div class="unit">documents read</div>
+          <div class="fig fig-md">{{ stats.headline.completed_assays.period|intcomma }}</div>
+          <div class="unit">ToxTemps completed</div>
         </div>
         <div class="col-6 col-md">
-          <div class="fig fig-md">{{ stats.headline.llm_cost.currency }}{{ stats.headline.llm_cost.total|floatformat:2|default:"0.00" }}</div>
-          <div class="unit">spent on drafting</div>
+          <div class="fig fig-md">{{ stats.answers.answered|intcomma }}</div>
+          <div class="unit">draft answers</div>
+        </div>
+        <div class="col-6 col-md">
+          <div class="fig fig-md">{{ stats.answers.accepted|intcomma }}</div>
+          <div class="unit">answers accepted</div>
+        </div>
+        <div class="col-6 col-md">
+          <div class="fig fig-md">{{ stats.answers.not_found|intcomma }}</div>
+          <div class="unit">answers not found</div>
+        </div>
+        <div class="col-6 col-md">
+          <div class="fig fig-md">{{ stats.files.count|intcomma }}</div>
+          <div class="unit">context documents uploaded</div>
         </div>
       </div>
     </div>
@@ -184,7 +191,7 @@ Config rather than being written twice.
     <div class="row g-0">
       <div class="col-12 col-lg-7">
         <div class="panel-bd">
-          <p class="note mb-3">People with an account and ToxTemps started, counted cumulatively.</p>
+          <p class="note mb-3">Users with an account and ToxTemps started, counted cumulatively.</p>
           <div style="height:250px"><canvas id="chartGrowth"></canvas></div>
         </div>
       </div>
@@ -196,7 +203,7 @@ Config rather than being written twice.
               <thead>
                 <tr>
                   <th scope="col">Institution</th>
-                  <th scope="col" class="num">People</th>
+                  <th scope="col" class="num">Users</th>
                   <th scope="col" class="num">ToxTemps</th>
                   <th scope="col" class="num">Done</th>
                 </tr>
@@ -236,52 +243,48 @@ Config rather than being written twice.
           </p>
 
           <div class="mb-4">
-            <div class="d-flex align-items-baseline justify-content-between mb-1">
+            <div class="d-flex align-items-baseline justify-content-between gap-3 mb-1">
               <span>Answers accepted by their author</span>
-              <span class="val">{{ stats.answers.accepted_pct|default:"0" }}%</span>
+              <span class="text-nowrap"><span class="val">{{ stats.answers.accepted|intcomma }}</span> <span class="unit">{{ stats.answers.accepted_pct|default:"0" }}%</span></span>
             </div>
             <div class="meter"><span style="width: {{ stats.answers.accepted_pct|default:0 }}%"></span></div>
-            <p class="note mt-1 mb-0">{{ stats.answers.accepted|intcomma }} of {{ stats.answers.total|intcomma }}</p>
+            <p class="note mt-1 mb-0">of {{ stats.answers.total|intcomma }} questions</p>
           </div>
 
           <div class="mb-4">
-            <div class="d-flex align-items-baseline justify-content-between mb-1">
-              <span>Edited before being accepted</span>
-              <span class="val">{{ stats.answers.edited_pct|default:"0" }}%</span>
+            <div class="d-flex align-items-baseline justify-content-between gap-3 mb-1">
+              <span>Answers edited before being accepted</span>
+              <span class="text-nowrap"><span class="val">{{ stats.answers.edited|intcomma }}</span> <span class="unit">{{ stats.answers.edited_pct|default:"0" }}%</span></span>
             </div>
             <div class="meter"><span style="width: {{ stats.answers.edited_pct|default:0 }}%"></span></div>
-            <p class="note mt-1 mb-0">{{ stats.answers.edited|intcomma }} answers saved more than once</p>
+            <p class="note mt-1 mb-0">saved more than once</p>
           </div>
 
           <div class="mb-0">
-            <div class="d-flex align-items-baseline justify-content-between mb-1">
-              <span>Not found in the uploaded documents</span>
-              <span class="val">{{ stats.answers.not_found_pct|default:"0" }}%</span>
+            <div class="d-flex align-items-baseline justify-content-between gap-3 mb-1">
+              <span>Answers not found in the context documents</span>
+              <span class="text-nowrap"><span class="val">{{ stats.answers.not_found|intcomma }}</span> <span class="unit">{{ stats.answers.not_found_pct|default:"0" }}%</span></span>
             </div>
             <div class="meter"><span style="width: {{ stats.answers.not_found_pct|default:0 }}%"></span></div>
-            <p class="note mt-1 mb-0">{{ stats.answers.not_found|intcomma }} of {{ stats.answers.answered|intcomma }} drafted answers — lower is better</p>
+            <p class="note mt-1 mb-0">of {{ stats.answers.answered|intcomma }} draft answers — lower is better</p>
           </div>
         </div>
       </div>
 
       <div class="col-12 col-lg-5 split">
         <div class="panel-bd">
-          <div class="row g-4 mb-4">
-            <div class="col-6">
-              <div class="fig fig-md">{{ stats.headline.completed_assays.total|intcomma }}</div>
-              <div class="unit">ToxTemps finished</div>
-            </div>
-            <div class="col-6">
-              <div class="fig fig-md">{{ stats.engagement.median_completion_display }}</div>
-              <div class="unit">typical time to finish one</div>
-            </div>
+          {# Completed counts already lead the summary block above, so this
+             column carries the one figure that appears nowhere else. #}
+          <div class="mb-4">
+            <div class="fig fig-lg">{{ stats.engagement.median_completion_display }}</div>
+            <div class="unit">typical time to finish a ToxTemp</div>
           </div>
 
           {% if stats.feedback.rated %}
           <p class="mb-1">
-            Rated <span class="val">{{ stats.feedback.mean }}</span><span class="unit"> / 5 useful</span>
+            User rating <span class="val">{{ stats.feedback.mean }}</span><span class="unit"> / 5</span>
           </p>
-          <p class="note mb-3">{{ stats.feedback.rated|intcomma }} ratings on export{% if stats.feedback.response_rate %}, from {{ stats.feedback.response_rate }}% of ToxTemps{% endif %}.</p>
+          <p class="note mb-3">{{ stats.feedback.rated|intcomma }} ratings given on export{% if stats.feedback.response_rate %}, from {{ stats.feedback.response_rate }}% of ToxTemps{% endif %}.</p>
           <div style="height:130px"><canvas id="chartRatings"></canvas></div>
           {% else %}
           <p class="note mb-0">No usefulness ratings submitted in this period.</p>
@@ -347,7 +350,7 @@ Config rather than being written twice.
               <tr><td>Words written</td><td class="num">{{ stats.llm.output_tokens|intcomma }}</td></tr>
               <tr><td>Documents stored</td><td class="num">{{ stats.files.megabytes|intcomma }} MB</td></tr>
               <tr><td>Shared workspaces</td><td class="num">{{ stats.collaboration.workspaces|intcomma }}</td></tr>
-              <tr><td>People collaborating</td><td class="num">{{ stats.collaboration.collaborating_users|intcomma }}</td></tr>
+              <tr><td>Users collaborating</td><td class="num">{{ stats.collaboration.collaborating_users|intcomma }}</td></tr>
             </tbody>
           </table>
           {% if stats.question_sets %}
@@ -403,7 +406,7 @@ Config rather than being written twice.
     data: {
       labels: D.growth.labels,
       datasets: [
-        { label: 'People', data: D.growth.users_cumulative, borderColor: P.series[0],
+        { label: 'Users', data: D.growth.users_cumulative, borderColor: P.series[0],
           backgroundColor: P.series[0], borderWidth: 2, pointRadius: 0, pointHoverRadius: 5 },
         { label: 'ToxTemps', data: D.growth.assays_cumulative, borderColor: P.series[1],
           backgroundColor: P.series[1], borderWidth: 2, pointRadius: 0, pointHoverRadius: 5 },
