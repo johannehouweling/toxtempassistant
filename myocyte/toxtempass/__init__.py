@@ -259,11 +259,14 @@ class Config:
     stats_rule = "#dee2e6"      # $gray-300
     stats_brand = "#0d6efd"     # $primary — matches the header, white text on it
                                 # clears 4.5:1 (Bootstrap's own .text-bg-primary)
-    # Chart colours: $primary paired with $orange. Validated as a categorical
-    # pair on a white panel — adjacent ΔE 30.7 protan / 39.1 normal, well clear
-    # of the colourblind-separation floor. Slot 1 carries every single-series
-    # chart; slot 2 only joins it when a second series shares the axis.
-    stats_chart_series = ("#0d6efd", "#eb6834")
+    # Chart colours: $primary paired with $teal. Validated as a categorical pair
+    # on a white panel — adjacent ΔE 30.4 protan / 32.5 normal, clear of the
+    # colourblind-separation floor. $warning and $info fall outside the
+    # lightness band, and $danger was ruled out on meaning rather than measure:
+    # a red series on a growth chart reads as something going wrong. Slot 1
+    # carries every single-series chart; slot 2 only joins it when a second
+    # series shares the axis.
+    stats_chart_series = ("#0d6efd", "#20c997")
     # Ordinal ramp from Bootstrap's blue scale ($blue-300/-500/-600): monotone
     # lightness and the light end clears 2:1 on white ($blue-200 does not, at
     # 1.77:1, so the ramp starts at -300). Used where categories are ordered —
