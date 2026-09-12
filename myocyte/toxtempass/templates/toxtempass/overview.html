@@ -26,50 +26,60 @@
   {# shareable; hidden inputs carry the other view filters through a submit.    #}
   <form method="get" role="search" class="mb-3" aria-label="Search assays">
     {% if request.GET.hide_demo %}<input type="hidden" name="hide_demo" value="{{ request.GET.hide_demo }}">{% endif %}
-    <div class="input-group">
+    {# Two input-groups in a grid row: side by side from md up, stacked on #}
+    {# phones, where one joined group squeezed the text input to nothing.  #}
+    <div class="row g-2">
       {% if workspace_tabs %}
-        {# Workspace picker sits in the search bar so the two filters read as #}
-        {# one control; they compose. Server validates ?workspace= against    #}
-        {# the user's memberships, so you only ever see your own workspaces.  #}
-        <label class="input-group-text" for="id_workspace_filter">
-          <i class="bi bi-share" aria-hidden="true"></i>
-          <span class="visually-hidden">Workspace</span>
-        </label>
-        <select class="form-select flex-grow-0 w-auto"
-                id="id_workspace_filter"
-                name="workspace"
-                onchange="this.form.submit()">
-          <option value="">All workspaces</option>
-          <option value="{{ unassigned_value }}"{% if unassigned_only %} selected{% endif %}>Not in a workspace</option>
-          {% for ws in workspace_tabs %}
-            <option value="{{ ws.pk }}"{% if selected_workspace_pk == ws.pk %} selected{% endif %}>{{ ws.name }}</option>
-          {% endfor %}
-        </select>
+        {# Workspace picker sits next to the search bar so the two filters #}
+        {# read as one control; they compose. Server validates ?workspace= #}
+        {# against the user's memberships, so you only see your own.       #}
+        <div class="col-12 col-md-auto">
+          <div class="input-group">
+            <label class="input-group-text" for="id_workspace_filter">
+              <i class="bi bi-share" aria-hidden="true"></i>
+              <span class="visually-hidden">Workspace</span>
+            </label>
+            <select class="form-select w-auto"
+                    id="id_workspace_filter"
+                    name="workspace"
+                    onchange="this.form.submit()">
+              <option value="">All workspaces</option>
+              <option value="{{ unassigned_value }}"{% if unassigned_only %} selected{% endif %}>Not in a workspace</option>
+              {% for ws in workspace_tabs %}
+                <option value="{{ ws.pk }}"{% if selected_workspace_pk == ws.pk %} selected{% endif %}>{{ ws.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
       {% endif %}
-      {# type=text, not type=search: WebKit draws its own clear ✕ inside a #}
-      {# search input, which would sit next to the bi-x-lg button below.   #}
-      <input type="text"
-             class="form-control"
-             name="q"
-             value="{{ search_query }}"
-             placeholder="Search assay, study or investigation"
-             aria-label="Search assay, study or investigation">
-      {% if search_query %}
-        <a class="btn btn-outline-secondary"
-           href="{% querystring q=None page=None %}"
-           aria-label="Clear search"
-           data-bs-toggle="tooltip"
-           title="Clear search">
-          <i class="bi bi-x-lg" aria-hidden="true"></i>
-        </a>
-      {% endif %}
-      <button class="btn btn-outline-secondary"
-              type="submit"
-              aria-label="Search"
-              data-bs-toggle="tooltip"
-              title="Search">
-        <i class="bi bi-search" aria-hidden="true"></i>
-      </button>
+      <div class="col">
+        <div class="input-group">
+          {# type=text, not type=search: WebKit draws its own clear ✕ inside a #}
+          {# search input, which would sit next to the bi-x-lg button below.   #}
+          <input type="text"
+                 class="form-control"
+                 name="q"
+                 value="{{ search_query }}"
+                 placeholder="Search assay, study or investigation"
+                 aria-label="Search assay, study or investigation">
+          {% if search_query %}
+            <a class="btn btn-outline-secondary"
+               href="{% querystring q=None page=None %}"
+               aria-label="Clear search"
+               data-bs-toggle="tooltip"
+               title="Clear search">
+              <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </a>
+          {% endif %}
+          <button class="btn btn-outline-secondary"
+                  type="submit"
+                  aria-label="Search"
+                  data-bs-toggle="tooltip"
+                  title="Search">
+            <i class="bi bi-search" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
     </div>
   </form>
 
