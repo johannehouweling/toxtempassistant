@@ -22,8 +22,52 @@
     {% endif %}
   </div>
 
+  {# Search across the assay, study and investigation titles. GET keeps the URL #}
+  {# shareable; hidden inputs carry the other view filters through a submit.    #}
+  <form method="get" role="search" class="mb-3" aria-label="Search assays">
+    {% if selected_workspace_pk %}<input type="hidden" name="workspace" value="{{ selected_workspace_pk }}">{% endif %}
+    {% if request.GET.hide_demo %}<input type="hidden" name="hide_demo" value="{{ request.GET.hide_demo }}">{% endif %}
+    <div class="input-group">
+      <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+      <input type="search"
+             class="form-control"
+             name="q"
+             value="{{ search_query }}"
+             placeholder="Search assay, study or investigation"
+             aria-label="Search assay, study or investigation">
+      <button class="btn btn-outline-secondary" type="submit">Search</button>
+      {% if search_query %}
+        <a class="btn btn-outline-secondary" href="{% querystring q=None page=None %}">Clear</a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if workspace_tabs %}
+    {# Per-workspace scan view: filters the same table, so sorting, paging and #}
+    {# the row actions keep working. Server validates ?workspace= against the  #}
+    {# user's memberships in AssayListView.selected_workspace_pk.              #}
+    <ul class="nav nav-pills flex-wrap gap-1 mb-3" aria-label="Filter assays by workspace">
+      <li class="nav-item">
+        <a class="nav-link{% if not selected_workspace_pk %} active{% endif %}"
+           {% if not selected_workspace_pk %}aria-current="page"{% endif %}
+           href="{% querystring workspace=None page=None %}">All</a>
+      </li>
+      {% for ws in workspace_tabs %}
+        <li class="nav-item">
+          <a class="nav-link d-inline-flex align-items-center gap-2{% if selected_workspace_pk == ws.pk %} active{% endif %}"
+             {% if selected_workspace_pk == ws.pk %}aria-current="page"{% endif %}
+             href="{% querystring workspace=ws.pk page=None %}">
+            <i class="bi bi-share" aria-hidden="true"></i>
+            <span class="text-break">{{ ws.name }}</span>
+            <span class="badge rounded-pill text-bg-secondary">{{ ws.count }}</span>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
   {# django-tables2 will pass a “table” object into the context #}
-  
+
   {% render_table table %}
 
   <a class="btn btn-primary" id="id_btn_new" href="{% url 'add_new' %}">New</a>
