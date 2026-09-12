@@ -18,7 +18,12 @@ import plotly.graph_objects as go
 HERE = Path(__file__).resolve().parent
 ANALYSIS_DIR = HERE / "output" / "_analysis"      # gold CSVs live here
 PLOTTING_DIR = HERE / "output" / "_plotting"      # figures written here
-QUESTIONNAIRE = 77  # ToxTemp question count (completeness denominator)
+QUESTIONNAIRE = 77  # "Each ToxTemp consists of 77 questions" (paper, Fig. 4 caption)
+
+# Column labels, in the paper's vocabulary (Manuscript TEBT-2025-0014).
+EXPERT = "Expert answers (N<sub>non-trivial</sub>)"
+TRIVIAL = "Not found (N<sub>trivial</sub>)"
+MISSING = "Unanswered (N<sub>missing</sub>)"
 
 
 def _latest_gold() -> Path:
@@ -54,7 +59,7 @@ def build(csv_path: Path) -> tuple[str, str]:
 
     rows = []
     # Group by assay_id (NOT title): two same-titled assays at one institute are distinct
-    # reviews, so merging them double-counts and pushes "Reviewed %" over 100.
+    # reviews, so merging them double-counts and pushes the counts past 77.
     for _aid, g in df.groupby("assay_id"):
         accepted = len(g)
         nf = int(g["is_nf"].sum())
@@ -63,19 +68,27 @@ def build(csv_path: Path) -> tuple[str, str]:
             {
                 "Assay": str(first["assay_title"])[:42],
                 "Institute": first["institute"],
-                # Expert answers = substantive accepted; "Not found" = reviewed but no
-                # answer in the docs; Reviewed % = share of the 77-question questionnaire.
-                "Expert answers": accepted - nf,
-                '"Not found"': nf,
-                "Reviewed (%)": round(100 * accepted / QUESTIONNAIRE),
+                # Column names follow the paper (Manuscript TEBT-2025-0014, Table 2 /
+                # Fig. 4): N_non-trivial = any response other than the standardised
+                # "Answer not found in documents."; N_trivial = that exact string;
+                # N_missing = questions left unanswered by the expert (paper Table 1).
+                # The three sum to QUESTIONNAIRE by construction, so a reader can check
+                # the row. The old "Reviewed (%)" was N_non-trivial + N_trivial over 77,
+                # which counted abstentions as coverage and had no paper counterpart.
+                EXPERT: accepted - nf,
+                TRIVIAL: nf,
+                MISSING: QUESTIONNAIRE - accepted,
             }
         )
     tbl = pd.DataFrame(rows).sort_values(
-        ["Expert answers", "Reviewed (%)"], ascending=False
+        [EXPERT, TRIVIAL], ascending=False
     ).reset_index(drop=True)
     tbl.insert(0, "#", range(1, len(tbl) + 1))
 
-    header = "| " + " | ".join(tbl.columns) + " |"
+    plain = {EXPERT: "Expert answers (N_non-trivial)",
+             TRIVIAL: "Not found (N_trivial)",
+             MISSING: "Unanswered (N_missing)"}
+    header = "| " + " | ".join(plain.get(c, c) for c in tbl.columns) + " |"
     sep = "| " + " | ".join("---" for _ in tbl.columns) + " |"
     body = "\n".join(
         "| " + " | ".join(str(v) for v in r) + " |" for r in tbl.itertuples(index=False)
@@ -89,16 +102,19 @@ def build(csv_path: Path) -> tuple[str, str]:
     total_gold = int((~df["is_nf"]).sum())
     total_nf = int(df["is_nf"].sum())
     summary = (
-        f"**{total_gold} expert-validated answers** across **{n_assays} assays** from "
-        f"**{n_people} scientists** at **{n_inst} institutes** "
-        f"({total_acc} accepted total; {total_nf} confirmed 'not found')."
+        f"**{total_gold} expert-validated answers** (N_non-trivial) across "
+        f"**{n_assays} assays** from **{n_people} scientists** at "
+        f"**{n_inst} institutes** — {total_acc} accepted in total, of which "
+        f"{total_nf} are the standardised 'answer not found in documents'. "
+        f"Each ToxTemp has {QUESTIONNAIRE} questions, so the three counts sum to "
+        f"{QUESTIONNAIRE} per row."
     )
     return md, summary, tbl
 
 
-def _green(pct: float) -> str:
-    """Light→dark green shade for a 0–100 'reviewed' value (slide-friendly highlight)."""
-    t = max(0.0, min(1.0, pct / 100))
+def _green(n: float) -> str:
+    """Light→dark green shade for an expert-answer count out of QUESTIONNAIRE."""
+    t = max(0.0, min(1.0, n / QUESTIONNAIRE))
     return f"rgb({int(232 - 150 * t)},{int(245 - 75 * t)},{int(233 - 150 * t)})"
 
 
@@ -106,11 +122,12 @@ def make_table_figure(tbl: pd.DataFrame, summary: str) -> go.Figure:
     """Render the per-assay table as a styled Plotly figure (PNG/HTML for slides)."""
     n = len(tbl)
     zebra = ["#f4f7f8" if i % 2 else "#ffffff" for i in range(n)]
-    reviewed = [_green(v) for v in tbl["Reviewed (%)"]]
-    fill = [zebra, zebra, zebra, zebra, zebra, reviewed]  # one entry per column
+    shaded = [_green(v) for v in tbl[EXPERT]]
+    # Shade the expert-answer column: that is the quantity the table is about.
+    fill = [zebra, zebra, zebra, shaded, zebra, zebra]  # one entry per column
     fig = go.Figure(
         go.Table(
-            columnwidth=[0.5, 5.2, 2.3, 1.7, 1.4, 1.6],
+            columnwidth=[0.5, 5.0, 2.2, 1.9, 1.6, 1.7],
             header=dict(
                 values=[f"<b>{c}</b>" for c in tbl.columns],
                 fill_color="#1f4e5f", font=dict(color="white", size=13),
