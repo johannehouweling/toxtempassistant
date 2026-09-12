@@ -57,6 +57,15 @@ def test_about_demo_video_uses_privacy_enhanced_embed_and_video_data():
 
 
 @pytest.mark.django_db
+def test_about_page_header_links_to_login_instead_of_itself():
+    """On /about/ the header button leads to the login page, not back to /about/."""
+    html = Client().get(reverse("about")).content.decode()
+    header = html.split("</header>")[0]
+    assert f'href="{reverse("overview")}">Log in</a>' in header
+    assert f'href="{reverse("about")}">About</a>' not in header
+
+
+@pytest.mark.django_db
 def test_about_page_does_not_publish_the_maintainer_email():
     """The address stays off public pages; logged-in users find it in the user menu."""
     html = Client().get(reverse("about")).content.decode()
