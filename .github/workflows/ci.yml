@@ -28,9 +28,14 @@ jobs:
     # there's nothing here we haven't already tested. release.yml uses
     # `conclusion == 'success'` to gate; a skipped job leaves the workflow
     # at conclusion `skipped`, so release.yml correctly doesn't re-fire.
-    # `pull_request` events have a null head_commit, so the != check
-    # passes (PRs run CI as normal).
-    if: ${{ github.event.head_commit.author.name != 'github-actions[bot]' }}
+    # `pull_request` events have a null head_commit, so neither name matches
+    # and PRs run CI as normal.
+    # Both names are listed on purpose: pyproject.toml pins commit_author to the
+    # bot, and "semantic-release" is python-semantic-release's own default, so
+    # the guard still holds if that pin is ever dropped.
+    if: >-
+      ${{ github.event.head_commit.author.name != 'github-actions[bot]'
+      && github.event.head_commit.author.name != 'semantic-release' }}
 
     steps:
       - name: Checkout code

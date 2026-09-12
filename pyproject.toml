@@ -145,6 +145,12 @@ version_source = "commit"
 branch = "main"
 update_changelog = true
 version_toml = ["pyproject.toml:project.version"]
+# Attribute the version-bump commit to the bot. Without this, python-semantic-release
+# uses its own default author ("semantic-release <semantic-release>") and ignores the
+# `git config user.name` that release.yml sets — which left ci.yml's "skip the bump
+# commit" guard testing a name that never appeared, so every release re-ran the full
+# test suite on a commit that only touches pyproject.toml and CHANGELOG.md.
+commit_author = "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
 
 [tool.semantic_release.commit_parser_options]
 patch_tags = ["fix", "perf", "chore"]
