@@ -10,6 +10,7 @@ prints a per-assay Markdown table + a one-line summary, writing them to
 from __future__ import annotations
 
 import sys
+import textwrap
 from pathlib import Path
 
 import pandas as pd
@@ -102,12 +103,10 @@ def build(csv_path: Path) -> tuple[str, str]:
     total_gold = int((~df["is_nf"]).sum())
     total_nf = int(df["is_nf"].sum())
     summary = (
-        f"**{total_gold} expert-validated answers** (N_non-trivial) across "
-        f"**{n_assays} assays** from **{n_people} scientists** at "
-        f"**{n_inst} institutes** — {total_acc} accepted in total, of which "
-        f"{total_nf} are the standardised 'answer not found in documents'. "
-        f"Each ToxTemp has {QUESTIONNAIRE} questions, so the three counts sum to "
-        f"{QUESTIONNAIRE} per row."
+        f"**{total_gold} expert-validated answers** across **{n_assays} assays**, "
+        f"**{n_people} scientists**, **{n_inst} institutes**. {total_acc} accepted "
+        f"in total; {total_nf} are the standardised 'answer not found in documents'. "
+        f"The three counts sum to {QUESTIONNAIRE}, the ToxTemp question count."
     )
     return md, summary, tbl
 
@@ -139,15 +138,18 @@ def make_table_figure(tbl: pd.DataFrame, summary: str) -> go.Figure:
             ),
         )
     )
+    # Wrap the subtitle: at 960px a single line clips silently.
+    sub = textwrap.wrap(summary.replace("**", ""), 108)
     fig.update_layout(
         title=dict(
             text=(
                 "Gold-standard ToxTemp answers — workshop result"
-                f"<br><sub>{summary.replace('**', '')}</sub>"
+                f"<br><sub>{'<br>'.join(sub)}</sub>"
             ),
             x=0.01, font=dict(size=18),
         ),
-        width=960, height=130 + 26 * n, margin=dict(l=12, r=12, t=86, b=12),
+        width=960, height=104 + 28 * len(sub) + 26 * n,
+        margin=dict(l=12, r=12, t=60 + 28 * len(sub), b=12),
         template="plotly_white",
     )
     return fig
