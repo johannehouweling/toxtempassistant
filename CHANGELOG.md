@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.38.0 (2026-09-12)
+
+### Features
+
+- **seo**: Make the public site indexable and add about and ToxTemp pages
+  ([`8a1be39`](https://github.com/johannehouweling/toxtempassistant/commit/8a1be393f3337ce750c7bc958e32fde43391f702))
+
+
 ## v3.37.0 (2026-09-12)
 
 ### Features
