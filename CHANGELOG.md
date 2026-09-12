@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.35.2 (2026-09-12)
+
+### Bug Fixes
+
+- **stats**: Label the section percentage, teal second series, summary spacing
+  ([`de1f124`](https://github.com/johannehouweling/toxtempassistant/commit/de1f124bdc33da9f5e981c1290a570c40202c448))
+
+
 ## v3.35.1 (2026-09-12)
 
 ### Bug Fixes
