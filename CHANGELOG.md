@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.37.0 (2026-09-12)
+
+### Features
+
+- **admin**: Register workspaces with their permission side effects
+  ([`7c79449`](https://github.com/johannehouweling/toxtempassistant/commit/7c794499aa472c45bc8810f803e2f6a703967c37))
+
+
 ## v3.36.0 (2026-09-12)
 
 ### Features
