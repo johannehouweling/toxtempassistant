@@ -237,6 +237,8 @@ def headline(rng: StatsRange) -> dict[str, Any]:
     # ToxTemps dial, with "completed" as the inner ring inside it.
     n_worked_on = in_period.filter(answers__accepted=True).distinct().count()
     n_completed = _scoped(completed, "submission_date", rng).count()
+    completed_pct = _pct(n_completed, n_period) or 0.0
+    worked_pct = _pct(n_worked_on, n_period) or 0.0
 
     return {
         "users": {
@@ -250,12 +252,18 @@ def headline(rng: StatsRange) -> dict[str, Any]:
             "total": assays.count(),
             "period": n_period,
             "worked_on": n_worked_on,
-            "worked_on_pct": _pct(n_worked_on, n_period),
+            "worked_on_pct": worked_pct,
+            # Bands for the headline bar: complete, worked on but not finished,
+            # and created-then-left. The three always sum to 100.
+            "in_progress": n_worked_on - n_completed,
+            "in_progress_pct": round(worked_pct - completed_pct, 1),
+            "untouched": n_period - n_worked_on,
+            "untouched_pct": round(100.0 - worked_pct, 1),
         },
         "completed_assays": {
             "total": completed.count(),
             "period": n_completed,
-            "pct": _pct(n_completed, n_period),
+            "pct": completed_pct,
             # Pre-built so the template does not have to concatenate an int and
             # a string — Django's `add` filter silently returns "" for that.
             "fraction": f"{n_completed}/{n_period}",
@@ -584,6 +592,38 @@ def section_progress(rng: StatsRange) -> dict[str, Any]:
     }
 
 
+def grounding(rng: StatsRange) -> dict[str, Any]:
+    """How much source material users gave the model to work from.
+
+    Reads ``Answer.answer_documents``, which ``process_llm_async`` fills with
+    the document names that were in the payload for that drafting run — what the
+    user supplied, not what the model ended up citing. It is written for every
+    answer regardless of whether the user consented to the files being stored,
+    so it counts grounding that ``FileAsset`` cannot see.
+    """
+    rows = (
+        Answer.objects.filter(
+            assay__in=_scoped(real_assays(), "submission_date", rng).values("pk")
+        )
+        .exclude(answer_documents=None)
+        .values_list("assay_id", "answer_documents")
+    )
+
+    per_assay: dict[int, set[str]] = {}
+    for assay_id, documents in rows:
+        if not documents:
+            continue
+        per_assay.setdefault(assay_id, set()).update(documents)
+
+    counts = sorted(len(names) for names in per_assay.values())
+    return {
+        "assays_with_documents": len(counts),
+        "median_documents": _median(counts),
+        "max_documents": counts[-1] if counts else 0,
+        "distinct_documents": sum(counts),
+    }
+
+
 def answer_quality(rng: StatsRange) -> dict[str, Any]:
     """Return acceptance, coverage and human-edit rates for answers in the window."""
     assay_ids = _scoped(real_assays(), "submission_date", rng).values("pk")
@@ -594,8 +634,12 @@ def answer_quality(rng: StatsRange) -> dict[str, Any]:
     empty = answers.filter(answer_text="").count()
     not_found = answers.filter(answer_text__icontains=config.not_found_string).count()
 
-    # simple_history writes one row per save; >1 row means a human touched the
-    # LLM draft at least once after it was first written.
+    # CAUTION: this is "answers a user saved", not "answers a user rewrote".
+    # process_llm_async writes drafts with Answer.objects.filter(...).update(),
+    # which bypasses save() and so records no history row at all — the model's
+    # draft is invisible here. Accepting an answer calls save(), so an untouched
+    # answer that was merely accepted also lands in this count. Kept in the
+    # export for continuity; do not put it on the page as an edit rate.
     historical = Answer.history.model.objects.filter(assay__in=assay_ids)
     edited = (
         historical.values("id")
@@ -885,6 +929,7 @@ def build_stats(range_key: str | None = None) -> dict[str, Any]:
         "growth": growth(rng),
         "completion": completion_marks(rng),
         "progress": average_progress(rng),
+        "grounding": grounding(rng),
         "section_progress": section_progress(rng),
         "assay_status": assay_status(rng),
         "funnel": funnel(rng),

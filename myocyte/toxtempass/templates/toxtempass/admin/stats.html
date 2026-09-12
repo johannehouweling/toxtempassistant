@@ -10,11 +10,11 @@ iD, assay title or free-text feedback — the whole point of the module boundary
 is that this template cannot leak what it never receives.
 
 On the style block: the project convention is Bootstrap utilities over custom
-CSS, and the structure below still uses Bootstrap's grid and spacing. The rules
-here are the page's visual language (typeface, ink, hairline panels, the summary
-dials), which Bootstrap has no vocabulary for. Everything is scoped
-under .readout so it cannot reach any other page, and every colour comes from
-Config rather than being written twice.
+CSS, and the structure below still uses Bootstrap's grid and spacing. These
+rules are the page's visual language — display type, the ink card, the stacked
+progress bars — which Bootstrap has no vocabulary for. Everything is scoped
+under .readout so it cannot reach any other page, and every colour is read from
+Config rather than written twice.
 {% endcomment %}
 
 {% block title %}Usage stats — ToxTempAssistant{% endblock %}
@@ -33,27 +33,46 @@ Config rather than being written twice.
     --ink-3: {{ config.stats_ink_3 }};
     --rule:  {{ config.stats_rule }};
     --panel: {{ config.stats_chart_surface }};
-    --m0: {{ config.stats_rule }};
-    --m1: {{ config.stats_chart_ordinal.0 }};
-    --m2: {{ config.stats_chart_ordinal.2 }};
-    --m3: {{ config.stats_chart_ordinal.3 }};
+    --accent:      {{ config.stats_chart_ordinal.3 }};
+    --accent-soft: {{ config.stats_chart_ordinal.0 }};
+    --accent-mid:  {{ config.stats_chart_ordinal.2 }};
     font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
     font-size: .9375rem;
     line-height: 1.55;
     color: var(--ink);
   }
 
-  /* Measured values are set in the Mono cut so digits align down a column and
-     the large figures read as an instrument readout rather than a headline. */
+  /* Display figures carry weight, not lightness — this page has to look like
+     the project is working, and a hairline numeral reads as tentative at size.
+     Tabular figures so a column of cards keeps its digits on the same rhythm. */
+  .readout .fig {
+    font-weight: 600;
+    letter-spacing: -.035em;
+    line-height: .95;
+    font-variant-numeric: tabular-nums;
+  }
+  .readout .fig-hero { font-size: clamp(3.5rem, 8vw, 5.25rem); letter-spacing: -.05em; }
+  .readout .fig-lg   { font-size: clamp(2rem, 4vw, 2.625rem); }
+  .readout .fig-md   { font-size: 1.625rem; }
+  .readout .fig sub  { font-size: .35em; font-weight: 500; letter-spacing: 0;
+                       vertical-align: baseline; color: var(--ink-2); }
+  /* Mono is kept for table columns, where fixed width does an actual job. */
   .readout .val { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
-  .readout .fig { font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 300; letter-spacing: -.02em; line-height: 1; }
-  .readout .fig-lg { font-size: clamp(2.25rem, 5vw, 3rem); }
-  .readout .fig-md { font-size: 1.75rem; }
   .readout .unit { color: var(--ink-2); font-size: .8125rem; }
   .readout .note { color: var(--ink-2); font-size: .8125rem; max-width: 62ch; }
 
-  /* Panels are defined by a hairline on white, never by a shadow. */
-  .readout .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; }
+  /* Stat cards. Hierarchy comes from fill and scale, not from a different
+     radius or shadow on each: the headline card is inked, the rest are paper. */
+  .readout .stat { background: var(--panel); border: 1px solid var(--rule);
+                   border-radius: 4px; padding: 1.375rem 1.5rem; height: 100%; }
+  .readout .stat-label { color: var(--ink-2); font-size: .875rem; margin-top: .5rem; }
+  .readout .stat-ink { background: var(--ink); border-color: var(--ink); color: #fff;
+                       display: flex; flex-direction: column; }
+  .readout .stat-ink .stat-label,
+  .readout .stat-ink .unit { color: rgba(255,255,255,.72); }
+
+  /* Panels for the detail sections below the cards. */
+  .readout .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
   .readout .panel + .panel { margin-top: 1rem; }
   .readout .panel-hd { border-bottom: 1px solid var(--rule); padding: .875rem 1.25rem; }
   .readout .panel-hd h2 { font-size: 1.0625rem; font-weight: 600; margin: 0; letter-spacing: -.01em; }
@@ -62,65 +81,52 @@ Config rather than being written twice.
   @media (min-width: 992px) {
     .readout .split { border-top: 0; border-left: 1px solid var(--rule); }
   }
+  .readout .section-hd { font-size: .875rem; font-weight: 600; color: var(--ink-2);
+                         letter-spacing: .01em; margin: 2rem 0 .75rem; }
 
-  /* Paired dials: two concentric semicircles, radius 54 and 38, so the arc
-     lengths are pi*54 = 169.65 and pi*38 = 119.38. The dash offset walks each
-     length back by its own rate. Outer ring is always the looser criterion. */
-  .readout .dial svg { display: block; width: 100%; max-width: 11.5rem; margin: 0 auto; height: auto; }
-  .readout .dial path { fill: none; stroke-linecap: round; }
-  .readout .dial .dial-track { stroke: var(--rule); stroke-width: 11; }
-  .readout .dial .dial-track-inner { stroke-width: 9; }
-  .readout .dial .dial-outer {
-    stroke: var(--m1); stroke-width: 11;
-    stroke-dasharray: 169.65;
-    stroke-dashoffset: calc(169.65px * (1 - var(--p, 0) / 100));
-  }
-  .readout .dial .dial-inner {
-    stroke: var(--m3); stroke-width: 9;
-    stroke-dasharray: 119.38;
-    stroke-dashoffset: calc(119.38px * (1 - var(--p, 0) / 100));
-  }
-  .readout .dial .dial-num { font-family: "IBM Plex Mono", ui-monospace, monospace;
-                             font-weight: 300; fill: var(--ink); }
-  /* Legend under a dial: swatch, value, label — one line each, left-aligned
-     under a centred dial so the two rings read top-to-bottom in ring order. */
-  .readout .dial-key { display: inline-block; text-align: left; }
-  .readout .dial-key span { display: block; font-size: .8125rem; color: var(--ink-2); }
-  .readout .dial-key b { font-weight: 500; color: var(--ink); }
-
-  /* Stacked progress bar: accepted | drafted-not-accepted | undrafted.
-     The three widths always sum to 100, so no track is needed behind them. */
-  .readout .bar { display: flex; height: 10px; border-radius: 1px; overflow: hidden; gap: 1px; background: var(--rule); }
-  .readout .bar > i { display: block; }
-  .readout .bar > .b-accepted  { background: var(--m3); }
-  .readout .bar > .b-awaiting  { background: var(--m1); }
-  .readout .bar > .b-undrafted { background: var(--rule); }
-  .readout .swatch { display: inline-block; width: .6rem; height: .6rem; border-radius: 1px; margin-right: .35rem; }
-  .readout .swatch.b-accepted { background: var(--m3); }
-  .readout .swatch.b-awaiting { background: var(--m1); }
-  .readout .swatch.b-undrafted { background: var(--rule); }
-
+  /* Stacked bars. Segment widths always sum to 100, so the bar needs no track
+     behind it; the 1px gaps are the surface showing through between bands. */
+  .readout .bar { display: flex; height: 9px; border-radius: 2px; overflow: hidden; gap: 1px; }
+  .readout .bar > i { display: block; min-width: 0; }
+  .readout .bar-tall { height: 14px; border-radius: 3px; }
+  .readout .b1 { background: var(--accent); }
+  .readout .b2 { background: var(--accent-soft); }
+  .readout .b3 { background: var(--rule); }
+  /* On the inked card the same three bands are set in light-on-dark. */
+  .readout .stat-ink .b1 { background: var(--accent-soft); }
+  .readout .stat-ink .b2 { background: rgba(255,255,255,.34); }
+  .readout .stat-ink .b3 { background: rgba(255,255,255,.14); }
+  .readout .key { display: inline-flex; align-items: baseline; gap: .4rem; font-size: .8125rem; }
+  .readout .key::before { content: ""; width: .55rem; height: .55rem; border-radius: 2px;
+                          background: currentColor; flex: none; transform: translateY(.05rem); }
+  .readout .key.b1 { color: var(--accent); background: none; }
+  .readout .key.b2 { color: var(--accent-soft); background: none; }
+  .readout .key.b3 { color: var(--rule); background: none; }
+  .readout .key > span { color: var(--ink-2); }
+  .readout .key > span b { font-weight: 600; color: var(--ink); }
+  .readout .stat-ink .key.b1 { color: var(--accent-soft); }
+  .readout .stat-ink .key.b2 { color: rgba(255,255,255,.34); }
+  .readout .stat-ink .key > span { color: rgba(255,255,255,.72); }
+  .readout .stat-ink .key > span b { color: #fff; }
 
   .readout table { font-size: .875rem; }
   .readout thead th { font-weight: 500; color: var(--ink-2); border-bottom: 1px solid var(--rule); padding-bottom: .4rem; }
-  .readout tbody td { border-bottom: 1px solid var(--rule); padding: .45rem 0; }
+  .readout tbody td { border-bottom: 1px solid var(--rule); padding: .5rem 0; }
   .readout tbody tr:last-child td { border-bottom: 0; }
   .readout td.num, .readout th.num { text-align: right; font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
-  .readout .scroll-y { max-height: 21rem; overflow-y: auto; }
   /* Inline scale in the institutions table: the row is its own bar chart, so
      the panel does not need a second chart repeating the same numbers. */
   .readout .rowbar { display: block; height: 3px; width: var(--w); min-width: 2px;
-                     background: var(--m2); border-radius: 1px; margin-top: .25rem; }
+                     background: var(--accent-mid); border-radius: 2px; margin-top: .3rem; }
 
   .readout .seg a { border: 1px solid var(--rule); color: var(--ink-2); background: var(--panel); padding: .25rem .7rem; font-size: .8125rem; text-decoration: none; }
   .readout .seg a + a { border-left: 0; }
-  .readout .seg a:first-child { border-radius: 3px 0 0 3px; }
-  .readout .seg a:last-child { border-radius: 0 3px 3px 0; }
+  .readout .seg a:first-child { border-radius: 4px 0 0 4px; }
+  .readout .seg a:last-child { border-radius: 0 4px 4px 0; }
   .readout .seg a[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: #fff; }
   .readout .seg a:hover { color: var(--ink); }
   .readout .seg a[aria-current="page"]:hover { color: #fff; }
-  .readout a:focus-visible, .readout .seg a:focus-visible { outline: 2px solid var(--m3); outline-offset: 2px; }
-
+  .readout a:focus-visible, .readout .seg a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 
 <div class="readout">
@@ -143,37 +149,63 @@ Config rather than being written twice.
   </div>
 
   {# ── Summary ──────────────────────────────────────────────────────────── #}
-  {# Two counts and two paired dials. Each dial nests a stricter measure inside
-     a looser one over the same denominator, so the gap between the rings is
-     the work in flight. #}
-  <div class="panel">
-    <div class="panel-hd"><h2>Summary</h2></div>
-    <div class="panel-bd">
-      <div class="row align-items-center g-4 text-center text-lg-start">
-        <div class="col-6 col-lg-3">
-          <div class="fig fig-lg">{{ stats.headline.organisations.period|intcomma }}</div>
-          <div class="unit">institutions</div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="fig fig-lg">{{ stats.headline.users.period|intcomma }}</div>
-          <div class="unit">registered users</div>
-        </div>
+  {# The inked card carries the headline count; the four beside it are the
+     numbers a reader who has never seen the app can still weigh. Hierarchy is
+     fill and scale — every card has the same border, radius and no shadow. #}
+  <div class="row g-3">
+    <div class="col-12 col-lg-5">
+      <div class="stat stat-ink">
+        <div class="fig fig-hero">{{ stats.headline.assays.period|intcomma }}</div>
+        <div class="stat-label">ToxTemps created</div>
 
-        <div class="col-6 col-lg-3 text-center">
-          {% include "toxtempass/admin/_dial.html" with outer=stats.headline.assays.worked_on_pct inner=stats.headline.completed_assays.pct centre=stats.headline.completed_assays.fraction centre_size=19 %}
-          <div class="dial-key mt-2">
-            <span><i class="swatch b-accepted"></i><b>{{ stats.headline.completed_assays.period|intcomma }}</b> complete</span>
-            <span><i class="swatch b-awaiting"></i><b>{{ stats.headline.assays.worked_on|intcomma }}</b> being worked on</span>
-            <span><i class="swatch b-undrafted"></i>of <b>{{ stats.headline.assays.period|intcomma }}</b> ToxTemps created</span>
+        <div class="mt-auto pt-4">
+          <div class="bar bar-tall" role="img"
+               aria-label="{{ stats.headline.completed_assays.period }} complete, {{ stats.headline.assays.in_progress }} in progress, {{ stats.headline.assays.untouched }} not started">
+            <i class="b1" style="width: {{ stats.headline.completed_assays.pct }}%"></i>
+            <i class="b2" style="width: {{ stats.headline.assays.in_progress_pct }}%"></i>
+            <i class="b3" style="width: {{ stats.headline.assays.untouched_pct }}%"></i>
+          </div>
+          <div class="d-flex flex-wrap gap-4 mt-3">
+            <span class="key b1"><span><b>{{ stats.headline.completed_assays.period|intcomma }}</b> complete</span></span>
+            <span class="key b2"><span><b>{{ stats.headline.assays.in_progress|intcomma }}</b> in progress</span></span>
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="col-6 col-lg-3 text-center">
-          {% include "toxtempass/admin/_dial.html" with outer=stats.progress.drafted inner=stats.progress.accepted centre=stats.progress.accepted|floatformat:0|add:"%" %}
-          <div class="dial-key mt-2">
-            <span><i class="swatch b-accepted"></i><b>{{ stats.progress.accepted }}%</b> expert-accepted</span>
-            <span><i class="swatch b-awaiting"></i><b>{{ stats.progress.drafted }}%</b> drafted by the model</span>
-            <span><i class="swatch b-undrafted"></i>average answer progress</span>
+    <div class="col-12 col-lg-7">
+      <div class="row g-3">
+        <div class="col-6">
+          <div class="stat">
+            <div class="fig fig-lg">{{ stats.headline.organisations.period|intcomma }}</div>
+            <div class="stat-label">institutions</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="stat">
+            <div class="fig fig-lg">{{ stats.headline.users.period|intcomma }}</div>
+            <div class="stat-label">registered users</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="stat">
+            <div class="fig fig-lg">{{ stats.engagement.median_completion_display }}</div>
+            <div class="stat-label">typical time to finish one</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="stat">
+            <div class="fig fig-lg">{{ stats.progress.accepted|floatformat:0 }}<sub>%</sub></div>
+            <div class="stat-label">of answers accepted by an expert</div>
+            <div class="bar mt-3" role="img"
+                 aria-label="{{ stats.progress.accepted }} percent accepted, {{ stats.progress.awaiting }} percent drafted but not yet accepted">
+              <i class="b1" style="width: {{ stats.progress.accepted }}%"></i>
+              <i class="b2" style="width: {{ stats.progress.awaiting }}%"></i>
+              <i class="b3" style="width: {{ stats.progress.undrafted }}%"></i>
+            </div>
+            <div class="mt-2">
+              <span class="key b2"><span><b>{{ stats.progress.drafted }}%</b> drafted by the model</span></span>
+            </div>
           </div>
         </div>
       </div>
@@ -255,9 +287,9 @@ Config rather than being written twice.
     <div class="panel-bd">
       {% if stats.section_progress.sections %}
       <div class="d-flex flex-wrap gap-4 mb-4">
-        <span class="note"><i class="swatch b-accepted"></i>accepted by an expert</span>
-        <span class="note"><i class="swatch b-awaiting"></i>drafted, not yet accepted</span>
-        <span class="note"><i class="swatch b-undrafted"></i>no draft answer</span>
+        <span class="key b1"><span>accepted by an expert</span></span>
+        <span class="key b2"><span>drafted, not yet accepted</span></span>
+        <span class="key b3"><span>no draft answer</span></span>
       </div>
       {% for section in stats.section_progress.sections %}
       <div class="row align-items-center g-3 mb-3">
@@ -268,9 +300,9 @@ Config rather than being written twice.
         <div class="col-10 col-md-7">
           <div class="bar" role="img"
                aria-label="{{ section.title }}: {{ section.accepted }} percent accepted, {{ section.awaiting }} percent drafted but not accepted, {{ section.undrafted }} percent with no draft">
-            <i class="b-accepted" style="width: {{ section.accepted }}%"></i>
-            <i class="b-awaiting" style="width: {{ section.awaiting }}%"></i>
-            <i class="b-undrafted" style="width: {{ section.undrafted }}%"></i>
+            <i class="b1" style="width: {{ section.accepted }}%"></i>
+            <i class="b2" style="width: {{ section.awaiting }}%"></i>
+            <i class="b3" style="width: {{ section.undrafted }}%"></i>
           </div>
         </div>
         <div class="col-2 col-md-1 text-end val">{{ section.accepted|floatformat:0 }}%</div>
@@ -295,28 +327,22 @@ Config rather than being written twice.
     </div>
     <div class="row g-0">
       <div class="col-12 col-lg-7">
-        {# The stage-by-stage table that used to sit here is now the ToxTemps
-           dial in the summary, which says the same thing in one shape. #}
         <div class="panel-bd">
           <div class="row g-4">
-            <div class="col-6 col-md-4">
-              <div class="fig fig-md">{{ stats.engagement.median_completion_display }}</div>
-              <div class="unit">typical time to finish one</div>
+            <div class="col-6">
+              <div class="fig fig-md">{{ stats.grounding.median_documents|floatformat:0 }}</div>
+              <div class="unit">context documents supplied per ToxTemp, typically</div>
             </div>
-            <div class="col-6 col-md-4">
-              <div class="fig fig-md">{{ stats.answers.edited|intcomma }}<span class="unit"> · {{ stats.answers.edited_pct|default:"0" }}%</span></div>
-              <div class="unit">answers edited after drafting</div>
-            </div>
-            <div class="col-6 col-md-4">
+            <div class="col-6">
               <div class="fig fig-md">{{ stats.answers.not_found|intcomma }}<span class="unit"> · {{ stats.answers.not_found_pct|default:"0" }}%</span></div>
-              <div class="unit">answers not found in the documents</div>
+              <div class="unit">questions the documents did not answer</div>
             </div>
           </div>
           <p class="note mt-4 mb-0">
-            Rates are over the {{ stats.answers.total|intcomma }} individual questions
-            across every ToxTemp in the period. A high edit rate and a low
-            not-found rate together mean the drafts land close enough to be worth
-            keeping.
+            Across {{ stats.answers.total|intcomma }} questions in
+            {{ stats.grounding.assays_with_documents|intcomma }} ToxTemps with documents
+            attached. The more source material a team supplies, the fewer questions
+            come back unanswered — these two read together.
           </p>
         </div>
       </div>
