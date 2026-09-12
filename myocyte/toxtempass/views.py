@@ -9,6 +9,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import cached_property
 from itertools import product
 
 import requests
@@ -19,7 +20,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetView as DjangoPasswordResetView
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.db import models, transaction
-from django.db.models import QuerySet, Sum
+from django.db.models import Count, QuerySet, Sum
 from django.http import (
     FileResponse,
     HttpRequest,
@@ -88,6 +89,8 @@ from toxtempass.models import (
     Section,
     Study,
     Subsection,
+    Workspace,
+    WorkspaceMember,
 )
 from toxtempass.stats import build_stats, to_csv_rows, to_json_payload
 from toxtempass.tables import AssayTable
@@ -1693,10 +1696,11 @@ class AssayListView(SingleTableView):
             return redirect(reverse("beta_wait"))
         return super().dispatch(request, *args, **kwargs)
 
-    def get_queryset(self) -> QuerySet[Assay]:
-        """Return a queryset of Assays accessible by the user.
+    def accessible_assays(self) -> QuerySet[Assay]:
+        """Every Assay the user may view, before the workspace tab filter.
 
-        Filtered to only those with a question_set.
+        Shared by ``get_queryset`` and the per-workspace tab counts so both see
+        exactly the same set of assays.
         """
         user = self.request.user
         accessible_investigations = get_objects_for_user(
@@ -1731,7 +1735,53 @@ class AssayListView(SingleTableView):
             qs = qs.filter(
                 demo_lock=False, demo_template=False, demo_source__isnull=True
             )
+        # ?q= matches the three titles the table shows, so what you type is
+        # searched against what you can see. Applied here rather than in
+        # get_queryset so the workspace tab counts narrow with the search.
+        if self.search_query:
+            qs = qs.filter(
+                models.Q(title__icontains=self.search_query)
+                | models.Q(study__title__icontains=self.search_query)
+                | models.Q(study__investigation__title__icontains=self.search_query)
+            )
+        return qs
+
+    def get_queryset(self) -> QuerySet[Assay]:
+        """Return the accessible assays, narrowed to a workspace tab if picked."""
+        qs = self.accessible_assays()
+        # ?workspace=<pk> narrows the list to assays whose parent investigation is
+        # shared into that workspace. Restricted to workspaces the user belongs to,
+        # so an arbitrary pk cannot be used to probe which workspaces exist.
+        if self.selected_workspace_pk is not None:
+            qs = qs.filter(
+                study__investigation__shared_in_workspaces__workspace_id=(
+                    self.selected_workspace_pk
+                )
+            ).distinct()
         return qs.order_by("-submission_date")
+
+    @cached_property
+    def search_query(self) -> str:
+        """Trimmed ``?q=`` search term, empty string when absent."""
+        return self.request.GET.get("q", "").strip()
+
+    @cached_property
+    def member_workspace_ids(self) -> set[int]:
+        """PKs of every workspace the user belongs to (owned or joined)."""
+        return set(
+            WorkspaceMember.objects.filter(user=self.request.user).values_list(
+                "workspace_id", flat=True
+            )
+        )
+
+    @cached_property
+    def selected_workspace_pk(self) -> int | None:
+        """Validated ``?workspace=`` pk, or None for the unfiltered list."""
+        raw = self.request.GET.get("workspace")
+        if not raw or not raw.isdigit():
+            return None
+        pk = int(raw)
+        return pk if pk in self.member_workspace_ids else None
 
     def get_context_data(self, **kwargs) -> dict:
         """Inject context."""
@@ -1741,9 +1791,39 @@ class AssayListView(SingleTableView):
         context["reload_busy_max_retries"] = config.reload_busy_max_retries
         context["LLMStatus"] = LLMStatus
         context.update(get_workspace_list(self.request))
+        context["selected_workspace_pk"] = self.selected_workspace_pk
+        context["search_query"] = self.search_query
+        context["workspace_tabs"] = self.workspace_tabs()
         # Tour management is now handled by JavaScript localStorage
         # No backend flags needed
         return context
+
+    def workspace_tabs(self) -> list[dict]:
+        """One entry per workspace the user belongs to, with its assay count.
+
+        Counted over ``accessible_assays`` so a tab's badge always matches what
+        the tab actually shows. Workspaces with nothing shared into them yet are
+        kept (count 0) — an empty workspace is information too.
+        """
+        if not self.member_workspace_ids:
+            return []
+        counts = dict(
+            self.accessible_assays()
+            .filter(
+                study__investigation__shared_in_workspaces__workspace_id__in=(
+                    self.member_workspace_ids
+                )
+            )
+            .values_list("study__investigation__shared_in_workspaces__workspace_id")
+            .annotate(n=Count("pk", distinct=True))
+        )
+        workspaces = Workspace.objects.filter(pk__in=self.member_workspace_ids).order_by(
+            "name"
+        )
+        return [
+            {"pk": ws.pk, "name": ws.name, "count": counts.get(ws.pk, 0)}
+            for ws in workspaces
+        ]
 
 
 @login_required(login_url="/login/")
