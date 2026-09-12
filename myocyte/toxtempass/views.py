@@ -646,11 +646,12 @@ def stats_dashboard(request: HttpRequest) -> HttpResponse:
         "toxtempass/admin/stats.html",
         {
             "stats": stats,
+            # Only what the page actually draws. Operational series (processing
+            # status, login recency, download counts) stay in build_stats() for
+            # the CSV/JSON export but are not charted: this page is a standing
+            # record of uptake, not a monitor.
             "chart_data": {
                 "growth": stats["growth"],
-                "status": stats["assay_status"],
-                "organisations": stats["organisations"][: config.stats_top_n],
-                "funnel": stats["funnel"],
                 "models": stats["llm"]["by_model"][: config.stats_top_n],
                 "ratings": stats["feedback"]["bins"],
                 "palette": {
@@ -659,6 +660,8 @@ def stats_dashboard(request: HttpRequest) -> HttpResponse:
                     "grid": config.stats_chart_grid,
                     "axis": config.stats_chart_axis,
                     "surface": config.stats_chart_surface,
+                    "ink": config.stats_ink,
+                    "ink2": config.stats_ink_2,
                 },
                 "currency": stats["llm"]["currency"],
             },

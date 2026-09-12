@@ -286,18 +286,97 @@ def _fill_buckets(keys: list[dt.date], bucket: str) -> list[dt.date]:
     return out
 
 
+def _running_total(per_bucket: list[int], start: int) -> list[int]:
+    """Accumulate ``per_bucket`` on top of ``start`` (the count before the window)."""
+    total = start
+    out = []
+    for n in per_bucket:
+        total += n
+        out.append(total)
+    return out
+
+
 def growth(rng: StatsRange) -> dict[str, Any]:
-    """Aligned time-series of new users and new assays over the window."""
-    users = _timeseries(people(), "date_joined", rng)
-    assays = _timeseries(real_assays(), "submission_date", rng)
+    """Reach over time: new accounts and ToxTemps per bucket, and running totals.
+
+    The dashboard plots the running totals — for a low-traffic instrument the
+    per-bucket counts are too spiky to read, and the question stakeholders ask
+    is how far the tool has got, not what happened last month. Both series are
+    kept in the payload so the CSV/JSON export can answer either question.
+    """
+    all_people, all_assays = people(), real_assays()
+    users = _timeseries(all_people, "date_joined", rng)
+    assays = _timeseries(all_assays, "submission_date", rng)
 
     keys = _fill_buckets(sorted(set(users) | set(assays)), rng.bucket)
     fmt = _BUCKET_FMT[rng.bucket]
+
+    # A windowed view still shows the true cumulative line, so the curve does
+    # not restart from zero at the window edge.
+    before_users = before_assays = 0
+    if rng.since is not None:
+        before_users = all_people.filter(date_joined__lt=rng.since).count()
+        before_assays = all_assays.filter(submission_date__lt=rng.since).count()
+
+    per_user = [users.get(k, 0) for k in keys]
+    per_assay = [assays.get(k, 0) for k in keys]
     return {
         "labels": [k.strftime(fmt) for k in keys],
-        "users": [users.get(k, 0) for k in keys],
-        "assays": [assays.get(k, 0) for k in keys],
+        "users": per_user,
+        "assays": per_assay,
+        "users_cumulative": _running_total(per_user, before_users),
+        "assays_cumulative": _running_total(per_assay, before_assays),
         "bucket": rng.bucket,
+    }
+
+
+def completion_marks(rng: StatsRange) -> dict[str, Any]:
+    """One mark per ToxTemp, bucketed by how much of the template is accepted.
+
+    Drives the unit strip at the top of the dashboard: every ToxTemp created in
+    the window gets its own mark, sorted most-complete first so the strip reads
+    as a distribution rather than noise. Buckets are ordinal (0 = nothing
+    accepted ... 3 = every answer accepted), which is what lets the strip use a
+    single-hue ramp instead of arbitrary categorical colours.
+    """
+    rows = (
+        _scoped(real_assays(), "submission_date", rng)
+        .annotate(
+            n_answers=Count("answers", distinct=True),
+            n_accepted=Count(
+                "answers", filter=Q(answers__accepted=True), distinct=True
+            ),
+        )
+        .values_list("n_answers", "n_accepted")
+    )
+
+    shares = []
+    for n_answers, n_accepted in rows:
+        shares.append(n_accepted / n_answers if n_answers else 0.0)
+    shares.sort(reverse=True)
+
+    def _bucket(share: float) -> int:
+        if share >= 1.0:
+            return 3
+        if share >= 0.5:
+            return 2
+        if share > 0.0:
+            return 1
+        return 0
+
+    marks = [_bucket(s) for s in shares]
+    limit = config.stats_unit_marks_max
+    counts = [marks.count(i) for i in range(4)]
+    return {
+        "marks": marks[:limit],
+        "total": len(marks),
+        "truncated": len(marks) > limit,
+        "legend": [
+            {"key": 3, "label": "complete", "count": counts[3]},
+            {"key": 2, "label": "over half accepted", "count": counts[2]},
+            {"key": 1, "label": "under half accepted", "count": counts[1]},
+            {"key": 0, "label": "not started", "count": counts[0]},
+        ],
     }
 
 
@@ -410,6 +489,11 @@ def organisation_rows() -> list[dict[str, Any]]:
             }
         )
     rows.sort(key=lambda r: (-r["assays"], -r["users"], r["organisation"]))
+    # Each row carries its own share of the busiest institution, so the table can
+    # draw an inline scale instead of needing a chart beside it.
+    busiest = max((r["assays"] for r in rows), default=0)
+    for row in rows:
+        row["share"] = _pct(row["assays"], busiest) or 0.0
     return rows
 
 
@@ -634,6 +718,7 @@ def build_stats(range_key: str | None = None) -> dict[str, Any]:
         "headline": headline(rng),
         "content": content_totals(rng),
         "growth": growth(rng),
+        "completion": completion_marks(rng),
         "assay_status": assay_status(rng),
         "funnel": funnel(rng),
         "answers": answer_quality(rng),

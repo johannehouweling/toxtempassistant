@@ -221,7 +221,10 @@ class Config:
         "12m": ("Last 12 months", 365, "month"),
         "all": ("All time", None, "month"),
     })
-    stats_default_range = "12m"
+    # All-time by default: this is a standing record of uptake for stakeholders,
+    # not an operations monitor, so the cumulative total is the headline and the
+    # shorter windows exist for reporting-period cuts.
+    stats_default_range = "all"
     # Row label pooling users who never filled in Person.organization. Blank
     # organisations are pooled rather than listed so the row is not read as an
     # institution in its own right.
@@ -229,24 +232,50 @@ class Config:
     # Cap for "top N" breakdowns (file MIME types, model rows) before the tail
     # is dropped — keeps a chart under the 8-category legibility limit.
     stats_top_n = 10
-    # Recency windows (days) used for the "active users" counters.
+    # Ceiling on the per-ToxTemp marks in the completion strip. Past this the
+    # strip says so rather than rendering thousands of hairlines.
+    stats_unit_marks_max = 600
+    # Recency windows (days) used for the "active users" counters. Exported in
+    # the CSV/JSON but not shown on the page — recency is a monitoring question.
     stats_active_user_windows: Final[tuple[int, ...]] = (7, 30, 90)
     # Bin edges for the feedback usefulness histogram. The rating slider is
     # 1–5 with 0.1 steps (see answer_extras/feedback_export.html).
     stats_rating_bins: Final[tuple[float, ...]] = (1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0)
-    # Chart colours for /stats. Taken from a CVD-validated categorical palette
-    # (adjacent-pair ΔE 24.7 protan / 33.6 normal on a white card surface) —
-    # Bootstrap's own theme colours are not colourblind-safe as a pair. Slot 1
-    # is used for every single-series chart; slot 2 only joins it when a second
-    # series is on the same axis.
+
+    # ── /stats visual language ────────────────────────────────────────────────
+    # The dashboard is styled as a laboratory readout: a cool clinical page, ink
+    # in a blue-black, panels separated by hairlines rather than drop shadows,
+    # and — the governing rule — saturated colour reserved entirely for data
+    # marks, so nothing in the chrome can be mistaken for a series.
+    stats_ink = "#14202b"
+    stats_ink_2 = "#55687a"
+    stats_ink_3 = "#8697a4"
+    stats_paper = "#e9edf0"
+    stats_rule = "#cbd6de"
+    # Chart colours. A CVD-validated categorical pair (adjacent ΔE 24.7 protan /
+    # 33.6 normal on a white panel) — Bootstrap's own theme colours are not
+    # colourblind-safe as a pair. Slot 1 carries every single-series chart;
+    # slot 2 only joins it when a second series shares the axis.
     stats_chart_series = ("#2a78d6", "#eb6834")
-    # Single-hue ordinal ramp for the completion funnel (light → dark, monotone
-    # lightness, all steps ≥2:1 against white).
+    # Single-hue ordinal ramp, light → dark, monotone lightness, every step
+    # ≥2:1 on white. Used where the categories are genuinely ordered: the
+    # completion strip's acceptance bands.
     stats_chart_ordinal = ("#86b6ef", "#5598e7", "#2a78d6", "#1c5cab")
-    stats_chart_grid = "#e1e0d9"
-    stats_chart_axis = "#898781"
-    # Card background — used as the 2px spacer between stacked bar segments.
+    stats_chart_grid = "#dde5ea"
+    stats_chart_axis = "#8697a4"
+    # Panel background — doubles as the 2px spacer between stacked bar segments.
     stats_chart_surface = "#ffffff"
+    # Typeface for the dashboard. Plex was drawn for engineering documentation
+    # and carries true tabular figures; the Mono cut sets the measured values so
+    # digits align down a column and the hero figures read as an instrument
+    # readout. Served from Google Fonts — see the note in stats.html if the
+    # deployment needs these self-hosted instead.
+    stats_font_css = (
+        "https://fonts.googleapis.com/css2"
+        "?family=IBM+Plex+Mono:wght@300;400;500"
+        "&family=IBM+Plex+Sans:wght@400;500;600"
+        "&display=swap"
+    )
 
     license_url = "https://www.gnu.org/licenses/agpl-3.0.html"
     version = os.getenv("GIT_TAG", "") + "-beta"

@@ -179,6 +179,50 @@ class StatsAggregationTests(TestCase):
         self.assertGreaterEqual(len(growth["labels"]), 3)
         self.assertIn(0, growth["assays"])
 
+    def test_cumulative_series_never_decreases(self):
+        old = _assay_for(self.user)
+        Assay.objects.filter(pk=old.pk).update(
+            submission_date=timezone.now() - dt.timedelta(days=60)
+        )
+        growth = build_stats("all")["growth"]
+        running = growth["assays_cumulative"]
+        self.assertEqual(running, sorted(running))
+        self.assertEqual(running[-1], sum(growth["assays"]))
+        self.assertEqual(len(running), len(growth["labels"]))
+
+    def test_windowed_cumulative_starts_from_prior_total(self):
+        """A windowed curve must not restart at zero at the window edge."""
+        old = _assay_for(self.user)
+        Assay.objects.filter(pk=old.pk).update(
+            submission_date=timezone.now() - dt.timedelta(days=400)
+        )
+        growth = build_stats("12m")["growth"]
+        # The pre-window assay is excluded from the per-bucket counts but must
+        # still be carried in the running total.
+        self.assertGreater(growth["assays_cumulative"][0], growth["assays"][0])
+        self.assertEqual(growth["assays_cumulative"][-1], real_assays().count())
+
+    def test_completion_marks_are_sorted_and_bucketed(self):
+        marks = build_stats("all")["completion"]
+        self.assertEqual(marks["total"], 2)
+        # Most complete first, so the strip reads as a distribution.
+        self.assertEqual(marks["marks"], sorted(marks["marks"], reverse=True))
+        legend = {entry["label"]: entry["count"] for entry in marks["legend"]}
+        self.assertEqual(legend["complete"], 1)          # self.done
+        self.assertEqual(legend["over half accepted"], 1)  # self.partial, 1 of 2
+        self.assertEqual(sum(legend.values()), marks["total"])
+
+    def test_completion_marks_are_capped(self):
+        marks = build_stats("all")["completion"]
+        self.assertLessEqual(len(marks["marks"]), config.stats_unit_marks_max)
+        self.assertFalse(marks["truncated"])
+
+    def test_organisation_rows_carry_an_inline_scale(self):
+        rows = {r["organisation"]: r for r in build_stats("all")["organisations"]}
+        # The busiest institution anchors the scale at 100%.
+        self.assertEqual(max(r["share"] for r in rows.values()), 100.0)
+        self.assertEqual(rows["KU Leuven"]["share"] if "KU Leuven" in rows else 0.0, 0.0)
+
     def test_range_filter_excludes_older_rows(self):
         old = _assay_for(self.user)
         Assay.objects.filter(pk=old.pk).update(

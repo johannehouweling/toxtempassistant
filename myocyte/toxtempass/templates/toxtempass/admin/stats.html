@@ -2,133 +2,307 @@
 {% load humanize %}
 
 {% comment %}
-Staff-only KPI dashboard.
+Staff-only usage readout.
 
 Everything rendered here comes from toxtempass.stats.build_stats(), which emits
 aggregates only. Do NOT add a widget that surfaces a user's name, e-mail, ORCID
 iD, assay title or free-text feedback — the whole point of the module boundary
 is that this template cannot leak what it never receives.
+
+On the style block: the project convention is Bootstrap utilities over custom
+CSS, and the structure below still uses Bootstrap's grid and spacing. The rules
+here are the page's visual language (typeface, ink, hairline panels, the
+completion strip), which Bootstrap has no vocabulary for. Everything is scoped
+under .readout so it cannot reach any other page, and every colour comes from
+Config rather than being written twice.
 {% endcomment %}
 
-{% block title %}KPI dashboard — ToxTempAssistant{% endblock %}
+{% block title %}Usage readout — ToxTempAssistant{% endblock %}
 
 {% block content %}
 {{ chart_data|json_script:"kpiChartData" }}
 
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
-  <h2 class="mb-0"><i class="bi bi-graph-up-arrow me-2"></i>KPI dashboard</h2>
-  <div class="d-flex flex-wrap align-items-center gap-2">
-    <div class="btn-group btn-group-sm" role="group" aria-label="Time range">
-      {% for key, label in stats.ranges %}
-      <a class="btn {% if key == stats.range.key %}btn-primary{% else %}btn-outline-primary{% endif %}"
-         href="?range={{ key }}">{{ label }}</a>
-      {% endfor %}
-    </div>
-    <div class="btn-group btn-group-sm" role="group" aria-label="Export">
-      <a class="btn btn-outline-secondary" href="{% url 'stats_export_csv' %}?range={{ stats.range.key }}">
-        <i class="bi bi-filetype-csv me-1"></i>CSV
-      </a>
-      <a class="btn btn-outline-secondary" href="{% url 'stats_data' %}?range={{ stats.range.key }}" target="_blank" rel="noopener">
-        <i class="bi bi-braces me-1"></i>JSON
-      </a>
-    </div>
-  </div>
-</div>
-<p class="text-muted small mb-4">
-  Aggregates only — no personal data is shown. Seeded demo assays are excluded throughout.
-  Generated {{ stats.generated_at|naturaltime }}.
-</p>
+<link rel="stylesheet" href="{{ config.stats_font_css }}">
+<style>
+  /* Ships only with this page, so the body rule cannot affect the rest of the app. */
+  body { background: {{ config.stats_paper }}; }
 
-{# ── Hero tiles ──────────────────────────────────────────────────────────── #}
-<div class="row row-cols-2 row-cols-md-3 row-cols-xl-5 g-3 mb-4">
-  <div class="col">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <div class="text-muted text-uppercase small">Registered users</div>
-        <div class="fs-2 fw-semibold lh-1">{{ stats.headline.users.total|intcomma }}</div>
-        <div class="small text-success">+{{ stats.headline.users.period|intcomma }} <span class="text-muted">in period</span></div>
-      </div>
-    </div>
-  </div>
-  <div class="col">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <div class="text-muted text-uppercase small">Institutions</div>
-        <div class="fs-2 fw-semibold lh-1">{{ stats.headline.organisations.total|intcomma }}</div>
-        <div class="small text-muted">distinct organisations</div>
-      </div>
-    </div>
-  </div>
-  <div class="col">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <div class="text-muted text-uppercase small">Assays</div>
-        <div class="fs-2 fw-semibold lh-1">{{ stats.headline.assays.total|intcomma }}</div>
-        <div class="small text-success">+{{ stats.headline.assays.period|intcomma }} <span class="text-muted">in period</span></div>
-      </div>
-    </div>
-  </div>
-  <div class="col">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <div class="text-muted text-uppercase small">Completed ToxTemps</div>
-        <div class="fs-2 fw-semibold lh-1">{{ stats.headline.completed_assays.total|intcomma }}</div>
-        <div class="small text-muted">all answers accepted</div>
-      </div>
-    </div>
-  </div>
-  <div class="col">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <div class="text-muted text-uppercase small">LLM spend</div>
-        <div class="fs-2 fw-semibold lh-1">{{ stats.headline.llm_cost.currency }}{{ stats.headline.llm_cost.total|floatformat:2|default:"0.00" }}</div>
-        <div class="small text-muted">{{ stats.headline.llm_cost.currency }}{{ stats.headline.llm_cost.period|floatformat:2|default:"0.00" }} in period</div>
-      </div>
-    </div>
-  </div>
-</div>
+  .readout {
+    --ink:   {{ config.stats_ink }};
+    --ink-2: {{ config.stats_ink_2 }};
+    --ink-3: {{ config.stats_ink_3 }};
+    --rule:  {{ config.stats_rule }};
+    --panel: {{ config.stats_chart_surface }};
+    --m0: {{ config.stats_rule }};
+    --m1: {{ config.stats_chart_ordinal.0 }};
+    --m2: {{ config.stats_chart_ordinal.2 }};
+    --m3: {{ config.stats_chart_ordinal.3 }};
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: .9375rem;
+    line-height: 1.55;
+    color: var(--ink);
+  }
 
-{# ── Growth + assay status ───────────────────────────────────────────────── #}
-<div class="row g-3 mb-3">
-  <div class="col-12 col-xl-7">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title mb-0">Uptake over time</h5>
-        <p class="card-subtitle text-muted small mb-3">New accounts and new assays per {{ stats.growth.bucket }} — {{ stats.range.label|lower }}</p>
-        <div style="height:280px"><canvas id="chartGrowth" aria-label="New users and new assays over time" role="img"></canvas></div>
+  /* Measured values are set in the Mono cut so digits align down a column and
+     the large figures read as an instrument readout rather than a headline. */
+  .readout .val { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .readout .fig { font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 300; letter-spacing: -.02em; line-height: 1; }
+  .readout .fig-lg { font-size: clamp(2.25rem, 5vw, 3rem); }
+  .readout .fig-md { font-size: 1.75rem; }
+  .readout .unit { color: var(--ink-2); font-size: .8125rem; }
+  .readout .note { color: var(--ink-2); font-size: .8125rem; max-width: 62ch; }
+
+  /* Panels are defined by a hairline on white, never by a shadow. */
+  .readout .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; }
+  .readout .panel + .panel { margin-top: 1rem; }
+  .readout .panel-hd { border-bottom: 1px solid var(--rule); padding: .875rem 1.25rem; }
+  .readout .panel-hd h2 { font-size: 1.0625rem; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+  .readout .panel-bd { padding: 1.25rem; }
+  .readout .split { border-top: 1px solid var(--rule); }
+  @media (min-width: 992px) {
+    .readout .split { border-top: 0; border-left: 1px solid var(--rule); }
+  }
+
+  /* The completion strip: one mark per ToxTemp, sorted most-complete first. */
+  .readout .strip { display: flex; flex-wrap: wrap; gap: 2px; align-items: stretch; }
+  .readout .strip > i { flex: 1 1 5px; max-width: 24px; height: 46px; border-radius: 1px; transform-origin: bottom; }
+  .readout .strip > i.m0 { background: var(--m0); }
+  .readout .strip > i.m1 { background: var(--m1); }
+  .readout .strip > i.m2 { background: var(--m2); }
+  .readout .strip > i.m3 { background: var(--m3); }
+  @keyframes markIn { from { transform: scaleY(.12); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+  .readout .strip > i { animation: markIn .3s cubic-bezier(.2,.7,.3,1) backwards; animation-delay: calc(var(--i) * 1.4ms); }
+  .readout .key { display: inline-flex; align-items: center; gap: .4rem; }
+  .readout .key::before { content: ""; width: .6rem; height: .9rem; border-radius: 1px; background: currentColor; }
+  .readout .key.m0 { color: var(--m0); } .readout .key.m1 { color: var(--m1); }
+  .readout .key.m2 { color: var(--m2); } .readout .key.m3 { color: var(--m3); }
+  .readout .key > span { color: var(--ink); }
+
+  /* Measure bars: a rate with its own value beside it, no card around it. */
+  .readout .meter { height: 6px; background: var(--rule); border-radius: 1px; overflow: hidden; }
+  .readout .meter > span { display: block; height: 100%; border-radius: 1px; background: var(--m3); }
+
+  .readout table { font-size: .875rem; }
+  .readout thead th { font-weight: 500; color: var(--ink-2); border-bottom: 1px solid var(--rule); padding-bottom: .4rem; }
+  .readout tbody td { border-bottom: 1px solid var(--rule); padding: .45rem 0; }
+  .readout tbody tr:last-child td { border-bottom: 0; }
+  .readout td.num, .readout th.num { text-align: right; font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .readout .scroll-y { max-height: 21rem; overflow-y: auto; }
+  /* Inline scale in the institutions table: the row is its own bar chart, so
+     the panel does not need a second chart repeating the same numbers. */
+  .readout .rowbar { display: block; height: 3px; width: var(--w); min-width: 2px;
+                     background: var(--m2); border-radius: 1px; margin-top: .25rem; }
+
+  .readout .seg a { border: 1px solid var(--rule); color: var(--ink-2); background: var(--panel); padding: .25rem .7rem; font-size: .8125rem; text-decoration: none; }
+  .readout .seg a + a { border-left: 0; }
+  .readout .seg a:first-child { border-radius: 3px 0 0 3px; }
+  .readout .seg a:last-child { border-radius: 0 3px 3px 0; }
+  .readout .seg a[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .readout .seg a:hover { color: var(--ink); }
+  .readout .seg a[aria-current="page"]:hover { color: #fff; }
+  .readout a:focus-visible, .readout .seg a:focus-visible { outline: 2px solid var(--m3); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .readout .strip > i { animation: none; }
+  }
+</style>
+
+<div class="readout">
+
+  {# ── Masthead ─────────────────────────────────────────────────────────── #}
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 pb-3 mb-4"
+       style="border-bottom: 1px solid var(--rule)">
+    <div>
+      <h1 class="h4 mb-1" style="letter-spacing:-.02em">Usage readout</h1>
+      <p class="note mb-0">
+        {% if stats.range.is_all_time %}Everything since launch{% else %}{{ stats.range.label }}{% endif %},
+        as of {{ stats.generated_at|date:"j F Y, H:i" }}. Aggregates only — no personal data,
+        and the demo ToxTemp every new account receives is left out throughout.
+      </p>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-3">
+      <div class="seg d-flex">
+        {% for key, label in stats.ranges %}
+        <a href="?range={{ key }}" {% if key == stats.range.key %}aria-current="page"{% endif %}>{{ label }}</a>
+        {% endfor %}
+      </div>
+      <div class="d-flex gap-3">
+        <a class="note text-decoration-underline" href="{% url 'stats_export_csv' %}?range={{ stats.range.key }}">Download CSV</a>
+        <a class="note text-decoration-underline" href="{% url 'stats_data' %}?range={{ stats.range.key }}" target="_blank" rel="noopener">JSON</a>
       </div>
     </div>
   </div>
-  <div class="col-12 col-xl-5">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title mb-0">Assay processing status</h5>
-        <p class="card-subtitle text-muted small mb-3">Current LLM state of assays created in the period</p>
-        <div style="height:220px"><canvas id="chartStatus" aria-label="Assay count per processing status" role="img"></canvas></div>
-        <div class="d-flex flex-wrap gap-2 mt-3">
-          {% for entry in stats.assay_status %}
-          <span class="badge text-bg-light border">{{ entry.label }} <span class="fw-semibold">{{ entry.count|intcomma }}</span>{% if entry.pct %} · {{ entry.pct }}%{% endif %}</span>
-          {% endfor %}
+
+  {# ── Hero: every ToxTemp, one mark ────────────────────────────────────── #}
+  <div class="panel">
+    <div class="panel-bd">
+      <h2 class="h6 mb-1" style="font-weight:600">Every ToxTemp, one mark</h2>
+      <p class="note mb-3">Sorted by how much of the template its authors have accepted.</p>
+
+      {% if stats.completion.marks %}
+      <div class="strip mb-3" role="img"
+           aria-label="{{ stats.completion.total }} ToxTemps, {{ stats.completion.legend.0.count }} complete, {{ stats.completion.legend.1.count }} over half accepted, {{ stats.completion.legend.2.count }} under half accepted, {{ stats.completion.legend.3.count }} not started">
+        {% for mark in stats.completion.marks %}<i class="m{{ mark }}" style="--i:{{ forloop.counter0 }}"></i>{% endfor %}
+      </div>
+      <div class="d-flex flex-wrap gap-4 mb-0">
+        {% for entry in stats.completion.legend %}
+        <span class="key m{{ entry.key }}" style="font-size:.8125rem">
+          <span><span class="val">{{ entry.count|intcomma }}</span> {{ entry.label }}</span>
+        </span>
+        {% endfor %}
+      </div>
+      {% if stats.completion.truncated %}
+      <p class="note mt-2 mb-0">Showing the {{ stats.completion.marks|length }} most complete of {{ stats.completion.total|intcomma }}.</p>
+      {% endif %}
+      {% else %}
+      <p class="note mb-0">No ToxTemps in this period yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="panel-hd border-bottom-0" style="border-top:1px solid var(--rule)">
+      <div class="row g-4">
+        <div class="col-6 col-md">
+          <div class="fig fig-md">{{ stats.headline.users.total|intcomma }}</div>
+          <div class="unit">people</div>
+        </div>
+        <div class="col-6 col-md">
+          <div class="fig fig-md">{{ stats.headline.organisations.total|intcomma }}</div>
+          <div class="unit">institutions</div>
+        </div>
+        <div class="col-6 col-md">
+          <div class="fig fig-md">{{ stats.headline.assays.total|intcomma }}</div>
+          <div class="unit">ToxTemps started</div>
+        </div>
+        <div class="col-6 col-md">
+          <div class="fig fig-md">{{ stats.files.count|intcomma }}</div>
+          <div class="unit">documents read</div>
+        </div>
+        <div class="col-6 col-md">
+          <div class="fig fig-md">{{ stats.headline.llm_cost.currency }}{{ stats.headline.llm_cost.total|floatformat:2|default:"0.00" }}</div>
+          <div class="unit">spent on drafting</div>
         </div>
       </div>
     </div>
   </div>
-</div>
 
-{# ── Funnel + answer quality ─────────────────────────────────────────────── #}
-<div class="row g-3 mb-3">
-  <div class="col-12 col-xl-7">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title mb-0">Completion funnel</h5>
-        <p class="card-subtitle text-muted small mb-3">How far assays created in the period progress</p>
-        <div style="height:220px"><canvas id="chartFunnel" aria-label="Assay completion funnel" role="img"></canvas></div>
-        <div class="table-responsive mt-3">
-          <table class="table table-sm align-middle mb-0">
-            <thead><tr><th scope="col">Stage</th><th scope="col" class="text-end">Assays</th><th scope="col" class="text-end">Share</th></tr></thead>
+  {# ── Reach ────────────────────────────────────────────────────────────── #}
+  <div class="panel">
+    <div class="panel-hd"><h2>Reach</h2></div>
+    <div class="row g-0">
+      <div class="col-12 col-lg-7">
+        <div class="panel-bd">
+          <p class="note mb-3">People with an account and ToxTemps started, counted cumulatively.</p>
+          <div style="height:250px"><canvas id="chartGrowth"></canvas></div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-5 split">
+        <div class="panel-bd">
+          <p class="note mb-3">By institution, all time.</p>
+          <div class="scroll-y">
+            <table class="w-100">
+              <thead>
+                <tr>
+                  <th scope="col">Institution</th>
+                  <th scope="col" class="num">People</th>
+                  <th scope="col" class="num">ToxTemps</th>
+                  <th scope="col" class="num">Done</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in stats.organisations %}
+                <tr>
+                  <td>
+                    {{ row.organisation }}
+                    <span class="rowbar" style="--w: {{ row.share }}%"></span>
+                  </td>
+                  <td class="num">{{ row.users|intcomma }}</td>
+                  <td class="num">{{ row.assays|intcomma }}</td>
+                  <td class="num">{{ row.completed|intcomma }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="note">No institutions recorded yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Does the drafting help ───────────────────────────────────────────── #}
+  <div class="panel">
+    <div class="panel-hd"><h2>Drafting</h2></div>
+    <div class="row g-0">
+      <div class="col-12 col-lg-7">
+        <div class="panel-bd">
+          <p class="note mb-4">
+            Across {{ stats.answers.total|intcomma }} questions the model has answered.
+            A high keep rate and a low “not found” rate together mean the drafts are
+            landing close enough to be worth editing.
+          </p>
+
+          <div class="mb-4">
+            <div class="d-flex align-items-baseline justify-content-between mb-1">
+              <span>Answers accepted by their author</span>
+              <span class="val">{{ stats.answers.accepted_pct|default:"0" }}%</span>
+            </div>
+            <div class="meter"><span style="width: {{ stats.answers.accepted_pct|default:0 }}%"></span></div>
+            <p class="note mt-1 mb-0">{{ stats.answers.accepted|intcomma }} of {{ stats.answers.total|intcomma }}</p>
+          </div>
+
+          <div class="mb-4">
+            <div class="d-flex align-items-baseline justify-content-between mb-1">
+              <span>Edited before being accepted</span>
+              <span class="val">{{ stats.answers.edited_pct|default:"0" }}%</span>
+            </div>
+            <div class="meter"><span style="width: {{ stats.answers.edited_pct|default:0 }}%"></span></div>
+            <p class="note mt-1 mb-0">{{ stats.answers.edited|intcomma }} answers saved more than once</p>
+          </div>
+
+          <div class="mb-0">
+            <div class="d-flex align-items-baseline justify-content-between mb-1">
+              <span>Not found in the uploaded documents</span>
+              <span class="val">{{ stats.answers.not_found_pct|default:"0" }}%</span>
+            </div>
+            <div class="meter"><span style="width: {{ stats.answers.not_found_pct|default:0 }}%"></span></div>
+            <p class="note mt-1 mb-0">{{ stats.answers.not_found|intcomma }} of {{ stats.answers.answered|intcomma }} drafted answers — lower is better</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-5 split">
+        <div class="panel-bd">
+          <div class="row g-4 mb-4">
+            <div class="col-6">
+              <div class="fig fig-md">{{ stats.headline.completed_assays.total|intcomma }}</div>
+              <div class="unit">ToxTemps finished</div>
+            </div>
+            <div class="col-6">
+              <div class="fig fig-md">{{ stats.engagement.median_completion_display }}</div>
+              <div class="unit">typical time to finish one</div>
+            </div>
+          </div>
+
+          {% if stats.feedback.rated %}
+          <p class="mb-1">
+            Rated <span class="val">{{ stats.feedback.mean }}</span><span class="unit"> / 5 useful</span>
+          </p>
+          <p class="note mb-3">{{ stats.feedback.rated|intcomma }} ratings on export{% if stats.feedback.response_rate %}, from {{ stats.feedback.response_rate }}% of ToxTemps{% endif %}.</p>
+          <div style="height:130px"><canvas id="chartRatings"></canvas></div>
+          {% else %}
+          <p class="note mb-0">No usefulness ratings submitted in this period.</p>
+          {% endif %}
+
+          <table class="w-100 mt-4">
+            <thead><tr><th scope="col">How far ToxTemps get</th><th scope="col" class="num">Count</th><th scope="col" class="num">Share</th></tr></thead>
             <tbody>
               {% for stage in stats.funnel %}
-              <tr><td>{{ stage.label }}</td><td class="text-end font-monospace">{{ stage.count|intcomma }}</td><td class="text-end font-monospace">{% if stage.pct %}{{ stage.pct }}%{% else %}—{% endif %}</td></tr>
+              <tr>
+                <td>{{ stage.label }}</td>
+                <td class="num">{{ stage.count|intcomma }}</td>
+                <td class="num">{% if stage.pct %}{{ stage.pct }}%{% else %}—{% endif %}</td>
+              </tr>
               {% endfor %}
             </tbody>
           </table>
@@ -136,192 +310,64 @@ is that this template cannot leak what it never receives.
       </div>
     </div>
   </div>
-  <div class="col-12 col-xl-5">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title mb-0">Answer quality</h5>
-        <p class="card-subtitle text-muted small mb-3">{{ stats.answers.total|intcomma }} answers across assays created in the period</p>
 
-        <div class="mb-3">
-          <div class="d-flex justify-content-between small"><span>Accepted by user</span><span class="fw-semibold">{{ stats.answers.accepted_pct|default:"0" }}%</span></div>
-          <div class="progress" role="progressbar" aria-label="Accepted answers" aria-valuenow="{{ stats.answers.accepted_pct|default:0 }}" aria-valuemin="0" aria-valuemax="100" style="height:8px">
-            <div class="progress-bar bg-success" style="width: {{ stats.answers.accepted_pct|default:0 }}%"></div>
-          </div>
-          <div class="form-text">{{ stats.answers.accepted|intcomma }} of {{ stats.answers.total|intcomma }}</div>
-        </div>
-
-        <div class="mb-3">
-          <div class="d-flex justify-content-between small"><span>Edited after drafting</span><span class="fw-semibold">{{ stats.answers.edited_pct|default:"0" }}%</span></div>
-          <div class="progress" role="progressbar" aria-label="Human-edited answers" aria-valuenow="{{ stats.answers.edited_pct|default:0 }}" aria-valuemin="0" aria-valuemax="100" style="height:8px">
-            <div class="progress-bar bg-primary" style="width: {{ stats.answers.edited_pct|default:0 }}%"></div>
-          </div>
-          <div class="form-text">{{ stats.answers.edited|intcomma }} answers saved more than once</div>
-        </div>
-
-        <div class="mb-0">
-          <div class="d-flex justify-content-between small"><span>“Not found in documents”</span><span class="fw-semibold">{{ stats.answers.not_found_pct|default:"0" }}%</span></div>
-          <div class="progress" role="progressbar" aria-label="Answers not found in documents" aria-valuenow="{{ stats.answers.not_found_pct|default:0 }}" aria-valuemin="0" aria-valuemax="100" style="height:8px">
-            <div class="progress-bar bg-warning" style="width: {{ stats.answers.not_found_pct|default:0 }}%"></div>
-          </div>
-          <div class="form-text">{{ stats.answers.not_found|intcomma }} of {{ stats.answers.answered|intcomma }} drafted answers — lower is better</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-{# ── Institutions ────────────────────────────────────────────────────────── #}
-<div class="card border-0 shadow-sm mb-3">
-  <div class="card-body">
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-      <div>
-        <h5 class="card-title mb-0">Institutions</h5>
-        <p class="card-subtitle text-muted small mb-3">All-time usage per organisation. Accounts with no organisation on file are pooled into a single row, never listed individually.</p>
-      </div>
-      <span class="badge text-bg-light border align-self-start">All time</span>
-    </div>
-    <div style="height:320px"><canvas id="chartOrgs" aria-label="Users and assays per institution" role="img"></canvas></div>
-    <div class="table-responsive mt-3" style="max-height:320px">
-      <table class="table table-sm table-striped align-middle mb-0">
-        <thead class="sticky-top bg-white">
-          <tr>
-            <th scope="col">Organisation</th>
-            <th scope="col" class="text-end">Users</th>
-            <th scope="col" class="text-end">Investigations</th>
-            <th scope="col" class="text-end">Assays</th>
-            <th scope="col" class="text-end">Completed</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in stats.organisations %}
-          <tr>
-            <td>{{ row.organisation }}</td>
-            <td class="text-end font-monospace">{{ row.users|intcomma }}</td>
-            <td class="text-end font-monospace">{{ row.investigations|intcomma }}</td>
-            <td class="text-end font-monospace">{{ row.assays|intcomma }}</td>
-            <td class="text-end font-monospace">{{ row.completed|intcomma }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="5" class="text-muted">No organisations recorded yet.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-{# ── LLM cost + feedback ─────────────────────────────────────────────────── #}
-<div class="row g-3 mb-3">
-  <div class="col-12 col-xl-7">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title mb-0">LLM cost by model</h5>
-        <p class="card-subtitle text-muted small mb-3">
-          {{ stats.llm.input_tokens|intcomma }} input / {{ stats.llm.output_tokens|intcomma }} output tokens over
-          {{ stats.llm.runs|intcomma }} runs on {{ stats.llm.assays|intcomma }} assays
-          {% if stats.llm.cost_per_assay %}· {{ stats.llm.currency }}{{ stats.llm.cost_per_assay|floatformat:3 }} per assay{% endif %}
-        </p>
-        <div style="height:240px"><canvas id="chartCost" aria-label="LLM cost per model, split into input and output" role="img"></canvas></div>
-        <div class="table-responsive mt-3">
-          <table class="table table-sm align-middle mb-0">
+  {# ── Cost ─────────────────────────────────────────────────────────────── #}
+  <div class="panel">
+    <div class="panel-hd"><h2>Cost</h2></div>
+    <div class="row g-0">
+      <div class="col-12 col-lg-7">
+        <div class="panel-bd">
+          <p class="note mb-3">What each model has been charged for, split into what it read and what it wrote.</p>
+          {% if stats.llm.by_model %}
+          <div style="height:200px"><canvas id="chartCost"></canvas></div>
+          <table class="w-100 mt-3">
             <thead>
-              <tr><th scope="col">Model</th><th scope="col" class="text-end">Runs</th><th scope="col" class="text-end">Input tok.</th><th scope="col" class="text-end">Output tok.</th><th scope="col" class="text-end">Cost</th></tr>
+              <tr><th scope="col">Model</th><th scope="col" class="num">Read</th><th scope="col" class="num">Wrote</th><th scope="col" class="num">Cost</th></tr>
             </thead>
             <tbody>
               {% for row in stats.llm.by_model %}
               <tr>
                 <td class="text-break">{{ row.model }}</td>
-                <td class="text-end font-monospace">{{ row.runs|intcomma }}</td>
-                <td class="text-end font-monospace">{{ row.input_tokens|intcomma }}</td>
-                <td class="text-end font-monospace">{{ row.output_tokens|intcomma }}</td>
-                <td class="text-end font-monospace">{{ stats.llm.currency }}{{ row.cost_total|floatformat:3 }}</td>
+                <td class="num">{{ row.input_tokens|intcomma }}</td>
+                <td class="num">{{ row.output_tokens|intcomma }}</td>
+                <td class="num">{{ stats.llm.currency }}{{ row.cost_total|floatformat:2 }}</td>
               </tr>
-              {% empty %}
-              <tr><td colspan="5" class="text-muted">No cost records in this period.</td></tr>
               {% endfor %}
             </tbody>
           </table>
+          <p class="note mt-2 mb-0">Token counts in thousands of words read and written. A model showing tokens but no cost is missing its price tag in the deployment config.</p>
+          {% else %}
+          <p class="note mb-0">No drafting runs recorded in this period.</p>
+          {% endif %}
         </div>
       </div>
-    </div>
-  </div>
-  <div class="col-12 col-xl-5">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title mb-0">User feedback</h5>
-        <p class="card-subtitle text-muted small mb-3">
-          {{ stats.feedback.count|intcomma }} submissions{% if stats.feedback.response_rate %} · {{ stats.feedback.response_rate }}% of assays{% endif %}{% if stats.feedback.mean %} · mean {{ stats.feedback.mean }}/5{% endif %}
-        </p>
-        <div style="height:240px"><canvas id="chartRatings" aria-label="Distribution of usefulness ratings" role="img"></canvas></div>
-        <p class="form-text mb-0">Free-text feedback is never shown here — read it in the Django admin if needed.</p>
-      </div>
-    </div>
-  </div>
-</div>
-
-{# ── Secondary metric strips ─────────────────────────────────────────────── #}
-<div class="row g-3">
-  <div class="col-12 col-lg-4">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title mb-3">Engagement</h5>
-        <dl class="row mb-0 small">
-          <dt class="col-7 fw-normal text-muted">Active time logged</dt><dd class="col-5 text-end font-monospace">{{ stats.engagement.active_hours|intcomma }} h</dd>
-          <dt class="col-7 fw-normal text-muted">Median time to completion</dt><dd class="col-5 text-end font-monospace">{{ stats.engagement.median_completion_display }}</dd>
-          {% for window, count in stats.engagement.active_users.items %}
-          <dt class="col-7 fw-normal text-muted">Logged in ≤{{ window }} days</dt><dd class="col-5 text-end font-monospace">{{ count|intcomma }}</dd>
-          {% endfor %}
-          <dt class="col-7 fw-normal text-muted">ORCID linked</dt><dd class="col-5 text-end font-monospace">{{ stats.engagement.orcid_linked|intcomma }} / {{ stats.engagement.users_total|intcomma }}</dd>
-          <dt class="col-7 fw-normal text-muted">Assay views</dt><dd class="col-5 text-end font-monospace">{{ stats.engagement.assay_views|intcomma }}</dd>
-          <dt class="col-7 fw-normal text-muted">File downloads</dt><dd class="col-5 text-end font-monospace">{{ stats.engagement.file_downloads|intcomma }}</dd>
-        </dl>
-      </div>
-    </div>
-  </div>
-  <div class="col-12 col-lg-4">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title mb-3">Uploads &amp; storage</h5>
-        <dl class="row mb-3 small">
-          <dt class="col-7 fw-normal text-muted">Files stored</dt><dd class="col-5 text-end font-monospace">{{ stats.files.count|intcomma }}</dd>
-          <dt class="col-7 fw-normal text-muted">Volume</dt><dd class="col-5 text-end font-monospace">{{ stats.files.megabytes|intcomma }} MB</dd>
-        </dl>
-        <h6 class="text-muted small text-uppercase">Top content types</h6>
-        <ul class="list-group list-group-flush small">
-          {% for row in stats.files.by_type %}
-          <li class="list-group-item d-flex justify-content-between px-0 py-1 border-0">
-            <span class="text-truncate me-2">{{ row.content_type }}</span>
-            <span class="font-monospace">{{ row.count|intcomma }}</span>
-          </li>
-          {% empty %}
-          <li class="list-group-item px-0 py-1 border-0 text-muted">No uploads in this period.</li>
-          {% endfor %}
-        </ul>
-      </div>
-    </div>
-  </div>
-  <div class="col-12 col-lg-4">
-    <div class="card h-100 border-0 shadow-sm">
-      <div class="card-body">
-        <h5 class="card-title mb-3">Collaboration &amp; content</h5>
-        <dl class="row mb-3 small">
-          <dt class="col-7 fw-normal text-muted">Workspaces</dt><dd class="col-5 text-end font-monospace">{{ stats.collaboration.workspaces|intcomma }}</dd>
-          <dt class="col-7 fw-normal text-muted">Collaborating users</dt><dd class="col-5 text-end font-monospace">{{ stats.collaboration.collaborating_users|intcomma }}</dd>
-          <dt class="col-7 fw-normal text-muted">Shared investigations</dt><dd class="col-5 text-end font-monospace">{{ stats.collaboration.shared_investigations|intcomma }}</dd>
-          <dt class="col-7 fw-normal text-muted">Investigations</dt><dd class="col-5 text-end font-monospace">{{ stats.content.investigations.total|intcomma }}</dd>
-          <dt class="col-7 fw-normal text-muted">Studies</dt><dd class="col-5 text-end font-monospace">{{ stats.content.studies.total|intcomma }}</dd>
-        </dl>
-        <h6 class="text-muted small text-uppercase">Questionnaire version</h6>
-        <ul class="list-group list-group-flush small">
-          {% for row in stats.question_sets %}
-          <li class="list-group-item d-flex justify-content-between px-0 py-1 border-0">
-            <span class="text-truncate me-2">{{ row.label }}</span>
-            <span class="font-monospace">{{ row.count|intcomma }}{% if row.pct %} · {{ row.pct }}%{% endif %}</span>
-          </li>
-          {% empty %}
-          <li class="list-group-item px-0 py-1 border-0 text-muted">No assays in this period.</li>
-          {% endfor %}
-        </ul>
+      <div class="col-12 col-lg-5 split">
+        <div class="panel-bd">
+          <div class="mb-4">
+            <div class="fig fig-lg">{{ stats.llm.currency }}{{ stats.llm.cost_per_assay|floatformat:3|default:"0.000" }}</div>
+            <div class="unit">per ToxTemp drafted</div>
+          </div>
+          <table class="w-100">
+            <tbody>
+              <tr><td>Drafting runs</td><td class="num">{{ stats.llm.runs|intcomma }}</td></tr>
+              <tr><td>Words read</td><td class="num">{{ stats.llm.input_tokens|intcomma }}</td></tr>
+              <tr><td>Words written</td><td class="num">{{ stats.llm.output_tokens|intcomma }}</td></tr>
+              <tr><td>Documents stored</td><td class="num">{{ stats.files.megabytes|intcomma }} MB</td></tr>
+              <tr><td>Shared workspaces</td><td class="num">{{ stats.collaboration.workspaces|intcomma }}</td></tr>
+              <tr><td>People collaborating</td><td class="num">{{ stats.collaboration.collaborating_users|intcomma }}</td></tr>
+            </tbody>
+          </table>
+          {% if stats.question_sets %}
+          <p class="note mt-3 mb-1">Questionnaire version in use</p>
+          <table class="w-100">
+            <tbody>
+              {% for row in stats.question_sets %}
+              <tr><td>{{ row.label }}</td><td class="num">{{ row.count|intcomma }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% endif %}
+        </div>
       </div>
     </div>
   </div>
@@ -331,161 +377,104 @@ is that this template cannot leak what it never receives.
 <script>
 (function () {
   const D = JSON.parse(document.getElementById('kpiChartData').textContent);
-  if (typeof Chart === 'undefined') return;   // CDN blocked — tables still carry every number
+  if (typeof Chart === 'undefined') return;   // CDN blocked — the tables still carry every number
 
   const P = D.palette;
-  // Recessive, hairline chrome: the marks carry the message, not the grid.
-  Chart.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-  Chart.defaults.color = P.axis;
+  Chart.defaults.font.family = '"IBM Plex Sans", system-ui, -apple-system, sans-serif';
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = P.ink2;
+  Chart.defaults.maintainAspectRatio = false;
   Chart.defaults.plugins.legend.labels.boxWidth = 10;
   Chart.defaults.plugins.legend.labels.boxHeight = 10;
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
-  Chart.defaults.maintainAspectRatio = false;
+  Chart.defaults.plugins.tooltip.backgroundColor = P.ink;
+  Chart.defaults.plugins.tooltip.padding = 8;
+  Chart.defaults.plugins.tooltip.cornerRadius = 3;
+  Chart.defaults.plugins.tooltip.displayColors = false;
 
-  const grid = { color: P.grid, drawTicks: false, borderDash: [] };
+  const grid = { color: P.grid, drawTicks: false };
   const noGrid = { display: false };
 
-  // Horizontal-bar cards grow with their row count instead of squeezing N bars
-  // into a fixed box; the extra 48px is the x-axis band under the plot.
+  // Horizontal-bar panels grow with their row count rather than squeezing N
+  // bars into a fixed box; the extra 44px is the axis band under the plot.
   function fit(id, rows, perRow) {
     const el = document.getElementById(id);
-    if (el) el.parentElement.style.height = Math.max(140, rows * perRow + 48) + 'px';
+    if (el) el.parentElement.style.height = Math.max(130, rows * perRow + 44) + 'px';
     return el;
   }
 
-  // ── Uptake over time ──────────────────────────────────────────────────────
-  // Two series, one shared count axis (never a second y-scale).
+  // ── Reach, cumulative ─────────────────────────────────────────────────────
+  // Two series on one shared count axis — never a second y-scale.
   new Chart(document.getElementById('chartGrowth'), {
     type: 'line',
     data: {
       labels: D.growth.labels,
       datasets: [
-        { label: 'New users', data: D.growth.users, borderColor: P.series[0],
-          backgroundColor: P.series[0], borderWidth: 2, pointRadius: 0,
-          pointHoverRadius: 5, tension: 0.25 },
-        { label: 'New assays', data: D.growth.assays, borderColor: P.series[1],
-          backgroundColor: P.series[1], borderWidth: 2, pointRadius: 0,
-          pointHoverRadius: 5, tension: 0.25 },
+        { label: 'People', data: D.growth.users_cumulative, borderColor: P.series[0],
+          backgroundColor: P.series[0], borderWidth: 2, pointRadius: 0, pointHoverRadius: 5 },
+        { label: 'ToxTemps', data: D.growth.assays_cumulative, borderColor: P.series[1],
+          backgroundColor: P.series[1], borderWidth: 2, pointRadius: 0, pointHoverRadius: 5 },
       ],
     },
     options: {
       interaction: { mode: 'index', intersect: false },
+      plugins: { tooltip: { displayColors: true } },
       scales: {
-        x: { grid: noGrid },
-        y: { beginAtZero: true, grid: grid, ticks: { precision: 0 } },
-      },
-    },
-  });
-
-  // ── Assay status ──────────────────────────────────────────────────────────
-  // One series, one colour: identity is carried by the axis label, so status
-  // hues (which are not a CVD-safe categorical set) are not needed here.
-  new Chart(fit('chartStatus', D.status.length, 30), {
-    type: 'bar',
-    data: {
-      labels: D.status.map(s => s.label),
-      datasets: [{
-        label: 'Assays', data: D.status.map(s => s.count),
-        backgroundColor: P.series[0], borderRadius: 4, borderSkipped: 'start',
-        barPercentage: 0.7,
-      }],
-    },
-    options: {
-      indexAxis: 'y',
-      plugins: { legend: { display: false } },
-      scales: { x: { beginAtZero: true, grid: grid, ticks: { precision: 0 } }, y: { grid: noGrid } },
-    },
-  });
-
-  // ── Completion funnel ─────────────────────────────────────────────────────
-  // Ordered stages → single-hue ordinal ramp, light to dark.
-  new Chart(fit('chartFunnel', D.funnel.length, 36), {
-    type: 'bar',
-    data: {
-      labels: D.funnel.map(s => s.label),
-      datasets: [{
-        label: 'Assays', data: D.funnel.map(s => s.count),
-        backgroundColor: D.funnel.map((_, i) => P.ordinal[Math.min(i, P.ordinal.length - 1)]),
-        borderRadius: 4, borderSkipped: 'start', barPercentage: 0.7,
-      }],
-    },
-    options: {
-      indexAxis: 'y',
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: c => `${c.parsed.x} assays · ${D.funnel[c.dataIndex].pct ?? 0}%` } },
-      },
-      scales: { x: { beginAtZero: true, grid: grid, ticks: { precision: 0 } }, y: { grid: noGrid } },
-    },
-  });
-
-  // ── Institutions ──────────────────────────────────────────────────────────
-  new Chart(fit('chartOrgs', D.organisations.length, 42), {
-    type: 'bar',
-    data: {
-      labels: D.organisations.map(o => o.organisation),
-      datasets: [
-        { label: 'Users', data: D.organisations.map(o => o.users),
-          backgroundColor: P.series[0], borderRadius: 4, borderSkipped: 'start' },
-        { label: 'Assays', data: D.organisations.map(o => o.assays),
-          backgroundColor: P.series[1], borderRadius: 4, borderSkipped: 'start' },
-      ],
-    },
-    options: {
-      indexAxis: 'y',
-      scales: {
-        x: { beginAtZero: true, grid: grid, ticks: { precision: 0 } },
-        y: { grid: noGrid, ticks: { autoSkip: false, callback: function (v) {
-          const s = this.getLabelForValue(v);
-          return s.length > 28 ? s.slice(0, 27) + '…' : s;
-        } } },
+        x: { grid: noGrid, ticks: { maxRotation: 0, autoSkipPadding: 16 } },
+        y: { beginAtZero: true, grid: grid, border: { display: false }, ticks: { precision: 0 } },
       },
     },
   });
 
   // ── Cost by model ─────────────────────────────────────────────────────────
-  // Stacked input/output cost; the 2px white border is the surface gap between
-  // segments, not an outline around the marks.
-  new Chart(fit('chartCost', D.models.length, 40), {
-    type: 'bar',
-    data: {
-      labels: D.models.map(m => m.model),
-      datasets: [
-        { label: 'Input cost', data: D.models.map(m => m.cost_input),
-          backgroundColor: P.series[0], borderColor: P.surface, borderWidth: 2 },
-        { label: 'Output cost', data: D.models.map(m => m.cost_output),
-          backgroundColor: P.series[1], borderColor: P.surface, borderWidth: 2 },
-      ],
-    },
-    options: {
-      indexAxis: 'y',
-      plugins: {
-        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${D.currency}${Number(c.parsed.x).toFixed(3)}` } },
+  // Stacked read/write cost; the 2px panel-coloured border is the spacer
+  // between segments, not an outline around the marks.
+  if (D.models.length) {
+    new Chart(fit('chartCost', D.models.length, 38), {
+      type: 'bar',
+      data: {
+        labels: D.models.map(m => m.model),
+        datasets: [
+          { label: 'Reading', data: D.models.map(m => m.cost_input),
+            backgroundColor: P.series[0], borderColor: P.surface, borderWidth: 2 },
+          { label: 'Writing', data: D.models.map(m => m.cost_output),
+            backgroundColor: P.series[1], borderColor: P.surface, borderWidth: 2 },
+        ],
       },
-      scales: {
-        x: { stacked: true, beginAtZero: true, grid: grid,
-             ticks: { callback: v => D.currency + v } },
-        y: { stacked: true, grid: noGrid },
+      options: {
+        indexAxis: 'y',
+        plugins: {
+          tooltip: { displayColors: true,
+            callbacks: { label: c => `${c.dataset.label} ${D.currency}${Number(c.parsed.x).toFixed(2)}` } },
+        },
+        scales: {
+          x: { stacked: true, beginAtZero: true, grid: grid, border: { display: false },
+               ticks: { callback: v => D.currency + v } },
+          y: { stacked: true, grid: noGrid, border: { display: false } },
+        },
       },
-    },
-  });
+    });
+  }
 
   // ── Usefulness ratings ────────────────────────────────────────────────────
-  new Chart(document.getElementById('chartRatings'), {
-    type: 'bar',
-    data: {
-      labels: D.ratings.map(b => b.label),
-      datasets: [{
-        label: 'Responses', data: D.ratings.map(b => b.count),
-        backgroundColor: P.series[0], borderRadius: 4, borderSkipped: 'bottom',
-        barPercentage: 0.8,
-      }],
-    },
-    options: {
-      plugins: { legend: { display: false } },
-      scales: { x: { grid: noGrid }, y: { beginAtZero: true, grid: grid, ticks: { precision: 0 } } },
-    },
-  });
+  const ratings = document.getElementById('chartRatings');
+  if (ratings) {
+    new Chart(ratings, {
+      type: 'bar',
+      data: {
+        labels: D.ratings.map(b => b.label),
+        datasets: [{ label: 'Ratings', data: D.ratings.map(b => b.count),
+          backgroundColor: P.series[0], borderRadius: 3, borderSkipped: 'bottom', barPercentage: .85 }],
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: noGrid, border: { display: false }, ticks: { font: { size: 10 } } },
+          y: { beginAtZero: true, grid: grid, border: { display: false }, ticks: { precision: 0, maxTicksLimit: 4 } },
+        },
+      },
+    });
+  }
 })();
 </script>
 {% endblock %}
