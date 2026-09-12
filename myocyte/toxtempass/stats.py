@@ -224,14 +224,20 @@ def headline(rng: StatsRange) -> dict[str, Any]:
     n_answers = answers.count()
     n_accepted = answers.filter(accepted=True).count()
 
-    n_orgs = persons.exclude(organization="").values("organization").distinct().count()
+    named = persons.exclude(organization="")
+    n_orgs = named.values("organization").distinct().count()
+    n_orgs_period = (
+        _scoped(named, "date_joined", rng).values("organization").distinct().count()
+    )
 
     return {
         "users": {
             "total": persons.count(),
             "period": _scoped(persons, "date_joined", rng).count(),
         },
-        "organisations": {"total": n_orgs, "period": None},
+        # "period" counts institutions whose first account arrived inside the
+        # window, so it reads on the same basis as the users figure beside it.
+        "organisations": {"total": n_orgs, "period": n_orgs_period},
         "assays": {
             "total": assays.count(),
             "period": _scoped(assays, "submission_date", rng).count(),

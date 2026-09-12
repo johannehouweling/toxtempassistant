@@ -144,17 +144,21 @@ Config rather than being written twice.
       <div class="col-12 col-lg-7">
         <div class="panel-bd">
           <div class="row g-4">
-            <div class="col-6 col-md-4">
+            <div class="col-6">
+              <div class="fig fig-lg">{{ stats.headline.organisations.period|intcomma }}</div>
+              <div class="unit">institutions</div>
+            </div>
+            <div class="col-6">
+              <div class="fig fig-lg">{{ stats.headline.users.period|intcomma }}</div>
+              <div class="unit">registered users</div>
+            </div>
+            <div class="col-6">
               <div class="fig fig-lg">{{ stats.headline.assays.period|intcomma }}</div>
               <div class="unit">ToxTemps created</div>
             </div>
-            <div class="col-6 col-md-4">
+            <div class="col-6">
               <div class="fig fig-lg">{{ stats.headline.completed_assays.period|intcomma }}</div>
               <div class="unit">ToxTemps completed</div>
-            </div>
-            <div class="col-6 col-md-4">
-              <div class="fig fig-lg">{{ stats.headline.users.period|intcomma }}</div>
-              <div class="unit">users</div>
             </div>
           </div>
         </div>
@@ -171,6 +175,67 @@ Config rather than being written twice.
             <span class="note"><i class="swatch b-awaiting"></i>{{ stats.progress.drafted }}% drafted by the model</span>
           </div>
           <p class="note mb-0 mt-2">across {{ stats.progress.assays|intcomma }} ToxTemp{{ stats.progress.assays|pluralize }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Institutions ─────────────────────────────────────────────────────── #}
+  {# The named list is the credibility signal for a reader who does not know
+     the app, so it leads the panel and is not put behind a scrollbox. #}
+  <div class="panel">
+    <div class="panel-hd">
+      <h2>Institutions using ToxTempAssistant</h2>
+      <p class="note mb-0 mt-1">
+        {{ stats.headline.organisations.total|intcomma }} named institution{{ stats.headline.organisations.total|pluralize }},
+        all time. Accounts with no institution on file are pooled into one row.
+      </p>
+    </div>
+    <div class="row g-0">
+      <div class="col-12 col-lg-7">
+        <div class="panel-bd">
+          <table class="w-100">
+            <thead>
+              <tr>
+                <th scope="col">Institution</th>
+                <th scope="col" class="num">Users</th>
+                <th scope="col" class="num">ToxTemps</th>
+                <th scope="col" class="num">Completed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in stats.organisations %}
+              <tr>
+                <td>
+                  {{ row.organisation }}
+                  <span class="rowbar" style="--w: {{ row.share }}%"></span>
+                </td>
+                <td class="num">{{ row.users|intcomma }}</td>
+                <td class="num">{{ row.assays|intcomma }}</td>
+                <td class="num">{{ row.completed|intcomma }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4" class="note">No institutions recorded yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-5 split">
+        <div class="panel-bd">
+          <p class="note mb-3">Registered users and ToxTemps created, counted cumulatively.</p>
+          <div style="height:230px"><canvas id="chartGrowth"></canvas></div>
+          <div class="row g-4 mt-0">
+            <div class="col-6">
+              <div class="fig fig-md">{{ stats.collaboration.workspaces|intcomma }}</div>
+              <div class="unit">shared workspaces</div>
+            </div>
+            <div class="col-6">
+              <div class="fig fig-md">{{ stats.collaboration.collaborating_users|intcomma }}</div>
+              <div class="unit">users collaborating</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -214,65 +279,6 @@ Config rather than being written twice.
       {% else %}
       <p class="note mb-0">No ToxTemps with a questionnaire attached in this period.</p>
       {% endif %}
-    </div>
-  </div>
-
-  {# ── Reach ────────────────────────────────────────────────────────────── #}
-  <div class="panel">
-    <div class="panel-hd"><h2>Reach</h2></div>
-    <div class="row g-0">
-      <div class="col-12 col-lg-7">
-        <div class="panel-bd">
-          <p class="note mb-3">Users with an account and ToxTemps started, counted cumulatively.</p>
-          <div style="height:250px"><canvas id="chartGrowth"></canvas></div>
-          <div class="row g-4 mt-0">
-            <div class="col-4">
-              <div class="fig fig-md">{{ stats.headline.organisations.total|intcomma }}</div>
-              <div class="unit">institutions</div>
-            </div>
-            <div class="col-4">
-              <div class="fig fig-md">{{ stats.collaboration.workspaces|intcomma }}</div>
-              <div class="unit">shared workspaces</div>
-            </div>
-            <div class="col-4">
-              <div class="fig fig-md">{{ stats.collaboration.collaborating_users|intcomma }}</div>
-              <div class="unit">users collaborating</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-12 col-lg-5 split">
-        <div class="panel-bd">
-          <p class="note mb-3">By institution, all time.</p>
-          <div class="scroll-y">
-            <table class="w-100">
-              <thead>
-                <tr>
-                  <th scope="col">Institution</th>
-                  <th scope="col" class="num">Users</th>
-                  <th scope="col" class="num">ToxTemps</th>
-                  <th scope="col" class="num">Done</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for row in stats.organisations %}
-                <tr>
-                  <td>
-                    {{ row.organisation }}
-                    <span class="rowbar" style="--w: {{ row.share }}%"></span>
-                  </td>
-                  <td class="num">{{ row.users|intcomma }}</td>
-                  <td class="num">{{ row.assays|intcomma }}</td>
-                  <td class="num">{{ row.completed|intcomma }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="4" class="note">No institutions recorded yet.</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
