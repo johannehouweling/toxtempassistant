@@ -123,6 +123,8 @@
                           {% endif %}
                         </div>
                     </span>
+                    {% elif current_url_name == 'about' %}
+                    <a class="btn btn-outline-light ms-auto me-3" href="{% url 'overview' %}">Log in</a>
                     {% else %}
                     <a class="btn btn-outline-light ms-auto me-3" href="{% url 'about' %}">About</a>
                     {%endif%}
@@ -138,7 +140,7 @@
          {% endif %}
 
 
-        <div class="container px-4 py-4">
+        <div class="container px-3 py-4">
             {% block content %}
             <!-- Page content goes here -->
             {% endblock %}
@@ -146,7 +148,7 @@
         {# Logged-in users reach these from the user menu; the footer gives visitors and crawlers a path to the public pages. #}
         {% if not user.is_authenticated %}
         <footer class="border-top">
-            <div class="container px-4 py-4">
+            <div class="container px-3 py-4">
                 <nav class="d-flex flex-wrap gap-3 small" aria-label="Site">
                     <a class="link-secondary" href="{% url 'about' %}">About</a>
                     <a class="link-secondary" href="{% url 'toxtemp_questions' %}">ToxTemp questions</a>
