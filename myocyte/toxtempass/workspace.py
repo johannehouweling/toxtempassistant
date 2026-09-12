@@ -30,6 +30,7 @@ from toxtempass.models import (
     WorkspaceMember,
     WorkspaceRole,
 )
+from toxtempass.workspace_perms import revoke_investigation_from_members
 
 logger = logging.getLogger(__name__)
 
@@ -656,40 +657,10 @@ def remove_workspace_assay(request: HttpRequest, pk: int, assay_id: int) -> Json
 
     with transaction.atomic():
         workspace_inv.delete()
-
-        # Revoke view_investigation perm from each member, but only if they do not
-        # retain access to the same investigation via another workspace.
-        # Batch the cross-workspace lookups to avoid N+1 queries.
-        members = list(
-            WorkspaceMember.objects.filter(workspace=workspace).select_related("user")
-        )
-        member_user_ids = [m.user_id for m in members]
-
-        # All other-workspace memberships for current members in a single query.
-        other_memberships = WorkspaceMember.objects.filter(
-            user_id__in=member_user_ids
-        ).exclude(workspace=workspace)
-
-        # Which workspaces share this same investigation (single query).
-        investigation_workspace_ids = set(
-            WorkspaceInvestigation.objects.filter(
-                investigation=investigation
-            ).values_list("workspace_id", flat=True)
-        )
-
-        # Users who still have access via another workspace.
-        users_with_other_access = {
-            user_id
-            for user_id, ws_id in other_memberships.values_list("user_id", "workspace_id")
-            if ws_id in investigation_workspace_ids
-        }
-
-        for member in members:
-            # Never revoke the investigation owner's baseline perm.
-            if member.user_id == investigation.owner_id:
-                continue
-            if member.user_id in users_with_other_access:
-                continue  # member still has access via another workspace — keep the perm
-            remove_perm("view_investigation", member.user, investigation)
+        # Revoke only where the rules allow: the investigation owner keeps their
+        # baseline perm, and so does anyone who still reaches it through another
+        # workspace. Shared with the admin in workspace_perms so the two entry
+        # points cannot drift.
+        revoke_investigation_from_members(workspace, investigation)
 
     return JsonResponse({"success": True, "errors": {}})
