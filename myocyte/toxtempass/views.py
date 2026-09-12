@@ -1777,7 +1777,16 @@ class AssayListView(SingleTableView):
 
     @cached_property
     def member_workspace_ids(self) -> set[int]:
-        """PKs of every workspace the user belongs to (owned or joined)."""
+        """PKs of the workspaces this user may filter by.
+
+        Membership normally, and ``Workspace.save`` gives the creator an OWNER
+        row — so a user gets the workspaces they created or joined, and no
+        others. Superusers get all of them, matching guardian's superuser
+        bypass on the assay list itself: without this the page contradicts
+        itself, showing an admin assays from workspaces they cannot select.
+        """
+        if self.request.user.is_superuser:
+            return set(Workspace.objects.values_list("pk", flat=True))
         return set(
             WorkspaceMember.objects.filter(user=self.request.user).values_list(
                 "workspace_id", flat=True
