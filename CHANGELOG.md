@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.35.3 (2026-09-12)
+
+### Bug Fixes
+
+- **overview**: Let superusers filter by every workspace
+  ([`bf327e8`](https://github.com/johannehouweling/toxtempassistant/commit/bf327e883ebfb2ac23eb58c2fed6ca85e92e50ba))
+
+
 ## v3.35.2 (2026-09-12)
 
 ### Bug Fixes
