@@ -243,24 +243,27 @@ class Config:
     stats_rating_bins: Final[tuple[float, ...]] = (1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0)
 
     # ── /stats visual language ────────────────────────────────────────────────
-    # The dashboard is styled as a laboratory readout: a cool clinical page, ink
-    # in a blue-black, panels separated by hairlines rather than drop shadows,
-    # and — the governing rule — saturated colour reserved entirely for data
-    # marks, so nothing in the chrome can be mistaken for a series.
-    stats_ink = "#14202b"
-    stats_ink_2 = "#55687a"
-    stats_ink_3 = "#8697a4"
-    stats_paper = "#e9edf0"
-    stats_rule = "#cbd6de"
-    # Chart colours. A CVD-validated categorical pair (adjacent ΔE 24.7 protan /
-    # 33.6 normal on a white panel) — Bootstrap's own theme colours are not
-    # colourblind-safe as a pair. Slot 1 carries every single-series chart;
-    # slot 2 only joins it when a second series shares the axis.
-    stats_chart_series = ("#2a78d6", "#eb6834")
-    # Single-hue ordinal ramp, light → dark, monotone lightness, every step
-    # ≥2:1 on white. Used where the categories are genuinely ordered: the
-    # completion strip's acceptance bands.
-    stats_chart_ordinal = ("#86b6ef", "#5598e7", "#2a78d6", "#1c5cab")
+    # The dashboard uses the app's own colours: the filled headline card is
+    # Bootstrap's $primary, the same blue as the site header, and the data marks
+    # are steps of Bootstrap's blue scale. Text is a dark slate rather than
+    # black, and panels are separated by hairlines rather than drop shadows.
+    stats_ink = "#212529"       # Bootstrap $gray-900, the app's body text colour
+    stats_ink_2 = "#6c757d"     # $gray-600
+    stats_ink_3 = "#adb5bd"     # $gray-500
+    stats_paper = "#f1f3f5"     # a shade of $gray-100 for the page plane
+    stats_rule = "#dee2e6"      # $gray-300
+    stats_brand = "#0d6efd"     # $primary — matches the header, white text on it
+                                # clears 4.5:1 (Bootstrap's own .text-bg-primary)
+    # Chart colours: $primary paired with $orange. Validated as a categorical
+    # pair on a white panel — adjacent ΔE 30.7 protan / 39.1 normal, well clear
+    # of the colourblind-separation floor. Slot 1 carries every single-series
+    # chart; slot 2 only joins it when a second series shares the axis.
+    stats_chart_series = ("#0d6efd", "#eb6834")
+    # Ordinal ramp from Bootstrap's blue scale ($blue-300/-500/-600): monotone
+    # lightness and the light end clears 2:1 on white ($blue-200 does not, at
+    # 1.77:1, so the ramp starts at -300). Used where categories are ordered —
+    # the accepted / awaiting / undrafted progress bands.
+    stats_chart_ordinal = ("#6ea8fe", "#0d6efd", "#0a58ca")
     stats_chart_grid = "#dde5ea"
     stats_chart_axis = "#8697a4"
     # Panel background — doubles as the 2px spacer between stacked bar segments.

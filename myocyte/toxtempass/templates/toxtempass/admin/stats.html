@@ -33,9 +33,10 @@ Config rather than written twice.
     --ink-3: {{ config.stats_ink_3 }};
     --rule:  {{ config.stats_rule }};
     --panel: {{ config.stats_chart_surface }};
-    --accent:      {{ config.stats_chart_ordinal.3 }};
+    --brand:       {{ config.stats_brand }};
+    --accent:      {{ config.stats_chart_ordinal.2 }};
     --accent-soft: {{ config.stats_chart_ordinal.0 }};
-    --accent-mid:  {{ config.stats_chart_ordinal.2 }};
+    --accent-mid:  {{ config.stats_chart_ordinal.1 }};
     font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
     font-size: .9375rem;
     line-height: 1.55;
@@ -66,10 +67,10 @@ Config rather than written twice.
   .readout .stat { background: var(--panel); border: 1px solid var(--rule);
                    border-radius: 4px; padding: 1.375rem 1.5rem; height: 100%; }
   .readout .stat-label { color: var(--ink-2); font-size: .875rem; margin-top: .5rem; }
-  .readout .stat-ink { background: var(--ink); border-color: var(--ink); color: #fff;
+  .readout .stat-brand { background: var(--brand); border-color: var(--brand); color: #fff;
                        display: flex; flex-direction: column; }
-  .readout .stat-ink .stat-label,
-  .readout .stat-ink .unit { color: rgba(255,255,255,.72); }
+  .readout .stat-brand .stat-label,
+  .readout .stat-brand .unit { color: rgba(255,255,255,.88); }
 
   /* Panels for the detail sections below the cards. */
   .readout .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
@@ -92,10 +93,11 @@ Config rather than written twice.
   .readout .b1 { background: var(--accent); }
   .readout .b2 { background: var(--accent-soft); }
   .readout .b3 { background: var(--rule); }
-  /* On the inked card the same three bands are set in light-on-dark. */
-  .readout .stat-ink .b1 { background: var(--accent-soft); }
-  .readout .stat-ink .b2 { background: rgba(255,255,255,.34); }
-  .readout .stat-ink .b3 { background: rgba(255,255,255,.14); }
+  /* On the brand card the same three bands become a white ramp, so the most
+     important one (complete) is the highest-contrast. */
+  .readout .stat-brand .b1 { background: #fff; }
+  .readout .stat-brand .b2 { background: rgba(255,255,255,.48); }
+  .readout .stat-brand .b3 { background: rgba(255,255,255,.2); }
   .readout .key { display: inline-flex; align-items: baseline; gap: .4rem; font-size: .8125rem; }
   .readout .key::before { content: ""; width: .55rem; height: .55rem; border-radius: 2px;
                           background: currentColor; flex: none; transform: translateY(.05rem); }
@@ -104,10 +106,11 @@ Config rather than written twice.
   .readout .key.b3 { color: var(--rule); background: none; }
   .readout .key > span { color: var(--ink-2); }
   .readout .key > span b { font-weight: 600; color: var(--ink); }
-  .readout .stat-ink .key.b1 { color: var(--accent-soft); }
-  .readout .stat-ink .key.b2 { color: rgba(255,255,255,.34); }
-  .readout .stat-ink .key > span { color: rgba(255,255,255,.72); }
-  .readout .stat-ink .key > span b { color: #fff; }
+  .readout .stat-brand .key.b1 { color: #fff; }
+  .readout .stat-brand .key.b2 { color: rgba(255,255,255,.48); }
+  .readout .stat-brand .key.b3 { color: rgba(255,255,255,.2); }
+  .readout .stat-brand .key > span { color: rgba(255,255,255,.88); }
+  .readout .stat-brand .key > span b { color: #fff; }
 
   .readout table { font-size: .875rem; }
   .readout thead th { font-weight: 500; color: var(--ink-2); border-bottom: 1px solid var(--rule); padding-bottom: .4rem; }
@@ -154,7 +157,7 @@ Config rather than written twice.
      fill and scale — every card has the same border, radius and no shadow. #}
   <div class="row g-3">
     <div class="col-12 col-lg-5">
-      <div class="stat stat-ink">
+      <div class="stat stat-brand">
         <div class="fig fig-hero">{{ stats.headline.assays.period|intcomma }}</div>
         <div class="stat-label">ToxTemps created</div>
 
@@ -219,6 +222,21 @@ Config rather than written twice.
     </div>
   </div>
 
+  {# ── Growth ───────────────────────────────────────────────────────────── #}
+  {# Full width: a cumulative curve is the growth story, and it reads as growth
+     only when it has room to rise. Areas rather than bare lines so the
+     accumulation has mass, and the last value of each series is labelled on
+     the curve itself — the endpoint is the payoff. #}
+  <div class="panel">
+    <div class="panel-hd">
+      <h2>Growth</h2>
+      <p class="note mb-0 mt-1">Registered users and ToxTemps created, counted cumulatively.</p>
+    </div>
+    <div class="panel-bd">
+      <div style="height:260px"><canvas id="chartGrowth"></canvas></div>
+    </div>
+  </div>
+
   {# ── Institutions ─────────────────────────────────────────────────────── #}
   {# The named list is the credibility signal for a reader who does not know
      the app, so it leads the panel and is not put behind a scrollbox. #}
@@ -231,7 +249,7 @@ Config rather than written twice.
       </p>
     </div>
     <div class="row g-0">
-      <div class="col-12 col-lg-7">
+      <div class="col-12 col-lg-8">
         <div class="panel-bd">
           <table class="w-100">
             <thead>
@@ -261,19 +279,15 @@ Config rather than written twice.
         </div>
       </div>
 
-      <div class="col-12 col-lg-5 split">
+      <div class="col-12 col-lg-4 split">
         <div class="panel-bd">
-          <p class="note mb-3">Registered users and ToxTemps created, counted cumulatively.</p>
-          <div style="height:230px"><canvas id="chartGrowth"></canvas></div>
-          <div class="row g-4 mt-0">
-            <div class="col-6">
-              <div class="fig fig-md">{{ stats.collaboration.workspaces|intcomma }}</div>
-              <div class="unit">shared workspaces</div>
-            </div>
-            <div class="col-6">
-              <div class="fig fig-md">{{ stats.collaboration.collaborating_users|intcomma }}</div>
-              <div class="unit">users collaborating</div>
-            </div>
+          <div class="mb-4">
+            <div class="fig fig-md">{{ stats.collaboration.workspaces|intcomma }}</div>
+            <div class="unit">shared workspaces</div>
+          </div>
+          <div>
+            <div class="fig fig-md">{{ stats.collaboration.collaborating_users|intcomma }}</div>
+            <div class="unit">users collaborating across institutions</div>
           </div>
         </div>
       </div>
@@ -455,25 +469,81 @@ Config rather than written twice.
   const grid = { color: P.grid, drawTicks: false };
   const noGrid = { display: false };
 
-  // ── Reach, cumulative ─────────────────────────────────────────────────────
-  // Two series on one shared count axis — never a second y-scale.
+  // ── Growth, cumulative ────────────────────────────────────────────────────
+  // Two series on one shared count axis — never a second y-scale. Filled so
+  // the accumulation reads as mass, monotone interpolation so a cumulative
+  // curve can never dip below a value it already reached.
+  function fade(hex, top, bottom) {
+    return (ctx) => {
+      const area = ctx.chart.chartArea;
+      if (!area) return rgba(hex, top);
+      const g = ctx.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+      g.addColorStop(0, rgba(hex, top));
+      g.addColorStop(1, rgba(hex, bottom));
+      return g;
+    };
+  }
+  function rgba(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${n >> 16 & 255}, ${n >> 8 & 255}, ${n & 255}, ${a})`;
+  }
+
+  // The final value of each series, drawn on the curve. A growth chart's
+  // endpoint is the number the reader came for; the axis carries the rest.
+  const endLabel = {
+    id: 'endLabel',
+    afterDatasetsDraw(chart) {
+      const c = chart.ctx;
+      chart.data.datasets.forEach((ds, i) => {
+        const pts = chart.getDatasetMeta(i).data;
+        const last = pts[pts.length - 1];
+        if (!last) return;
+        const text = Number(ds.data[ds.data.length - 1]).toLocaleString();
+        c.save();
+        c.font = '600 15px "IBM Plex Sans", system-ui, sans-serif';
+        const w = c.measureText(text).width;
+        c.fillStyle = P.surface;
+        c.beginPath();
+        c.roundRect(last.x - w - 14, last.y - 22, w + 12, 22, 4);
+        c.fill();
+        c.fillStyle = ds.borderColor;
+        c.textAlign = 'right';
+        c.textBaseline = 'middle';
+        c.fillText(text, last.x - 8, last.y - 10);
+        c.restore();
+      });
+    },
+  };
+
   new Chart(document.getElementById('chartGrowth'), {
     type: 'line',
+    plugins: [endLabel],
     data: {
       labels: D.growth.labels,
       datasets: [
-        { label: 'Users', data: D.growth.users_cumulative, borderColor: P.series[0],
-          backgroundColor: P.series[0], borderWidth: 2, pointRadius: 0, pointHoverRadius: 5 },
-        { label: 'ToxTemps', data: D.growth.assays_cumulative, borderColor: P.series[1],
-          backgroundColor: P.series[1], borderWidth: 2, pointRadius: 0, pointHoverRadius: 5 },
+        { label: 'ToxTemps', data: D.growth.assays_cumulative,
+          borderColor: P.series[1], backgroundColor: fade(P.series[1], .22, .01),
+          borderWidth: 2.5, fill: 'origin', pointRadius: 0, pointHoverRadius: 5,
+          cubicInterpolationMode: 'monotone' },
+        { label: 'Users', data: D.growth.users_cumulative,
+          borderColor: P.series[0], backgroundColor: fade(P.series[0], .22, .01),
+          borderWidth: 2.5, fill: 'origin', pointRadius: 0, pointHoverRadius: 5,
+          cubicInterpolationMode: 'monotone' },
       ],
     },
     options: {
+      layout: { padding: { top: 26, right: 12 } },
       interaction: { mode: 'index', intersect: false },
-      plugins: { tooltip: { displayColors: true } },
+      plugins: {
+        legend: { position: 'bottom', align: 'start',
+                  labels: { padding: 16, boxWidth: 8, boxHeight: 8 } },
+        tooltip: { displayColors: true },
+      },
       scales: {
-        x: { grid: noGrid, ticks: { maxRotation: 0, autoSkipPadding: 16 } },
-        y: { beginAtZero: true, grid: grid, border: { display: false }, ticks: { precision: 0 } },
+        x: { grid: noGrid, border: { color: P.grid },
+             ticks: { maxRotation: 0, autoSkipPadding: 24 } },
+        y: { beginAtZero: true, grid: grid, border: { display: false },
+             ticks: { precision: 0, maxTicksLimit: 5 } },
       },
     },
   });
