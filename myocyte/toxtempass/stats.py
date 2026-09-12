@@ -43,6 +43,7 @@ from toxtempass.models import (
     Investigation,
     LLMStatus,
     Person,
+    Section,
     Study,
     Workspace,
     WorkspaceInvestigation,
@@ -423,6 +424,150 @@ def funnel(rng: StatsRange) -> list[dict[str, Any]]:
     ]
 
 
+def _progress_split(total: int, drafted: int, accepted: int) -> dict[str, float]:
+    """Split one questionnaire into accepted / awaiting / undrafted percentages.
+
+    The three always sum to 100 so a stacked bar can be rendered straight from
+    them. ``accepted`` is a subset of ``drafted``, so the middle band is the
+    answers that have a draft nobody has signed off yet.
+    """
+    if not total:
+        return {"accepted": 0.0, "awaiting": 0.0, "undrafted": 100.0, "drafted": 0.0}
+    accepted_pct = 100.0 * accepted / total
+    drafted_pct = 100.0 * drafted / total
+    return {
+        "accepted": round(accepted_pct, 1),
+        "awaiting": round(drafted_pct - accepted_pct, 1),
+        "undrafted": round(100.0 - drafted_pct, 1),
+        "drafted": round(drafted_pct, 1),
+    }
+
+
+def average_progress(rng: StatsRange) -> dict[str, Any]:
+    """Mean progress per ToxTemp, split into drafted and expert-accepted.
+
+    Each ToxTemp is scored on its own questionnaire and the scores are then
+    averaged, so every ToxTemp counts the same regardless of how many questions
+    its questionnaire version has. A ToxTemp with no questions seeded yet counts
+    as 0% rather than being dropped — it was still created.
+    """
+    rows = (
+        _scoped(real_assays(), "submission_date", rng)
+        .annotate(
+            n_total=Count("answers", distinct=True),
+            n_drafted=Count(
+                "answers", filter=Q(answers__answer_text__gt=""), distinct=True
+            ),
+            n_accepted=Count(
+                "answers", filter=Q(answers__accepted=True), distinct=True
+            ),
+        )
+        .values_list("n_total", "n_drafted", "n_accepted")
+    )
+
+    drafted_shares, accepted_shares, unseeded = [], [], 0
+    for total, drafted, accepted in rows:
+        if not total:
+            unseeded += 1
+            drafted_shares.append(0.0)
+            accepted_shares.append(0.0)
+            continue
+        drafted_shares.append(100.0 * drafted / total)
+        accepted_shares.append(100.0 * accepted / total)
+
+    n = len(drafted_shares)
+    drafted_pct = round(sum(drafted_shares) / n, 1) if n else 0.0
+    accepted_pct = round(sum(accepted_shares) / n, 1) if n else 0.0
+    return {
+        "assays": n,
+        "assays_without_questions": unseeded,
+        "drafted": drafted_pct,
+        "accepted": accepted_pct,
+        "awaiting": round(drafted_pct - accepted_pct, 1),
+        "undrafted": round(100.0 - drafted_pct, 1),
+    }
+
+
+def section_progress(rng: StatsRange) -> dict[str, Any]:
+    """Mean per-ToxTemp progress for each section of the questionnaire.
+
+    Scoped to whichever QuestionSet the most ToxTemps in the window use, since
+    sections are not comparable across questionnaire versions — merging a v1
+    section with a similarly titled v2 one would silently average two different
+    question lists. Sections keep their seeded order (pk), which is the order
+    they appear in the ToxTemp itself.
+    """
+    assays = _scoped(real_assays(), "submission_date", rng).exclude(question_set=None)
+    busiest = (
+        assays.values("question_set_id", "question_set__label",
+                      "question_set__display_name")
+        .annotate(n=Count("pk"))
+        .order_by("-n")
+        .first()
+    )
+    if not busiest:
+        return {"question_set": None, "assays": 0, "sections": []}
+
+    qset_id = busiest["question_set_id"]
+    assay_ids = assays.filter(question_set_id=qset_id).values("pk")
+
+    # One row per (ToxTemp, section): how many of that section's questions are
+    # drafted and accepted in that ToxTemp.
+    rows = (
+        Answer.objects.filter(
+            assay__in=assay_ids, question__subsection__section__question_set_id=qset_id
+        )
+        .values("assay_id", "question__subsection__section_id")
+        .annotate(
+            total=Count("pk"),
+            drafted=Count("pk", filter=Q(answer_text__gt="")),
+            accepted=Count("pk", filter=Q(accepted=True)),
+        )
+    )
+
+    per_section: dict[int, list[tuple[int, int, int]]] = {}
+    for row in rows:
+        section_id = row["question__subsection__section_id"]
+        per_section.setdefault(section_id, []).append(
+            (row["total"], row["drafted"], row["accepted"])
+        )
+
+    titles = dict(
+        Section.objects.filter(question_set_id=qset_id)
+        .order_by("pk")
+        .values_list("pk", "title")
+    )
+
+    sections = []
+    for section_id, title in titles.items():
+        entries = per_section.get(section_id, [])
+        if not entries:
+            sections.append(
+                {"title": title, "questions": 0, "accepted": 0.0, "awaiting": 0.0,
+                 "undrafted": 100.0, "drafted": 0.0}
+            )
+            continue
+        splits = [_progress_split(*entry) for entry in entries]
+        count = len(splits)
+        sections.append(
+            {
+                "title": title,
+                "questions": max(entry[0] for entry in entries),
+                "accepted": round(sum(s["accepted"] for s in splits) / count, 1),
+                "awaiting": round(sum(s["awaiting"] for s in splits) / count, 1),
+                "undrafted": round(sum(s["undrafted"] for s in splits) / count, 1),
+                "drafted": round(sum(s["drafted"] for s in splits) / count, 1),
+            }
+        )
+
+    return {
+        "question_set": busiest["question_set__display_name"]
+        or busiest["question_set__label"],
+        "assays": busiest["n"],
+        "sections": sections,
+    }
+
+
 def answer_quality(rng: StatsRange) -> dict[str, Any]:
     """Return acceptance, coverage and human-edit rates for answers in the window."""
     assay_ids = _scoped(real_assays(), "submission_date", rng).values("pk")
@@ -723,6 +868,8 @@ def build_stats(range_key: str | None = None) -> dict[str, Any]:
         "content": content_totals(rng),
         "growth": growth(rng),
         "completion": completion_marks(rng),
+        "progress": average_progress(rng),
+        "section_progress": section_progress(rng),
         "assay_status": assay_status(rng),
         "funnel": funnel(rng),
         "answers": answer_quality(rng),

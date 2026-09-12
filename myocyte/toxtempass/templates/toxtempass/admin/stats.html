@@ -63,25 +63,38 @@ Config rather than being written twice.
     .readout .split { border-top: 0; border-left: 1px solid var(--rule); }
   }
 
-  /* Summary dials. The arc is a semicircle of radius 50, so its length is
-     pi*50 = 157.08 — the dash offset walks that length back by the rate. */
-  .readout .gauge svg { display: block; width: 100%; max-width: 9rem; margin: 0 auto; height: auto; }
-  .readout .gauge path { fill: none; stroke-width: 8; stroke-linecap: round; }
-  .readout .gauge .gauge-track { stroke: var(--rule); }
-  .readout .gauge .gauge-value {
-    stroke: var(--m3);
-    stroke-dasharray: 157.08;
-    stroke-dashoffset: calc(157.08px * (1 - var(--p, 0) / 100));
-    transition: stroke-dashoffset .5s cubic-bezier(.2,.7,.3,1);
+  /* Average-progress dial: two concentric semicircles, radius 54 and 36, so
+     the arc lengths are pi*54 = 169.65 and pi*36 = 113.10. The dash offset
+     walks each length back by its own rate. */
+  .readout .dial svg { display: block; width: 100%; max-width: 14rem; margin: 0 auto; height: auto; }
+  .readout .dial path { fill: none; stroke-linecap: round; }
+  .readout .dial .dial-track { stroke: var(--rule); stroke-width: 11; }
+  .readout .dial .dial-track-inner { stroke-width: 9; }
+  .readout .dial .dial-drafted {
+    stroke: var(--m1); stroke-width: 11;
+    stroke-dasharray: 169.65;
+    stroke-dashoffset: calc(169.65px * (1 - var(--p, 0) / 100));
   }
-  .readout .gauge .gauge-num { font-family: "IBM Plex Mono", ui-monospace, monospace;
-                               font-size: 21px; font-weight: 300; fill: var(--ink); }
-  .readout .gauge .gauge-pct { font-family: "IBM Plex Mono", ui-monospace, monospace;
-                               font-size: 11px; fill: var(--ink-2); }
-  .readout .gauge .note { max-width: none; }
-  @media (prefers-reduced-motion: reduce) {
-    .readout .gauge .gauge-value { transition: none; }
+  .readout .dial .dial-accepted {
+    stroke: var(--m3); stroke-width: 9;
+    stroke-dasharray: 113.10;
+    stroke-dashoffset: calc(113.10px * (1 - var(--p, 0) / 100));
   }
+  .readout .dial .dial-num { font-family: "IBM Plex Mono", ui-monospace, monospace;
+                             font-size: 24px; font-weight: 300; fill: var(--ink); }
+
+  /* Stacked progress bar: accepted | drafted-not-accepted | undrafted.
+     The three widths always sum to 100, so no track is needed behind them. */
+  .readout .bar { display: flex; height: 10px; border-radius: 1px; overflow: hidden; gap: 1px; background: var(--rule); }
+  .readout .bar > i { display: block; }
+  .readout .bar > .b-accepted  { background: var(--m3); }
+  .readout .bar > .b-awaiting  { background: var(--m1); }
+  .readout .bar > .b-undrafted { background: var(--rule); }
+  .readout .swatch { display: inline-block; width: .6rem; height: .6rem; border-radius: 1px; margin-right: .35rem; }
+  .readout .swatch.b-accepted { background: var(--m3); }
+  .readout .swatch.b-awaiting { background: var(--m1); }
+  .readout .swatch.b-undrafted { background: var(--rule); }
+
 
   .readout table { font-size: .875rem; }
   .readout thead th { font-weight: 500; color: var(--ink-2); border-bottom: 1px solid var(--rule); padding-bottom: .4rem; }
@@ -125,43 +138,82 @@ Config rather than being written twice.
   </div>
 
   {# ── Summary ──────────────────────────────────────────────────────────── #}
-  {# Each dial is a rate with a real denominator; the three raw counts below
-     have none, so they stay plain figures rather than faking an arc. Cost is
-     deliberately absent — it has its own panel. #}
   <div class="panel">
     <div class="panel-hd"><h2>Summary</h2></div>
-    <div class="panel-bd">
-      <div class="row row-cols-2 row-cols-lg-4 g-4 text-center">
-        <div class="col">
-          {% include "toxtempass/admin/_gauge.html" with value=stats.headline.completed_assays.period total=stats.headline.assays.period pct=stats.headline.completed_assays.pct label="ToxTemps completed" denom="started" %}
+    <div class="row g-0">
+      <div class="col-12 col-lg-7">
+        <div class="panel-bd">
+          <div class="row g-4">
+            <div class="col-6 col-md-4">
+              <div class="fig fig-lg">{{ stats.headline.assays.period|intcomma }}</div>
+              <div class="unit">ToxTemps created</div>
+            </div>
+            <div class="col-6 col-md-4">
+              <div class="fig fig-lg">{{ stats.headline.completed_assays.period|intcomma }}</div>
+              <div class="unit">ToxTemps completed</div>
+            </div>
+            <div class="col-6 col-md-4">
+              <div class="fig fig-lg">{{ stats.headline.users.period|intcomma }}</div>
+              <div class="unit">users</div>
+            </div>
+          </div>
         </div>
-        <div class="col">
-          {% include "toxtempass/admin/_gauge.html" with value=stats.answers.accepted total=stats.answers.total pct=stats.answers.accepted_pct label="Answers accepted" denom="questions" %}
-        </div>
-        <div class="col">
-          {% include "toxtempass/admin/_gauge.html" with value=stats.answers.edited total=stats.answers.total pct=stats.answers.edited_pct label="Answers edited" denom="questions" note="saved more than once" %}
-        </div>
-        <div class="col">
-          {% include "toxtempass/admin/_gauge.html" with value=stats.answers.not_found total=stats.answers.answered pct=stats.answers.not_found_pct label="Answers not found" denom="draft answers" note="lower is better" %}
+      </div>
+
+      <div class="col-12 col-lg-5 split">
+        {# Each ToxTemp is scored on its own questionnaire and the scores are
+           then averaged, so a long questionnaire does not outweigh a short one. #}
+        <div class="panel-bd text-center">
+          {% include "toxtempass/admin/_dial.html" with drafted=stats.progress.drafted accepted=stats.progress.accepted %}
+          <div class="mt-2">Average progress per ToxTemp</div>
+          <div class="d-inline-flex flex-column align-items-start mt-2">
+            <span class="note"><i class="swatch b-accepted"></i>{{ stats.progress.accepted }}% accepted by an expert</span>
+            <span class="note"><i class="swatch b-awaiting"></i>{{ stats.progress.drafted }}% drafted by the model</span>
+          </div>
+          <p class="note mb-0 mt-2">across {{ stats.progress.assays|intcomma }} ToxTemp{{ stats.progress.assays|pluralize }}</p>
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="panel-hd border-bottom-0" style="border-top:1px solid var(--rule)">
-      <div class="row g-4">
-        <div class="col-12 col-md-4">
-          <div class="fig fig-md">{{ stats.headline.assays.period|intcomma }}</div>
-          <div class="unit">ToxTemps started</div>
-        </div>
-        <div class="col-12 col-md-4">
-          <div class="fig fig-md">{{ stats.answers.answered|intcomma }}</div>
-          <div class="unit">draft answers written</div>
-        </div>
-        <div class="col-12 col-md-4">
-          <div class="fig fig-md">{{ stats.files.count|intcomma }}</div>
-          <div class="unit">context documents uploaded</div>
-        </div>
+  {# ── Progress by section ──────────────────────────────────────────────── #}
+  <div class="panel">
+    <div class="panel-hd">
+      <h2>Progress by section</h2>
+      {% if stats.section_progress.question_set %}
+      <p class="note mb-0 mt-1">
+        ToxTemp {{ stats.section_progress.question_set }}, averaged over
+        {{ stats.section_progress.assays|intcomma }} ToxTemp{{ stats.section_progress.assays|pluralize }} using that version.
+      </p>
+      {% endif %}
+    </div>
+    <div class="panel-bd">
+      {% if stats.section_progress.sections %}
+      <div class="d-flex flex-wrap gap-4 mb-4">
+        <span class="note"><i class="swatch b-accepted"></i>accepted by an expert</span>
+        <span class="note"><i class="swatch b-awaiting"></i>drafted, not yet accepted</span>
+        <span class="note"><i class="swatch b-undrafted"></i>no draft answer</span>
       </div>
+      {% for section in stats.section_progress.sections %}
+      <div class="row align-items-center g-3 mb-3">
+        <div class="col-12 col-md-4">
+          {{ section.title }}
+          <span class="note d-block">{{ section.questions|intcomma }} question{{ section.questions|pluralize }}</span>
+        </div>
+        <div class="col-10 col-md-7">
+          <div class="bar" role="img"
+               aria-label="{{ section.title }}: {{ section.accepted }} percent accepted, {{ section.awaiting }} percent drafted but not accepted, {{ section.undrafted }} percent with no draft">
+            <i class="b-accepted" style="width: {{ section.accepted }}%"></i>
+            <i class="b-awaiting" style="width: {{ section.awaiting }}%"></i>
+            <i class="b-undrafted" style="width: {{ section.undrafted }}%"></i>
+          </div>
+        </div>
+        <div class="col-2 col-md-1 text-end val">{{ section.accepted|floatformat:0 }}%</div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p class="note mb-0">No ToxTemps with a questionnaire attached in this period.</p>
+      {% endif %}
     </div>
   </div>
 
@@ -238,6 +290,19 @@ Config rather than being written twice.
     <div class="row g-0">
       <div class="col-12 col-lg-7">
         <div class="panel-bd">
+          {# Both figures moved off the summary: they answer "is the model
+             helping", which is a drafting question, not a headline one. #}
+          <div class="row g-4 mb-4">
+            <div class="col-6">
+              <div class="fig fig-md">{{ stats.answers.edited|intcomma }}<span class="unit"> · {{ stats.answers.edited_pct|default:"0" }}%</span></div>
+              <div class="unit">answers edited after drafting</div>
+            </div>
+            <div class="col-6">
+              <div class="fig fig-md">{{ stats.answers.not_found|intcomma }}<span class="unit"> · {{ stats.answers.not_found_pct|default:"0" }}%</span></div>
+              <div class="unit">answers not found in the context documents</div>
+            </div>
+          </div>
+
           <p class="note mb-3">How far ToxTemps get once they are started.</p>
           <table class="w-100">
             <thead><tr><th scope="col">Stage</th><th scope="col" class="num">ToxTemps</th><th scope="col" class="num">Share</th></tr></thead>
@@ -252,8 +317,8 @@ Config rather than being written twice.
             </tbody>
           </table>
           <p class="note mt-3 mb-0">
-            Acceptance, edit and not-found rates for the {{ stats.answers.total|intcomma }}
-            individual questions are the dials in the summary above.
+            Rates are over the {{ stats.answers.total|intcomma }} individual questions
+            across every ToxTemp in the period.
           </p>
         </div>
       </div>

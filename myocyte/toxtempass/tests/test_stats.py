@@ -69,13 +69,18 @@ class StatsAggregationTests(TestCase):
             subsection__section__question_set__label="kpitest"
         )
         self.question2 = QuestionFactory.create(subsection=self.question.subsection)
+        self.question_set = self.question.subsection.section.question_set
 
         # One fully accepted assay for self.user
-        self.done = _assay_for(self.user, status=LLMStatus.DONE)
+        self.done = _assay_for(
+            self.user, status=LLMStatus.DONE, question_set=self.question_set
+        )
         AnswerFactory.create(assay=self.done, question=self.question, accepted=True)
 
         # One partially accepted assay for self.other
-        self.partial = _assay_for(self.other, status=LLMStatus.DONE)
+        self.partial = _assay_for(
+            self.other, status=LLMStatus.DONE, question_set=self.question_set
+        )
         AnswerFactory.create(assay=self.partial, question=self.question, accepted=True)
         AnswerFactory.create(
             assay=self.partial,
@@ -220,6 +225,53 @@ class StatsAggregationTests(TestCase):
                 self.assertEqual(
                     stats["completion"]["total"], stats["headline"]["assays"]["period"]
                 )
+
+    def test_average_progress_is_a_mean_of_per_assay_shares(self):
+        """One fully accepted and one half accepted averages to 75%, not 66%.
+
+        Pooling would give 2 accepted of 3 questions = 66.7%; averaging each
+        ToxTemp's own share gives (100 + 50) / 2 = 75%.
+        """
+        progress = build_stats("all")["progress"]
+        self.assertEqual(progress["assays"], 2)
+        self.assertEqual(progress["accepted"], 75.0)
+        self.assertEqual(progress["drafted"], 100.0)
+        self.assertEqual(progress["awaiting"], 25.0)
+        self.assertEqual(progress["undrafted"], 0.0)
+
+    def test_progress_bands_always_sum_to_a_hundred(self):
+        for key in ("all", "12m"):
+            with self.subTest(range=key):
+                p = build_stats(key)["progress"]
+                self.assertAlmostEqual(
+                    p["accepted"] + p["awaiting"] + p["undrafted"], 100.0, places=1
+                )
+
+    def test_unseeded_assay_counts_as_zero_progress(self):
+        """A ToxTemp with no questions was still created, so it drags the mean."""
+        _assay_for(self.user)  # no answers at all
+        progress = build_stats("all")["progress"]
+        self.assertEqual(progress["assays"], 3)
+        self.assertEqual(progress["assays_without_questions"], 1)
+        self.assertEqual(progress["accepted"], 50.0)  # (100 + 50 + 0) / 3
+
+    def test_section_progress_is_scoped_to_the_busiest_question_set(self):
+        section = self.question.subsection.section
+        progress = build_stats("all")["section_progress"]
+        self.assertEqual(progress["assays"], 2)
+        titles = [entry["title"] for entry in progress["sections"]]
+        self.assertEqual(titles, [section.title])
+        band = progress["sections"][0]
+        self.assertAlmostEqual(
+            band["accepted"] + band["awaiting"] + band["undrafted"], 100.0, places=1
+        )
+        self.assertEqual(band["questions"], 2)
+
+    def test_section_progress_is_empty_without_a_question_set(self):
+        Assay.objects.update(question_set=None)
+        progress = build_stats("all")["section_progress"]
+        self.assertIsNone(progress["question_set"])
+        self.assertEqual(progress["sections"], [])
 
     def test_completion_marks_are_capped(self):
         marks = build_stats("all")["completion"]

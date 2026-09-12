@@ -1,0 +1,21 @@
+{% comment %}
+Two concentric semicircle arcs over one denominator: the outer ring is how much
+has been drafted, the inner ring how much an expert has accepted. Accepted is
+always a subset of drafted, so the nesting is the point — a reader can see the
+gap between "the model wrote something" and "a person signed it off".
+
+Include as:
+  {% include "toxtempass/admin/_dial.html" with drafted=X accepted=Y %}
+
+Radii are 50 and 36, so the arc lengths are pi*50 = 157.08 and pi*36 = 113.10.
+{% endcomment %}
+<div class="dial">
+  <svg viewBox="0 0 120 74" role="img"
+       aria-label="Average progress per ToxTemp: {{ drafted|default:0 }} percent drafted, {{ accepted|default:0 }} percent accepted by an expert">
+    <path class="dial-track" d="M6,60 A54,54 0 0 1 114,60"/>
+    <path class="dial-drafted" d="M6,60 A54,54 0 0 1 114,60" style="--p: {{ drafted|default:0 }}"/>
+    <path class="dial-track dial-track-inner" d="M24,60 A36,36 0 0 1 96,60"/>
+    <path class="dial-accepted" d="M24,60 A36,36 0 0 1 96,60" style="--p: {{ accepted|default:0 }}"/>
+    <text class="dial-num" x="60" y="54" text-anchor="middle">{{ accepted|default:0|floatformat:0 }}%</text>
+  </svg>
+</div>
