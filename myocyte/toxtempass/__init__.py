@@ -211,6 +211,46 @@ class Config:
     PANDOC_EXPORT_TYPES: Final[frozenset[str]] = frozenset(EXPORT_MAPPING) - {"json"}
     status_error_max_len = 8192
 
+    # Legal documents served at /terms/ and /license/: title and the HTML that
+    # md_content/dependencies/run_pandoc.py generates at image build time.
+    _legal_documents: Final[Mapping[str, tuple[str, str]]] = MappingProxyType({
+        "terms": ("Terms of Service", "md_content/auto_generated_html/terms-of-service.html"),
+        "license": ("License", "md_content/auto_generated_html/LICENSE.html"),
+    })
+
+    # FAQ on the public /about/ page as (question, answer) pairs. Rendered both as
+    # the visible accordion and as FAQPage structured data, so answers stay plain text.
+    _about_faq: Final[tuple[tuple[str, str], ...]] = (
+        (
+            "What is ToxTemp?",
+            "ToxTemp is a template for describing cell-based toxicological test methods (Krebs et al., ALTEX 2019). It turns the requirements of OECD Guidance Document 211 into 77 guided questions across 11 sections, so that non-guideline in vitro methods can be evaluated and used in regulatory contexts.",
+        ),
+        (
+            "Does ToxTempAssistant replace expert review?",
+            "No. Every answer is a draft, and questions your documents don't cover are left for you: the model is instructed to reply \"Answer not found in documents.\" rather than guess. It cites the document each statement comes from, and you review, edit and accept each answer before exporting.",
+        ),
+        (
+            "Which files can I upload?",
+            "PDF, Word (DOCX), PowerPoint (PPTX), Excel (XLSX, XLS), CSV, plain text, Markdown, HTML and JSON files, and images (PNG, JPG, GIF, BMP, TIFF, WebP). Images inside PDF and Word files can optionally be extracted as extra context.",
+        ),
+        (
+            "Which language models does it use?",
+            "The free version uses gpt-4o-mini, hosted by Microsoft in the EU (EU data residency), which had the highest overall accuracy of the three models in our peer-reviewed evaluation (with o3-mini and gpt-4.1-nano). If you need a different model, contact us and we can upgrade your account at our discretion. The model used and its parameters are recorded in the metadata of every export.",
+        ),
+        (
+            "What happens to the documents I upload?",
+            "They are used to generate your draft. Keeping the uploaded files so the development team can benchmark and improve the tool is optional: you choose when you create an assay, and you can withdraw consent at any time by contacting the maintainers.",
+        ),
+        (
+            "Can I work on a ToxTemp with colleagues?",
+            "Yes. Share an investigation into a workspace and every workspace member can view and work on its studies and assays. The investigation stays owned by you.",
+        ),
+        (
+            "Is ToxTempAssistant open source?",
+            "Yes. The source code is on GitHub under the GNU Affero General Public License v3.0, and releases are archived on Zenodo (doi:10.5281/zenodo.15607642).",
+        ),
+    )
+
     # ── Staff KPI dashboard (/stats) ──────────────────────────────────────────
     # Selectable time windows: key -> (label, lookback days, time-series bucket).
     # ``None`` days means "all time". The bucket width is chosen so a window

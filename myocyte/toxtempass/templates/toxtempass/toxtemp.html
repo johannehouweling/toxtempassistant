@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load extras %}
+{% block title %}ToxTemp questions and guidance (Krebs et al., 2019) | ToxTempAssistant{% endblock %}
+{% block meta_description %}All 77 questions of the ToxTemp template for describing cell-based toxicological test methods (OECD GD211), with the template’s notes and examples. Template by Krebs et al., ALTEX 2019.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'toxtemp_questions' %}">{% endblock %}
+{% block extra_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "ToxTemp: the 77 questions for describing cell-based test methods",
+  "url": "{{ request.scheme }}://{{ request.get_host }}{% url 'toxtemp_questions' %}",
+  "isBasedOn": {
+    "@type": "ScholarlyArticle",
+    "name": "Template for the description of cell-based toxicological test methods to allow evaluation and regulatory use of the data",
+    "creditText": "Krebs et al. (2019), ALTEX 36(4), 682–699",
+    "datePublished": "2019",
+    "isPartOf": {"@type": "Periodical", "name": "ALTEX - Alternatives to animal experimentation"},
+    "sameAs": "{{ config.reference_toxtemp }}",
+    "license": "https://creativecommons.org/licenses/by/4.0/"
+  }
+}
+</script>
+{% endblock %}
+{% block content %}
+{% toxtemp_sections as sections %}
+<div class="row justify-content-center">
+  <div class="col-lg-10 col-xl-9">
+
+    <header class="mb-5">
+      <p class="small text-body-secondary mb-1">Template by Krebs et al. (2019), <em>ALTEX</em></p>
+      <h1 class="fs-2 mb-3">ToxTemp: the 77 questions for describing cell-based test methods</h1>
+
+      <div class="border border-primary-subtle bg-primary-subtle text-primary-emphasis rounded p-3 mb-4" role="note" id="source">
+        <p class="fw-semibold mb-2">The ToxTemp template was developed by Krebs et al. It is not the work of the ToxTempAssistant team.</p>
+        <p class="mb-2">
+          Krebs, A., Waldmann, T., Wilks, M. F., van Vugt-Lussenburg, B. M. A., van der Burg, B., et al. (2019).
+          Template for the description of cell-based toxicological test methods to allow evaluation and regulatory
+          use of the data. <em>ALTEX</em>, 36(4), 682–699.
+          <a class="link-primary" href="{{ config.reference_toxtemp }}" target="_blank" rel="noopener noreferrer">https://doi.org/10.14573/altex.1909271</a>
+        </p>
+        <p class="small mb-0">
+          The questions, notes and examples below are reproduced from that article and its supplementary material
+          under the <a class="link-primary" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0 license</a>.
+          We changed the formatting and left out notes that repeat the question. ToxTempAssistant is a separate
+          tool that helps you draft answers to these questions.
+        </p>
+      </div>
+
+      <p>
+        ToxTemp turns the requirements of OECD Guidance Document 211 into guided questions, so that non-guideline,
+        cell-based toxicological test methods are described completely and consistently. It has 70 questions in
+        11 sections, plus 7 sub-questions that structure the abstract.
+      </p>
+      <p class="mb-0">
+        Have protocols or publications for your assay? ToxTempAssistant can draft answers to these questions from
+        your documents. <a href="{% url 'about' %}">See how it works</a>.
+      </p>
+    </header>
+
+    <nav class="mb-5" aria-labelledby="contents-title">
+      <h2 class="fs-5" id="contents-title">Sections</h2>
+      <ul class="list-unstyled mb-0">
+        {% for section in sections %}
+        <li class="py-1"><a href="#section-{{ forloop.counter }}">{{ section.title }}</a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+
+    {% for section in sections %}
+    <section class="mb-5" id="section-{{ forloop.counter }}">
+      <h2 class="fs-4 border-bottom pb-2 mb-3">{{ section.title }}</h2>
+      {% with notes=section.title|guidance_paragraphs %}{% if notes %}
+      <div class="small text-body-secondary border-start border-3 ps-3 mb-4">
+        {% for paragraph in notes %}<p class="mb-1">{{ paragraph }}</p>{% endfor %}
+      </div>
+      {% endif %}{% endwith %}
+
+      {% for sub in section.subsections %}
+      <article class="mb-4" id="{{ sub.title|slugify }}">
+        <h3 class="fs-6 fw-semibold mb-1">{{ sub.title }}</h3>
+        <p class="mb-2">{{ sub.question }}</p>
+        {% if sub.subquestions %}
+        <ul class="mb-2">
+          {% for subquestion in sub.subquestions %}<li>{{ subquestion.question }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        {% with notes=sub.title|guidance_paragraphs %}{% if notes %}
+        <div class="small text-body-secondary border-start border-3 ps-3">
+          {% for paragraph in notes %}<p class="mb-1">{{ paragraph }}</p>{% endfor %}
+        </div>
+        {% endif %}{% endwith %}
+      </article>
+      {% endfor %}
+    </section>
+    {% endfor %}
+
+    <footer class="border-top pt-4 mb-5">
+      <p class="small text-body-secondary">
+        Source: Krebs et al. (2019), <em>ALTEX</em> 36(4), 682–699,
+        <a href="{{ config.reference_toxtemp }}" target="_blank" rel="noopener noreferrer">doi:10.14573/altex.1909271</a>,
+        licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>.
+      </p>
+      <p class="mb-0">
+        Ready to fill it in? <a href="{% url 'signup' %}">Sign up for ToxTempAssistant</a> to draft answers from your documents,
+        then review and export them.
+      </p>
+    </footer>
+
+  </div>
+</div>
+{% endblock %}

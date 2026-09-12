@@ -21,6 +21,9 @@ for md_file in list(cwd.glob("**/*.md")):
                 "pandoc",
                 str(md_file),
                 f"--template={cwd / 'dependencies/GitHub.html5'}",
+                # The output is included inside modals on every page, so demote
+                # headings: a stray <h1> would compete with the page's own <h1>.
+                "--shift-heading-level-by=1",
                 "-o",
                 str(output_file),
             ],

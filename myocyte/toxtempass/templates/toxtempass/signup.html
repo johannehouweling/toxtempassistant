@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}Home Page{% endblock %}
+{% block title %}Sign up | ToxTempAssistant{% endblock %}
+{% block meta_description %}Create a free ToxTempAssistant beta account to draft ToxTemp descriptions of cell-based toxicological test methods from your own documents.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'signup' %}">{% endblock %}
 
 {% block content %}
 {% load django_bootstrap5 %}
@@ -8,7 +10,8 @@
 <div class="row justify-content-center px-3">
   <div class="col-lg-4 card my-3 py-2 mx-3 ">
    
-    <h2>Signup</h2>
+    <h1 class="fs-2">Sign up</h1>
+    <p class="text-body-secondary">Create a free beta account to draft ToxTemp answers from your own documents. The maintainers admit new accounts, and each one comes with a read-only demo assay. <a href="{% url 'about' %}">Learn more</a></p>
     {% if form.orcid_id.value %}
     {% else %}
     <div class="d-grid gap-2 ">

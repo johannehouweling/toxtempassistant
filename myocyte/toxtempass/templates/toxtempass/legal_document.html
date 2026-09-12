@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | ToxTempAssistant{% endblock %}
+{% block meta_description %}{{ title }} of ToxTempAssistant, the LLM-assisted drafting tool for ToxTemp test method descriptions.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-10">
+    <h1 class="fs-3">{{ title }}</h1>
+    {{ body }}
+  </div>
+</div>
+{% endblock %}
