@@ -137,10 +137,9 @@
     <hr>
     {% include "toxtempass/base_extras/workspaces/workspace_list_partial.html" %}
 </div>
-    <div class="text-center mb-2">
-        <a href="{{config.reference_toxtempassistant_paper}}">
-            <img src="{{config.reference_toxtempassistant_paper_svg}}" alt="DOI">
-        </a>
+    <div class="text-center mb-2 small">
+        <span class="text-body-secondary">If useful, please cite:</span>
+        <a href="{% url 'about' %}#how-to-cite">How to cite</a>
     </div>
     <div class="sticky-bottom d-flex justify-content-center pb-3">
         <div class="btn-group" role="group">
