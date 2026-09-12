@@ -1,0 +1,59 @@
+cff-version: 1.2.0
+message: >-
+  If you use ToxTempAssistant in your work, please cite the article listed
+  under preferred-citation.
+title: ToxTempAssistant
+type: software
+abstract: >-
+  LLM-based web application that helps toxicologists draft ToxTemp
+  descriptions of cell-based toxicological test methods (OECD Guidance
+  Document 211) from their own documents, for expert review and export.
+authors:
+  - family-names: Houweling
+    given-names: Jente M.
+    orcid: "https://orcid.org/0009-0005-3680-0645"
+    affiliation: >-
+      National Institute for Public Health and the Environment (RIVM);
+      Maastricht University
+  - family-names: Arras
+    given-names: Matthias M. L.
+    orcid: "https://orcid.org/0000-0002-4714-9086"
+repository-code: "https://github.com/johannehouweling/ToxTempAssistant"
+url: "https://toxtempassistant.vhp4safety.nl"
+doi: 10.5281/zenodo.15607642
+license: AGPL-3.0-or-later
+keywords:
+  - ToxTemp
+  - OECD GD211
+  - cell-based toxicological test methods
+  - New Approach Methodologies
+  - large language models
+preferred-citation:
+  type: article
+  title: >-
+    ToxTempAssistant: using large language models to standardise cell-based
+    toxicological test method descriptions
+  authors:
+    - family-names: Houweling
+      given-names: Jente M.
+      orcid: "https://orcid.org/0009-0005-3680-0645"
+    - family-names: Arras
+      given-names: Matthias M. L.
+      orcid: "https://orcid.org/0000-0002-4714-9086"
+    - family-names: Willighagen
+      given-names: Egon L.
+      orcid: "https://orcid.org/0000-0001-7542-0286"
+    - family-names: Jennen
+      given-names: Danyel G. J.
+      orcid: "https://orcid.org/0000-0002-8618-2487"
+    - family-names: Evelo
+      given-names: Chris T.
+      orcid: "https://orcid.org/0000-0002-5301-3142"
+    - family-names: Kienhuis
+      given-names: Anne S.
+      orcid: "https://orcid.org/0000-0002-6465-4498"
+  journal: Evidence-Based Toxicology
+  volume: 4
+  issue: 1
+  year: 2026
+  doi: 10.1080/2833373X.2026.2638036
