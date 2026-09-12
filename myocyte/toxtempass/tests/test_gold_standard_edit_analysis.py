@@ -10,6 +10,7 @@ from toxtempass import config
 from toxtempass.evaluation.gold_standard.edit_analysis import (
     analyze_answer_history,
     classify_edit,
+    is_not_found,
 )
 
 # Use the central sentinel (toxtempass/__init__.py Config) so the test never drifts.
@@ -137,3 +138,48 @@ def test_saved_once_lower_bound_zero_delta():
     assert a["baseline_kind"] == "first_human_save"
     assert a["delta_exact"] is False
     assert a["change_type"] == "none"
+
+
+# ---------------------------------------------------------------------------
+# is_not_found — the N_trivial classifier. Deliberately not a substring test:
+# real cases from the 2026-06-16 prod extract are pinned below.
+# ---------------------------------------------------------------------------
+
+SENTINEL = NF
+
+
+def test_exact_sentinel_is_not_found():
+    assert is_not_found(SENTINEL, SENTINEL)
+
+
+def test_sentinel_normalisation():
+    for variant in ("  answer not found in documents  ", "ANSWER NOT FOUND IN DOCUMENTS",
+                    "Answer not found in documents"):
+        assert is_not_found(variant, SENTINEL), variant
+
+
+def test_mangled_sentinel_is_still_not_found():
+    # Real row: assay 71 / question 140 — transposed characters broke the old
+    # substring test.
+    assert is_not_found("Answer not found in dments.ocu", SENTINEL)
+
+
+def test_prose_ending_with_sentinel_is_a_real_answer():
+    # Real row: assay 5 / question 141 — substantive prose that happens to end with the
+    # sentinel. The old substring test binned it as an abstention.
+    prose = (
+        "The original deposition date of the first version is not specified in the "
+        "provided context. The current version is Version 1. " + SENTINEL
+    )
+    assert not is_not_found(prose, SENTINEL)
+
+
+def test_placeholders_are_not_abstentions():
+    # Per the workshop decision these count as real expert answers.
+    for text in ("NA", "n/a", "None.", "Not applicable", "", "Unknown?"):
+        assert not is_not_found(text, SENTINEL), text
+
+
+def test_empty_sentinel_never_matches():
+    assert not is_not_found("anything", "")
+
