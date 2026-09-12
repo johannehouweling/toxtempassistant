@@ -46,6 +46,11 @@ INSTITUTE = {
 }
 
 
+# Per-assay overrides for owners who signed up with a personal address, so the domain
+# says nothing about their institute. Keyed by assay_id to keep the address out of git.
+ASSAY_INSTITUTE = {109: "Utrecht U."}  # OATP1C1 thyroxin uptake
+
+
 def _institute(email: str) -> str:
     """Map an owner email to a readable institute label (fallback: the domain)."""
     domain = str(email).split("@")[-1].lower()
@@ -56,6 +61,8 @@ def build(csv_path: Path) -> tuple[str, str]:
     """Return (markdown_table, summary_line) for the gold CSV."""
     df = pd.read_csv(csv_path).fillna("")
     df["institute"] = df["owner_email"].map(_institute)
+    for aid, inst in ASSAY_INSTITUTE.items():
+        df.loc[df["assay_id"] == aid, "institute"] = inst
     df["is_nf"] = df["is_not_found"].astype(str).str.lower().isin(["true", "1", "1.0"])
 
     rows = []
