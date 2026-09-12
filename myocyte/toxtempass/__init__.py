@@ -210,6 +210,44 @@ class Config:
     # Subset of EXPORT_MAPPING types that require Pandoc (JSON is serialized inline).
     PANDOC_EXPORT_TYPES: Final[frozenset[str]] = frozenset(EXPORT_MAPPING) - {"json"}
     status_error_max_len = 8192
+
+    # ── Staff KPI dashboard (/stats) ──────────────────────────────────────────
+    # Selectable time windows: key -> (label, lookback days, time-series bucket).
+    # ``None`` days means "all time". The bucket width is chosen so a window
+    # never renders more than ~30 points (30 daily, 13 weekly, 12 monthly).
+    stats_ranges: Final[Mapping[str, tuple[str, int | None, str]]] = MappingProxyType({
+        "30d": ("Last 30 days", 30, "day"),
+        "90d": ("Last 90 days", 90, "week"),
+        "12m": ("Last 12 months", 365, "month"),
+        "all": ("All time", None, "month"),
+    })
+    stats_default_range = "12m"
+    # Row label pooling users who never filled in Person.organization. Blank
+    # organisations are pooled rather than listed so the row is not read as an
+    # institution in its own right.
+    stats_unknown_organisation = "Not specified"
+    # Cap for "top N" breakdowns (file MIME types, model rows) before the tail
+    # is dropped — keeps a chart under the 8-category legibility limit.
+    stats_top_n = 10
+    # Recency windows (days) used for the "active users" counters.
+    stats_active_user_windows: Final[tuple[int, ...]] = (7, 30, 90)
+    # Bin edges for the feedback usefulness histogram. The rating slider is
+    # 1–5 with 0.1 steps (see answer_extras/feedback_export.html).
+    stats_rating_bins: Final[tuple[float, ...]] = (1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0)
+    # Chart colours for /stats. Taken from a CVD-validated categorical palette
+    # (adjacent-pair ΔE 24.7 protan / 33.6 normal on a white card surface) —
+    # Bootstrap's own theme colours are not colourblind-safe as a pair. Slot 1
+    # is used for every single-series chart; slot 2 only joins it when a second
+    # series is on the same axis.
+    stats_chart_series = ("#2a78d6", "#eb6834")
+    # Single-hue ordinal ramp for the completion funnel (light → dark, monotone
+    # lightness, all steps ≥2:1 against white).
+    stats_chart_ordinal = ("#86b6ef", "#5598e7", "#2a78d6", "#1c5cab")
+    stats_chart_grid = "#e1e0d9"
+    stats_chart_axis = "#898781"
+    # Card background — used as the 2px spacer between stacked bar segments.
+    stats_chart_surface = "#ffffff"
+
     license_url = "https://www.gnu.org/licenses/agpl-3.0.html"
     version = os.getenv("GIT_TAG", "") + "-beta"
     reference_toxtempassistant_paper = "https://doi.org/10.1080/2833373X.2026.2638036"

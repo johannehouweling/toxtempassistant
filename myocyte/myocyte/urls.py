@@ -85,6 +85,10 @@ urlpatterns += [
         "beta/users/", views.AdminBetaUserListView.as_view(), name="admin_beta_user_list"
     ),
     path("beta/toggle-beta/", views.toggle_beta_admitted, name="toggle_beta_admitted"),
+    # Staff KPI dashboard (aggregates only — see toxtempass/stats.py)
+    path("stats/", views.stats_dashboard, name="stats_dashboard"),
+    path("stats/data.json", views.stats_data, name="stats_data"),
+    path("stats/export.csv", views.stats_export_csv, name="stats_export_csv"),
     # User preferences
     path(
         "settings/llm-model/",

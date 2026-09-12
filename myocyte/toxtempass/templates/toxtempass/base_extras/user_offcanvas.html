@@ -23,6 +23,14 @@
         </div>
         {% endif %}
     
+    {% if user.is_staff %}
+    <div class="d-grid gap-2 pt-3">
+        <a class="btn btn-outline-secondary d-flex align-items-center justify-content-center" href="{% url 'stats_dashboard' %}">
+            <i class="bi bi-graph-up-arrow me-2"></i> KPI dashboard
+        </a>
+    </div>
+    {% endif %}
+
     <div class="btn-toolbar gap-2 justify-content-between pt-3" role="toolbar">
         <button id="startOnboardingBtn" class="btn btn-outline-primary">
             <i class="bi bi-question-circle me-1"></i> Guided Tour

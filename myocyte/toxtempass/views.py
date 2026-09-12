@@ -1,3 +1,4 @@
+import csv
 import difflib
 import json
 import logging
@@ -88,6 +89,7 @@ from toxtempass.models import (
     Study,
     Subsection,
 )
+from toxtempass.stats import build_stats, to_csv_rows, to_json_payload
 from toxtempass.tables import AssayTable
 from toxtempass.utilities import (
     add_user_alert,
@@ -625,6 +627,65 @@ def toggle_beta_admitted(request: HttpRequest) -> HttpResponse:
         )
 
     return JsonResponse({"success": True, "admitted": admit, "person_id": person.id})
+
+
+# ── Staff KPI dashboard ──────────────────────────────────────────────────────
+# Every payload rendered by the three views below comes from toxtempass.stats,
+# which returns aggregates only — no names, e-mail addresses, ORCID iDs, assay
+# titles, IP addresses or free-text feedback. `organization` is the single
+# identifying dimension exposed, deliberately, since institutions are not
+# natural persons.
+
+
+@staff_member_required(login_url="/login/")
+def stats_dashboard(request: HttpRequest) -> HttpResponse:
+    """Render the staff-only KPI dashboard."""
+    stats = build_stats(request.GET.get("range"))
+    return render(
+        request,
+        "toxtempass/admin/stats.html",
+        {
+            "stats": stats,
+            "chart_data": {
+                "growth": stats["growth"],
+                "status": stats["assay_status"],
+                "organisations": stats["organisations"][: config.stats_top_n],
+                "funnel": stats["funnel"],
+                "models": stats["llm"]["by_model"][: config.stats_top_n],
+                "ratings": stats["feedback"]["bins"],
+                "palette": {
+                    "series": list(config.stats_chart_series),
+                    "ordinal": list(config.stats_chart_ordinal),
+                    "grid": config.stats_chart_grid,
+                    "axis": config.stats_chart_axis,
+                    "surface": config.stats_chart_surface,
+                },
+                "currency": stats["llm"]["currency"],
+            },
+        },
+    )
+
+
+@staff_member_required(login_url="/login/")
+@require_GET
+def stats_data(request: HttpRequest) -> JsonResponse:
+    """Return the same aggregates as the dashboard as JSON."""
+    payload = to_json_payload(build_stats(request.GET.get("range")))
+    return JsonResponse(payload)
+
+
+@staff_member_required(login_url="/login/")
+@require_GET
+def stats_export_csv(request: HttpRequest) -> HttpResponse:
+    """Stream the aggregated KPI tables as a CSV attachment."""
+    stats = build_stats(request.GET.get("range"))
+    response = HttpResponse(content_type="text/csv")
+    stamp = stats["generated_at"].strftime("%Y%m%d-%H%M")
+    filename = f"toxtempassistant-kpi-{stats['range'].key}-{stamp}.csv"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    writer = csv.writer(response)
+    writer.writerows(to_csv_rows(stats))
+    return response
 
 
 # Redirects the user to ORCID’s OAuth authorization endpoint.
