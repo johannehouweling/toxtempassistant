@@ -1696,11 +1696,13 @@ class AssayListView(SingleTableView):
             return redirect(reverse("beta_wait"))
         return super().dispatch(request, *args, **kwargs)
 
-    def accessible_assays(self) -> QuerySet[Assay]:
-        """Every Assay the user may view, before the workspace tab filter.
+    def accessible_assays(self, apply_search: bool = True) -> QuerySet[Assay]:
+        """Every Assay the user may view, before the study and workspace filters.
 
-        Shared by ``get_queryset`` and the per-workspace tab counts so both see
-        exactly the same set of assays.
+        Shared by ``get_queryset`` and the tab counts so both see the same set.
+        ``apply_search=False`` skips the ``?q=`` filter — used to decide which
+        tabs exist, so a search that happens to match one study does not make
+        the whole tab row disappear underneath the user.
         """
         user = self.request.user
         accessible_investigations = get_objects_for_user(
@@ -1738,7 +1740,7 @@ class AssayListView(SingleTableView):
         # ?q= matches the three titles the table shows, so what you type is
         # searched against what you can see. Applied here rather than in
         # get_queryset so the workspace tab counts narrow with the search.
-        if self.search_query:
+        if apply_search and self.search_query:
             qs = qs.filter(
                 models.Q(title__icontains=self.search_query)
                 | models.Q(study__title__icontains=self.search_query)
@@ -1747,11 +1749,11 @@ class AssayListView(SingleTableView):
         return qs
 
     def get_queryset(self) -> QuerySet[Assay]:
-        """Return the accessible assays, narrowed to a workspace tab if picked."""
+        """Return the accessible assays, narrowed to one workspace tab if picked."""
         qs = self.accessible_assays()
-        # ?workspace=<pk> narrows the list to assays whose parent investigation is
-        # shared into that workspace. Restricted to workspaces the user belongs to,
-        # so an arbitrary pk cannot be used to probe which workspaces exist.
+        # ?workspace=<pk> narrows to assays whose parent investigation is shared
+        # into that workspace. Restricted to workspaces the user belongs to, so an
+        # arbitrary pk cannot be used to probe which workspaces exist.
         if self.selected_workspace_pk is not None:
             qs = qs.filter(
                 study__investigation__shared_in_workspaces__workspace_id=(
@@ -1783,6 +1785,7 @@ class AssayListView(SingleTableView):
         pk = int(raw)
         return pk if pk in self.member_workspace_ids else None
 
+
     def get_context_data(self, **kwargs) -> dict:
         """Inject context."""
         context = super().get_context_data(**kwargs)
@@ -1793,37 +1796,63 @@ class AssayListView(SingleTableView):
         context.update(get_workspace_list(self.request))
         context["selected_workspace_pk"] = self.selected_workspace_pk
         context["search_query"] = self.search_query
-        context["workspace_tabs"] = self.workspace_tabs()
+        context["workspace_tabs"] = self.workspace_tabs
+        context["overall_progress"] = self.progress_for(self.accessible_assays())
         # Tour management is now handled by JavaScript localStorage
         # No backend flags needed
         return context
 
+    @cached_property
     def workspace_tabs(self) -> list[dict]:
-        """One entry per workspace the user belongs to, with its assay count.
+        """One tab per workspace the user belongs to, with its progress.
 
-        Counted over ``accessible_assays`` so a tab's badge always matches what
-        the tab actually shows. Workspaces with nothing shared into them yet are
-        kept (count 0) — an empty workspace is information too.
+        Membership comes from WorkspaceMember, and ``Workspace.save`` gives the
+        creator an OWNER row — so a user sees tabs for workspaces they created
+        or joined, and no others. Which tabs exist is decided before the search
+        so the row stays put while you type; the badges reflect the search.
+        Workspaces with nothing shared into them are kept — an empty workspace
+        is information too.
         """
         if not self.member_workspace_ids:
             return []
-        counts = dict(
-            self.accessible_assays()
-            .filter(
-                study__investigation__shared_in_workspaces__workspace_id__in=(
-                    self.member_workspace_ids
-                )
-            )
-            .values_list("study__investigation__shared_in_workspaces__workspace_id")
-            .annotate(n=Count("pk", distinct=True))
-        )
+        searched = self.accessible_assays()
         workspaces = Workspace.objects.filter(pk__in=self.member_workspace_ids).order_by(
             "name"
         )
-        return [
-            {"pk": ws.pk, "name": ws.name, "count": counts.get(ws.pk, 0)}
-            for ws in workspaces
-        ]
+        tabs = []
+        for ws in workspaces:
+            in_ws = searched.filter(
+                study__investigation__shared_in_workspaces__workspace_id=ws.pk
+            ).distinct()
+            tabs.append(
+                {
+                    "pk": ws.pk,
+                    "name": ws.name,
+                    "count": in_ws.count(),
+                    "progress": self.progress_for(in_ws),
+                }
+            )
+        return tabs
+
+    @staticmethod
+    def progress_for(assays: QuerySet[Assay]) -> dict:
+        """Roll up answers-accepted across a set of assays.
+
+        One aggregate over Answer rather than per-assay counts, so a tab row
+        costs one query no matter how many studies there are.
+        """
+        totals = Answer.objects.filter(assay__in=assays).aggregate(
+            total=Count("pk"),
+            accepted=Count("pk", filter=models.Q(accepted=True)),
+        )
+        total = totals["total"] or 0
+        accepted = totals["accepted"] or 0
+        return {
+            "total": total,
+            "accepted": accepted,
+            "pct": round(accepted / total * 100) if total else 0,
+        }
+
 
 
 @login_required(login_url="/login/")
