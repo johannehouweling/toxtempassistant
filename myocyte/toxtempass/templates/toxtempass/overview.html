@@ -28,7 +28,9 @@
     {% if selected_workspace_pk %}<input type="hidden" name="workspace" value="{{ selected_workspace_pk }}">{% endif %}
     {% if request.GET.hide_demo %}<input type="hidden" name="hide_demo" value="{{ request.GET.hide_demo }}">{% endif %}
     <div class="input-group">
-      <input type="search"
+      {# type=text, not type=search: WebKit draws its own clear ✕ inside a #}
+      {# search input, which would sit next to the bi-x-lg button below.   #}
+      <input type="text"
              class="form-control"
              name="q"
              value="{{ search_query }}"
