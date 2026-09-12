@@ -2,6 +2,30 @@
 
 <!-- version list -->
 
+## v3.39.0 (2026-09-12)
+
+### Bug Fixes
+
+- **favicon**: Restore the original multi-size favicon
+  ([`32d1fb1`](https://github.com/johannehouweling/toxtempassistant/commit/32d1fb10df5b29185fb60e1901c4ac43b82195b4))
+
+- **layout**: Align public pages with the banner and link Log in from /about/
+  ([`053ccb0`](https://github.com/johannehouweling/toxtempassistant/commit/053ccb02699ae2a2a84780201a92c6c926382520))
+
+- **overview**: Stack the workspace picker and search on phones
+  ([`9ead2d5`](https://github.com/johannehouweling/toxtempassistant/commit/9ead2d5de10146f27a2decc9552a93a2d1a1f705))
+
+### Documentation
+
+- Add CITATION.cff with the ToxTempAssistant paper as preferred citation
+  ([`565dc22`](https://github.com/johannehouweling/toxtempassistant/commit/565dc22f1bc21608f011f45a0a39849c151550e4))
+
+### Features
+
+- **citation**: Link the user menu to How to cite and show the DOI badge there
+  ([`7d717a3`](https://github.com/johannehouweling/toxtempassistant/commit/7d717a37bb587c0d694ba18d6deffbc3698656d5))
+
+
 ## v3.38.0 (2026-09-12)
 
 ### Features
