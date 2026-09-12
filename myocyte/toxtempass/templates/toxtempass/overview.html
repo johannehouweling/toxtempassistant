@@ -28,17 +28,28 @@
     {% if selected_workspace_pk %}<input type="hidden" name="workspace" value="{{ selected_workspace_pk }}">{% endif %}
     {% if request.GET.hide_demo %}<input type="hidden" name="hide_demo" value="{{ request.GET.hide_demo }}">{% endif %}
     <div class="input-group">
-      <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
       <input type="search"
              class="form-control"
              name="q"
              value="{{ search_query }}"
              placeholder="Search assay, study or investigation"
              aria-label="Search assay, study or investigation">
-      <button class="btn btn-outline-secondary" type="submit">Search</button>
       {% if search_query %}
-        <a class="btn btn-outline-secondary" href="{% querystring q=None page=None %}">Clear</a>
+        <a class="btn btn-outline-secondary"
+           href="{% querystring q=None page=None %}"
+           aria-label="Clear search"
+           data-bs-toggle="tooltip"
+           title="Clear search">
+          <i class="bi bi-x-lg" aria-hidden="true"></i>
+        </a>
       {% endif %}
+      <button class="btn btn-outline-secondary"
+              type="submit"
+              aria-label="Search"
+              data-bs-toggle="tooltip"
+              title="Search">
+        <i class="bi bi-search" aria-hidden="true"></i>
+      </button>
     </div>
   </form>
 
