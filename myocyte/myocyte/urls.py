@@ -23,13 +23,18 @@ from django.contrib.auth.views import (
     PasswordResetCompleteView,
     PasswordResetDoneView,
 )
+from django.contrib.sitemaps.views import sitemap
 from django.urls import path
-from toxtempass import views
+from toxtempass import seo, views
 
 from myocyte import settings
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Crawler-facing endpoints
+    path("robots.txt", seo.robots_txt, name="robots_txt"),
+    path("sitemap.xml", sitemap, {"sitemaps": seo.SITEMAPS}, name="sitemap"),
+    path("favicon.ico", seo.favicon, name="favicon"),
     path(
         "init/<slug:label>",
         views.init_db,
@@ -41,6 +46,16 @@ urlpatterns = [
 urlpatterns += [
     path("", views.AssayListView.as_view(), name="overview"),
     path("add/", views.new_form_view, name="add_new"),
+    # Legal documents: full pages, and fragments (?partial=1) for the modals
+    path(
+        "terms/",
+        views.legal_document,
+        {"document": "terms"},
+        name="terms_of_service",
+    ),
+    path("license/", views.legal_document, {"document": "license"}, name="license"),
+    path("about/", views.about, name="about"),
+    path("toxtemp/", views.toxtemp_questions, name="toxtemp_questions"),
     # Login stuff
     path("login/", views.LoginView.as_view(), name="login"),
     path("logout/", views.logout_view, name="logout"),

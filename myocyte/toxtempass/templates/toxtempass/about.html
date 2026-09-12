@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}About ToxTempAssistant: LLM-assisted ToxTemp drafting (OECD GD211){% endblock %}
+{% block meta_description %}How ToxTempAssistant uses LLMs to draft answers to the ToxTemp questions (OECD GD211) from your assay documents: workflow, evaluation, data handling and citation.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'about' %}">{% endblock %}
+{% block extra_head %}<script type="application/ld+json">{{ faq_jsonld }}</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ScholarlyArticle",
+  "headline": "ToxTempAssistant: using large language models to standardise cell-based toxicological test method descriptions",
+  "author": [
+    {"@type": "Person", "name": "Jente M. Houweling", "identifier": "https://orcid.org/0009-0005-3680-0645"},
+    {"@type": "Person", "name": "Matthias M. L. Arras", "identifier": "https://orcid.org/0000-0002-4714-9086"},
+    {"@type": "Person", "name": "Egon L. Willighagen", "identifier": "https://orcid.org/0000-0001-7542-0286"},
+    {"@type": "Person", "name": "Danyel G. J. Jennen", "identifier": "https://orcid.org/0000-0002-8618-2487"},
+    {"@type": "Person", "name": "Chris T. Evelo", "identifier": "https://orcid.org/0000-0002-5301-3142"},
+    {"@type": "Person", "name": "Anne S. Kienhuis", "identifier": "https://orcid.org/0000-0002-6465-4498"}
+  ],
+  "datePublished": "2026-04-06",
+  "isPartOf": {"@type": "PublicationVolume", "volumeNumber": "4", "isPartOf": {"@type": "Periodical", "name": "Evidence-Based Toxicology"}},
+  "sameAs": "{{ config.reference_toxtempassistant_paper }}",
+  "about": {"@type": "WebApplication", "name": "ToxTempAssistant", "url": "{{ request.scheme }}://{{ request.get_host }}{% url 'overview' %}"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "VideoObject",
+  "name": "ToxTempAssistant Tutorial Video",
+  "description": "Step-by-step tutorial of ToxTempAssistant (version 2.16.2), a tool that helps you fill in the ToxTemp template for cell-based toxicological test methods (OECD Guidance Document 211) from your own documents.",
+  "thumbnailUrl": "https://i.ytimg.com/vi/L1vsox-emrY/hqdefault.jpg",
+  "uploadDate": "2026-06-25T04:52:52-07:00",
+  "duration": "PT5M39S",
+  "embedUrl": "https://www.youtube-nocookie.com/embed/L1vsox-emrY",
+  "url": "https://www.youtube.com/watch?v=L1vsox-emrY",
+  "publisher": {"@type": "Organization", "name": "VHP4Safety"}
+}
+</script>{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-10 col-xl-9">
+
+    <section class="mb-5">
+      <h1 class="fs-2 mb-3">About ToxTempAssistant</h1>
+      <p class="lead">
+        ToxTempAssistant drafts ToxTemp descriptions of cell-based toxicological test methods from the
+        documents you already have: protocols, SOPs, publications and lab notes. For each of the 77 ToxTemp
+        questions, a large language model drafts an answer where your documents contain the information and
+        cites its sources; you fill the gaps, review, edit and export the result.
+      </p>
+      <div class="d-flex flex-wrap gap-2">
+        {% if user.is_authenticated %}
+          <a class="btn btn-primary" href="{% url 'overview' %}">Go to your assays</a>
+        {% else %}
+          <a class="btn btn-primary" href="{% url 'signup' %}">Sign up for the beta</a>
+          <a class="btn btn-outline-primary" href="{% url 'overview' %}">Log in</a>
+        {% endif %}
+        <a class="btn btn-outline-secondary" href="{{ config.reference_toxtempassistant_paper }}" target="_blank" rel="noopener noreferrer">Read the paper</a>
+      </div>
+    </section>
+
+    <section class="mb-5">
+      <h2 class="fs-4">Why ToxTemp, and why it takes so long</h2>
+      <p>
+        New Approach Methodologies (NAMs), such as human cell-based assays, can only support chemical safety
+        assessment when they are documented transparently and completely. Most NAMs developed in academic labs
+        are not OECD Test Guidelines, and inconsistent reporting makes them hard to evaluate and reuse.
+      </p>
+      <p>
+        The <a href="{{ config.reference_toxtemp }}" target="_blank" rel="noopener noreferrer">ToxTemp template</a>
+        (Krebs et al., ALTEX 2019) addresses this by turning the requirements of OECD Guidance Document 211 into
+        77 guided questions, from the cell source and culture conditions to the exposure scheme, endpoints,
+        prediction model and transferability. It is used by projects such as RISK-HUNT3R and ONTOX. Filling it in
+        by hand can take toxicologists up to a week, often re-typing information that already exists in
+        publications and protocols.
+      </p>
+    </section>
+
+    <section class="mb-5">
+      <h2 class="fs-4 mb-3">How it works</h2>
+      <ol class="list-unstyled row row-cols-1 row-cols-md-2 g-3">
+        <li class="col">
+          <div class="card h-100">
+            <div class="card-body">
+              <h3 class="card-title fs-6"><span class="badge text-bg-primary me-2">1</span>Upload your documents</h3>
+              <p class="card-text">
+                Give the assay a name and a short description of its purpose, test system and endpoint, then upload
+                your context documents. Images inside PDF and Word files can be extracted as extra context.
+              </p>
+            </div>
+          </div>
+        </li>
+        <li class="col">
+          <div class="card h-100">
+            <div class="card-body">
+              <h3 class="card-title fs-6"><span class="badge text-bg-primary me-2">2</span>Get draft answers</h3>
+              <p class="card-text">
+                The model drafts answers from the information in your documents and cites the document behind each
+                statement. Where your documents don’t cover a question, it replies “Answer not found in documents.”
+                instead of guessing, so expect some questions to be left for you.
+              </p>
+            </div>
+          </div>
+        </li>
+        <li class="col">
+          <div class="card h-100">
+            <div class="card-body">
+              <h3 class="card-title fs-6"><span class="badge text-bg-primary me-2">3</span>Review and refine</h3>
+              <p class="card-text">
+                For most people, correcting a draft is quicker than writing from scratch. Edit and accept answers
+                one by one, regenerate a single answer with extra instructions, and share the assay with colleagues
+                in a workspace.
+              </p>
+            </div>
+          </div>
+        </li>
+        <li class="col">
+          <div class="card h-100">
+            <div class="card-body">
+              <h3 class="card-title fs-6"><span class="badge text-bg-primary me-2">4</span>Export</h3>
+              <p class="card-text">
+                Download the finished ToxTemp as PDF, Word, HTML, Markdown, JSON, XML or LaTeX. The model and its
+                parameters are recorded in the export metadata.
+              </p>
+            </div>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="mb-5">
+      <h2 class="fs-4 mb-3">See it in action</h2>
+      <div class="ratio ratio-16x9 mb-2">
+        <iframe src="https://www.youtube-nocookie.com/embed/L1vsox-emrY" title="ToxTempAssistant tutorial video (version 2.16.2)" loading="lazy" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      </div>
+      <p class="small text-body-secondary">
+        This demo shows version 2.16.2, so the current version may look slightly different.
+        <a href="https://www.youtube.com/watch?v=L1vsox-emrY" target="_blank" rel="noopener noreferrer">Watch on YouTube</a>.
+      </p>
+    </section>
+
+    <section class="mb-5">
+      <h2 class="fs-4">The 77 ToxTemp questions</h2>
+      <p>The questions are kept word for word from the original template and grouped into 11 sections:</p>
+      <ol>
+        <li>Overview</li>
+        <li>General information</li>
+        <li>Description of general features of the test system source</li>
+        <li>Definition of the test system as used in the method</li>
+        <li>Test method exposure scheme and endpoints</li>
+        <li>Handling details of the test method</li>
+        <li>Data management</li>
+        <li>Prediction model and toxicological application</li>
+        <li>Publication/validation status</li>
+        <li>Test method transferability</li>
+        <li>Safety, ethics and specific requirements</li>
+      </ol>
+      <p><a href="{% url 'toxtemp_questions' %}">Read all 77 questions, with the template’s notes and examples</a></p>
+    </section>
+
+    <section class="mb-5">
+      <h2 class="fs-4">How accurate is it?</h2>
+      <p>
+        We evaluated ToxTempAssistant (v1.3.1) in a <strong>peer-reviewed study</strong>, published in
+        <a href="{{ config.reference_toxtempassistant_paper }}" target="_blank" rel="noopener noreferrer"><em>Evidence-Based Toxicology</em> (2026)</a>,
+        under two controlled conditions: eight publicly available, expert-completed ToxTemps as input (does it
+        recover the experts’ answers?) and eight out-of-scope documents (does it correctly decline to answer?).
+        An answer counted as correct when its meaning closely matched the expert’s answer (cosine similarity above 0.6).
+      </p>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <caption>Baseline performance per model (Houweling et al., 2026, Table 2).</caption>
+          <thead>
+            <tr>
+              <th scope="col">Model</th>
+              <th scope="col" class="text-end">Completeness</th>
+              <th scope="col" class="text-end">Precision</th>
+              <th scope="col" class="text-end">Specificity</th>
+              <th scope="col" class="text-end">Accuracy</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">gpt-4.1-nano</th><td class="text-end">44.3%</td><td class="text-end">83.1%</td><td class="text-end">98.4%</td><td class="text-end">69.4%</td></tr>
+            <tr><th scope="row">gpt-4o-mini</th><td class="text-end">68.1%</td><td class="text-end">79.6%</td><td class="text-end">92.4%</td><td class="text-end">74.4%</td></tr>
+            <tr><th scope="row">o3-mini</th><td class="text-end">99.8%</td><td class="text-end">79.8%</td><td class="text-end">65.9%</td><td class="text-end">72.4%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small text-body-secondary">
+        Completeness: share of answerable questions the model answered. Precision: share of those answers that
+        were correct. Specificity: share of questions correctly declined for out-of-scope documents. Accuracy:
+        correct answers and correct refusals combined.
+      </p>
+      <p>
+        Overall accuracy was similar across models, but they trade off differently: cautious models decline more
+        often, while high-coverage models are more likely to answer from unrelated text. That is why every answer
+        is a draft for expert review. The
+        <a href="https://doi.org/10.5281/zenodo.17047715" target="_blank" rel="noopener noreferrer">evaluation data</a>
+        and <a href="{{ config.github_repo_url }}/tree/main/myocyte/toxtempass/evaluation" target="_blank" rel="noopener noreferrer">scripts</a>
+        are open, so the results can be reproduced.
+      </p>
+    </section>
+
+    <section class="mb-5">
+      <h2 class="fs-4">Your data</h2>
+      <ul>
+        <li><strong>EU data residency:</strong> answers are generated by gpt-4o-mini, hosted by Microsoft in the EU through Azure AI Foundry.</li>
+        <li>Your investigations, studies and assays are visible only to you, unless you share an investigation with colleagues through a workspace.</li>
+        <li>Your documents are used to generate your draft. Letting the development team keep the uploaded files to benchmark and improve the tool is optional: you decide when you create an assay, and you can withdraw consent at any time.</li>
+        <li>ToxTempAssistant is a documentation aid. It doesn’t make safety, medical or legal decisions, and you review every generated statement.</li>
+      </ul>
+    </section>
+
+    <section class="mb-5">
+      <h2 class="fs-4">Getting access</h2>
+      <p>
+        ToxTempAssistant is in public beta. Sign up with your email address or ORCID iD; the maintainers admit new
+        accounts. Every new account comes with a read-only demo assay, so you can explore a finished draft before
+        uploading your own documents.
+      </p>
+      <p>
+        The free version uses gpt-4o-mini, hosted by Microsoft in the EU, which had the highest overall accuracy in
+        our evaluation. Need a different model? Contact us and we can
+        upgrade your account at our discretion.
+      </p>
+    </section>
+
+    <section class="mb-5">
+      <h2 class="fs-4 mb-3">Frequently asked questions</h2>
+      <div class="accordion" id="faqAccordion">
+        {% for question, answer in faq %}
+        <div class="accordion-item">
+          <h3 class="accordion-header">
+            <button class="accordion-button collapsed fs-6" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.counter }}" aria-expanded="false" aria-controls="faq{{ forloop.counter }}">{{ question }}</button>
+          </h3>
+          <div id="faq{{ forloop.counter }}" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+            <div class="accordion-body">{{ answer }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="mb-5">
+      <h2 class="fs-4">Team and funding</h2>
+      <p>
+        ToxTempAssistant was conceived at the 4th VHP4Safety Hackathon and is developed by Jente Houweling
+        (RIVM; Maastricht University) and Matthias Arras, with Egon Willighagen, Danyel Jennen and Chris Evelo
+        (Maastricht University) and Anne Kienhuis (RIVM; Utrecht University).
+      </p>
+      <p>
+        The work is part of the Virtual Human Platform for Safety Assessment (VHP4Safety) project, funded by the
+        Dutch Research Council (NWO) through the Dutch Research Agenda programme “Research on Routes by
+        Consortia” (NWA-ORC 1292.19.272).
+      </p>
+    </section>
+
+    <section class="mb-5" id="how-to-cite">
+      <h2 class="fs-4">How to cite</h2>
+      <p>If ToxTempAssistant helps your work, please cite:</p>
+      <blockquote class="border-start border-3 ps-3 text-body-secondary">
+        Houweling, J. M., Arras, M. M. L., Willighagen, E. L., Jennen, D. G. J., Evelo, C. T., &amp; Kienhuis, A. S. (2026).
+        ToxTempAssistant: using large language models to standardise cell-based toxicological test method descriptions.
+        <em>Evidence-Based Toxicology</em>, 4(1).
+        <a href="{{ config.reference_toxtempassistant_paper }}" target="_blank" rel="noopener noreferrer">https://doi.org/10.1080/2833373X.2026.2638036</a>
+      </blockquote>
+      <p>
+        The software is open source under the GNU Affero General Public License v3.0:
+        <a href="{{ config.github_repo_url }}" target="_blank" rel="noopener noreferrer">source code on GitHub</a>,
+        with archived releases on <a href="{{ config.reference_toxtempassistant_zenodo_code }}" target="_blank" rel="noopener noreferrer">Zenodo</a>.
+        Questions or ideas? <a href="{{ config.github_repo_url }}/issues" target="_blank" rel="noopener noreferrer">Open an issue on GitHub</a>.
+      </p>
+    </section>
+
+  </div>
+</div>
+{% endblock %}

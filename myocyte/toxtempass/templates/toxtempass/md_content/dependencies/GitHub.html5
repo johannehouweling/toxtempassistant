@@ -1,5 +1,7 @@
 $--| GitHub HTML5 Pandoc Template" v2.2 | 2020/08/12 | pandoc v2.1.1
-<!DOCTYPE html>
+$-- ToxTempAssistant: trimmed to an HTML fragment (no doctype, html, head,
+$-- body or title). The output is included inside every page, where a nested
+$-- document adds extra <title> tags that search engines pick up.
 <!--
 ==============================================================================
            "GitHub HTML5 Pandoc Template" v2.2 — by Tristano Ajmone
@@ -48,33 +50,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ==============================================================================-->
-$-------------------------------------------------------------------------> lang
-<html$if(lang)$ lang="$lang$"$endif$$if(dir)$ dir="$dir$"$endif$>
-<head>
-$--=============================================================================
-$--                                METADATA
-$--=============================================================================
-  <meta charset="$if(charset)$$charset$$else$utf-8$endif$" />
-  <meta name="generator" content="pandoc" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-$-----------------------------------------------------------------------> author
-$for(author-meta)$
-  <meta name="author" content="$author-meta$" />
-$endfor$
-$-------------------------------------------------------------------------> date
-$if(date-meta)$
-  <meta name="dcterms.date" content="$date-meta$" />
-$endif$
-$---------------------------------------------------------------------> keywords
-$if(keywords)$
-  <meta name="keywords" content="$for(keywords)$$keywords$$sep$, $endfor$" />
-$endif$
-$------------------------------------------------------------------> description
-$if(description)$
-  <meta name="description" content="$description$">
-$endif$
-$------------------------------------------------------------------------> title
-  <title>$if(title-prefix)$$title-prefix$ – $endif$$pagetitle$</title>
 $--===========================================================================
 $--                            CSS STYLESHEETS
 $--===========================================================================
@@ -104,16 +79,11 @@ $if(math)$
   $math$
 $endif$
 $-------------------------------------------------------------------------------
-  <!--[if lt IE 9]>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
-  <![endif]-->
 $--------------------------------------------------------------> header-includes
 $for(header-includes)$
   $header-includes$
 $endfor$
 $-------------------------------------------------------------------------------
-</head>
-<body>
 <article class="markdown-body">
 $---------------------------------------------------------------> include-before
 $for(include-before)$
@@ -162,5 +132,3 @@ $include-after$
 $endfor$
 $-------------------------------------------------------------------------------
 </article>
-</body>
-</html>

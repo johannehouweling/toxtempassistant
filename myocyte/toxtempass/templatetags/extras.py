@@ -49,6 +49,19 @@ def intdivperc(a: float, b: float) -> int:
 
 
 @lru_cache(maxsize=1)
+def _toxtemp_sections() -> tuple[dict, ...]:
+    """Load ToxTemp sections (questions, sub-questions, guidance) from ToxTemp_v1.json.
+
+    Cached for the process lifetime; empty when the seed file is missing or invalid.
+    """
+    try:
+        data = json.loads((settings.BASE_DIR / "ToxTemp_v1.json").read_text())
+    except (FileNotFoundError, ValueError, OSError):
+        return ()
+    return tuple(data.get("sections", []))
+
+
+@lru_cache(maxsize=1)
 def _question_guidance() -> dict:
     """Map section/subsection title -> ToxTemp guidance from the ToxTemp_v1.json seed.
 
@@ -57,11 +70,7 @@ def _question_guidance() -> dict:
     for the process lifetime.
     """
     out: dict = {}
-    try:
-        data = json.loads((settings.BASE_DIR / "ToxTemp_v1.json").read_text())
-    except (FileNotFoundError, ValueError, OSError):
-        return out
-    for section in data.get("sections", []):
+    for section in _toxtemp_sections():
         section_guidance = (section.get("guidance") or "").strip()
         if section_guidance:
             out[(section.get("title") or "").strip()] = section_guidance
@@ -70,6 +79,26 @@ def _question_guidance() -> dict:
             if guidance:
                 out[(sub.get("title") or "").strip()] = guidance
     return out
+
+
+@register.simple_tag
+def toxtemp_sections() -> tuple[dict, ...]:
+    """Return the ToxTemp sections, for pages that list the whole template.
+
+    Usage: {% toxtemp_sections as sections %}
+    """
+    return _toxtemp_sections()
+
+
+@register.filter()
+def guidance_paragraphs(title: object) -> list[str]:
+    """Split the ToxTemp guidance for a section/subsection title into Note/Example blocks.
+
+    Empty list when there is no guidance.
+    Usage: {% for paragraph in subsection.title|guidance_paragraphs %}
+    """
+    text = _question_guidance().get((str(title).strip() if title else ""), "")
+    return [p.strip() for p in _NE_SPLIT.split(text) if p.strip()]
 
 
 @register.filter()
@@ -81,11 +110,10 @@ def question_help(title: object) -> str:
     markup is trusted. Rendered inside the Bootstrap guidance popover.
     Usage: {{ subsection.title|question_help }}
     """
-    text = _question_guidance().get((str(title).strip() if title else ""), "")
-    if not text:
+    parts = guidance_paragraphs(title)
+    if not parts:
         return ""
-    parts = [p.strip() for p in _NE_SPLIT.split(text) if p.strip()]
-    body = "".join(f"<p class='mb-2'>{escape(p)}</p>" for p in parts) or escape(text)
+    body = "".join(f"<p class='mb-2'>{escape(p)}</p>" for p in parts)
     return mark_safe(  # noqa: S308 - dynamic text is escaped; wrapper markup is static
         "<div class='small text-start overflow-auto' style='max-height:60vh'>"
         f"{body}</div>"
