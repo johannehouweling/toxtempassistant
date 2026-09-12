@@ -2,6 +2,50 @@
 
 <!-- version list -->
 
+## v3.35.0 (2026-09-12)
+
+### Bug Fixes
+
+- **gold-standard**: Attribute the OATP1C1 assay to Utrecht U.
+  ([`1b92fd9`](https://github.com/johannehouweling/toxtempassistant/commit/1b92fd978787b5ec3aec30932a0d7dc7e11493b0))
+
+- **gold-standard**: Count abstentions and empty answers correctly
+  ([`c18f5e2`](https://github.com/johannehouweling/toxtempassistant/commit/c18f5e2ebfc64a80cfccfdf9cc231a17cc61c26c))
+
+- **gold-standard**: Label status-table columns with the paper's vocabulary
+  ([`ace615a`](https://github.com/johannehouweling/toxtempassistant/commit/ace615abe17ef325d823f4c20c774882bb2f8cfc))
+
+- **gold-standard**: Wrap the status-table subtitle so it stops clipping
+  ([`e9470e3`](https://github.com/johannehouweling/toxtempassistant/commit/e9470e3845ca4c8847864004b08c1f283a99290e))
+
+- **overview**: Drop the duplicate clear cross in the search bar
+  ([`e5ed446`](https://github.com/johannehouweling/toxtempassistant/commit/e5ed446b5218dddcde6b7754cbe8e94bb779a1bf))
+
+### Continuous Integration
+
+- Stop re-running the whole suite on the version-bump commit
+  ([`0e0f9de`](https://github.com/johannehouweling/toxtempassistant/commit/0e0f9dea0eb0592082f08bc9e3ce8d305a1c1aff))
+
+### Features
+
+- **overview**: Icon-only search and clear buttons
+  ([`c85ed2c`](https://github.com/johannehouweling/toxtempassistant/commit/c85ed2cbd8e60da22019427afe0952274fbbbe82))
+
+- **overview**: Move the workspace picker into the search bar
+  ([`b330e08`](https://github.com/johannehouweling/toxtempassistant/commit/b330e0802554331b5bd869679c7582d8973d8527))
+
+- **overview**: Per-workspace tabs and assay search
+  ([`e5322ae`](https://github.com/johannehouweling/toxtempassistant/commit/e5322aea5e1bf321102d025a5126ae53e4146b1b))
+
+- **overview**: Show answers-accepted progress on the workspace tabs
+  ([`8e543a5`](https://github.com/johannehouweling/toxtempassistant/commit/8e543a534a125aaf5b54c01daeb30447d8fb3827))
+
+### Refactoring
+
+- **overview**: Drop the answer counts from the workspace picker
+  ([`4f7b3c5`](https://github.com/johannehouweling/toxtempassistant/commit/4f7b3c5dc781072bc8ad67d1b93bf2ad182b409d))
+
+
 ## v3.34.0 (2026-09-12)
 
 ### Bug Fixes
