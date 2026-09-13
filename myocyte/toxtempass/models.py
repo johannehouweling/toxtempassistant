@@ -92,6 +92,26 @@ class Person(AbstractUser):
     username = None
     email = models.EmailField("email address", unique=True, validators=[validate_email])
     organization = models.CharField(default="", blank=True, max_length=255)
+    ror_id = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text="ROR identifier matched to organization "
+        "(e.g. https://ror.org/01cesdt21); empty if unmatched.",
+    )
+    ror_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="ROR display name of the matched institution; empty if unmatched.",
+    )
+    ror_checked_organization = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="The organization value the ROR lookup last ran for; lets the lookup "
+        "skip unchanged names.",
+    )
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []  # Add List of fields which you want to be required
     orcid_id = models.CharField(

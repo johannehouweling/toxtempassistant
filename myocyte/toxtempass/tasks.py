@@ -110,6 +110,10 @@ def queue_email(
     return str(task_id)
 
 
+def queue_ror_lookup(person_pk: int) -> str:
+    """Queue matching a Person's organization against ROR. Returns django-q2 task id."""
+    return str(async_task("toxtempass.ror.resolve_person", person_pk, group="ror"))
+
 
 # --- Beta signup notification -------------------------------------------------
 
