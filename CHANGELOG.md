@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.41.2 (2026-09-13)
+
+### Bug Fixes
+
+- **stats**: Count staff ToxTemps on the dashboard
+  ([`84f0d67`](https://github.com/johannehouweling/toxtempassistant/commit/84f0d671b46515c1533828e1dc5aafd8a229c631))
+
+
 ## v3.41.1 (2026-09-13)
 
 ### Bug Fixes
