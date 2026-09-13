@@ -149,7 +149,7 @@ class StatsAggregationTests(TestCase):
         self.assertNotIn(copy.pk, pks)
         self.assertIn(self.done.pk, pks)
 
-    def test_staff_toxtemps_count_but_staff_are_not_users(self):
+    def test_staff_accounts_and_their_toxtemps_count(self):
         staff = AdminFactory.create(email="staff.owner@example.org")
         by_staff = _assay_for(self.user, created_by=staff)
         in_staff_investigation = _assay_for(staff, created_by=self.user)
@@ -158,7 +158,7 @@ class StatsAggregationTests(TestCase):
         pks = set(real_assays().values_list("pk", flat=True))
         for assay in (by_staff, in_staff_investigation, staff_own, legacy):
             self.assertIn(assay.pk, pks)
-        self.assertNotIn(staff.pk, set(people().values_list("pk", flat=True)))
+        self.assertIn(staff.pk, set(people().values_list("pk", flat=True)))
 
     def test_staff_demo_toxtemps_are_still_excluded(self):
         staff = AdminFactory.create(email="staff.demo@example.org")
@@ -208,7 +208,6 @@ class StatsAggregationTests(TestCase):
         Person.objects.get_or_create(**{Person.USERNAME_FIELD: sentinel})
         real = (
             Person.objects.exclude(**{Person.USERNAME_FIELD: sentinel})
-            .exclude(is_staff=True)
             .exclude(email__iendswith="@test.com")
             .count()
         )
@@ -638,10 +637,11 @@ class StatsAggregationTests(TestCase):
 
     def test_files_and_time_skip_uncounted_toxtemps_and_accounts(self):
         staff = AdminFactory.create(email="staff.files@example.org")
+        synthetic = PersonFactory.create()
         FileAssetFactory.create(uploaded_by=self.user, size_bytes=1_048_576)
         FileAssetFactory.create(uploaded_by=staff, size_bytes=1_048_576)
+        FileAssetFactory.create(uploaded_by=synthetic, size_bytes=1_048_576)
         # Uploaded by a counted user, but into a ToxTemp that does not count.
-        synthetic = PersonFactory.create()
         in_synthetic_investigation = _assay_for(synthetic, created_by=self.user)
         linked = FileAssetFactory.create(uploaded_by=self.user, size_bytes=1_048_576)
         answer = AnswerFactory.create(
@@ -650,12 +650,14 @@ class StatsAggregationTests(TestCase):
         AnswerFile.objects.create(answer=answer, file=linked)
 
         AssayTimeLog.objects.create(user=self.user, assay=self.done, seconds=60)
-        AssayTimeLog.objects.create(user=staff, assay=self.done, seconds=600)
+        AssayTimeLog.objects.create(user=staff, assay=self.done, seconds=120)
+        AssayTimeLog.objects.create(user=synthetic, assay=self.done, seconds=600)
 
+        # Staff uploads and time count; the synthetic account's do not.
         stats = build_stats("all")
-        self.assertEqual(stats["files"]["count"], 1)
-        self.assertEqual(stats["files"]["megabytes"], 1.0)
-        self.assertEqual(stats["engagement"]["active_seconds"], 60)
+        self.assertEqual(stats["files"]["count"], 2)
+        self.assertEqual(stats["files"]["megabytes"], 2.0)
+        self.assertEqual(stats["engagement"]["active_seconds"], 180)
 
     # ── Collaboration ────────────────────────────────────────────────────────
 
@@ -688,11 +690,9 @@ class StatsAggregationTests(TestCase):
             workspace=demo,
             investigation=_assay_for(self.user, demo_template=True).study.investigation,
         )
-        # The only other member is a staff account: not a collaboration.
+        # The only other member is a synthetic account: not a collaboration.
         support = WorkspaceFactory.create(owner=self.user, name="Support")
-        WorkspaceMemberFactory.create(
-            workspace=support, user=AdminFactory.create(email="staff.ws@example.org")
-        )
+        WorkspaceMemberFactory.create(workspace=support, user=PersonFactory.create())
         WorkspaceInvestigationFactory.create(
             workspace=support, investigation=self.partial.study.investigation
         )

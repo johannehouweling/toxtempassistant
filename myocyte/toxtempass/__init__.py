@@ -284,7 +284,7 @@ class Config:
     # per-user copies, /stats leaves out ToxTemps created by — or sitting in an
     # investigation owned by — accounts whose e-mail domain marks them as
     # synthetic, which is what the evaluation harness's factories create. Staff
-    # ToxTemps count; staff accounts are only left out of the per-account figures.
+    # accounts and their ToxTemps count like any other.
     stats_excluded_email_domains: Final[tuple[str, ...]] = ("test.com",)
     # Context-document bands for the completeness chart:
     # (label, lower bound inclusive, upper bound inclusive or None for open).

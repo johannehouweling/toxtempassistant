@@ -18,8 +18,7 @@ module. Two named dimensions are exposed, deliberately:
 
 Who counts is decided in one place, :func:`real_assays` and :func:`people`.
 Every query below starts from one of them, so demo content and synthetic
-evaluation accounts never reach a figure. Staff accounts are left out of the
-per-account figures (users, active time, uploads), but their ToxTemps count.
+evaluation accounts never reach a figure. Staff accounts count like any other.
 
 The module is deliberately free of HTTP concerns so the same payload can be
 rendered as HTML, serialised to JSON, or flattened to CSV by
@@ -121,17 +120,14 @@ def resolve_range(key: str | None, now: dt.datetime | None = None) -> StatsRange
 REAL_ASSAY_Q = Q(demo_template=False, demo_lock=False, demo_source__isnull=True)
 
 
-def _exclude_non_users(qs: QuerySet, prefix: str = "", *, staff: bool = True) -> QuerySet:
-    """Drop rows whose person at ``prefix`` has an excluded e-mail domain or is staff.
+def _exclude_non_users(qs: QuerySet, prefix: str = "") -> QuerySet:
+    """Drop rows whose person at ``prefix`` has an excluded e-mail domain.
 
-    ``staff=False`` keeps staff accounts' rows and drops only the excluded
-    domains. Chained ``exclude()`` calls rather than one OR'd ``Q``: across a
-    nullable foreign key Django keeps the rows where the relation is NULL (a
-    ToxTemp with no recorded creator is not thrown out), and an exclude on a
-    forward key can never fan one row out into duplicates.
+    Chained ``exclude()`` calls rather than one OR'd ``Q``: across a nullable
+    foreign key Django keeps the rows where the relation is NULL (a ToxTemp with
+    no recorded creator is not thrown out), and an exclude on a forward key can
+    never fan one row out into duplicates.
     """
-    if staff:
-        qs = qs.exclude(**{f"{prefix}is_staff": True})
     for domain in config.stats_excluded_email_domains:
         qs = qs.exclude(**{f"{prefix}email__iendswith": f"@{domain}"})
     return qs
@@ -143,14 +139,11 @@ def real_assays() -> QuerySet[Assay]:
     Leaves out the seeded demo template and its per-user copies, and ToxTemps
     created by — or sitting in an investigation owned by — an account in
     ``Config.stats_excluded_email_domains``. A ToxTemp with no recorded creator
-    is judged on its investigation owner alone. Staff ToxTemps count: they are
-    part of the tool's record, even though staff accounts are not counted as
-    users (see :func:`people`).
+    is judged on its investigation owner alone. Staff ToxTemps count like any
+    other.
     """
-    qs = _exclude_non_users(
-        Assay.objects.filter(REAL_ASSAY_Q), "created_by__", staff=False
-    )
-    return _exclude_non_users(qs, "study__investigation__owner__", staff=False)
+    qs = _exclude_non_users(Assay.objects.filter(REAL_ASSAY_Q), "created_by__")
+    return _exclude_non_users(qs, "study__investigation__owner__")
 
 
 def people() -> QuerySet[Person]:
@@ -159,7 +152,8 @@ def people() -> QuerySet[Person]:
     Excludes django-guardian's AnonymousUser sentinel — guardian materialises a
     Person row for anonymous object-permission lookups (``ANONYMOUS_USER_NAME``,
     default ``"AnonymousUser"``), which would offset every per-account KPI by one
-    — plus staff accounts and accounts in ``Config.stats_excluded_email_domains``.
+    — plus accounts in ``Config.stats_excluded_email_domains``. Staff accounts
+    count as users.
     """
     sentinel = getattr(settings, "ANONYMOUS_USER_NAME", "AnonymousUser")
     qs = _exclude_non_users(Person.objects.all())
@@ -938,7 +932,7 @@ def engagement(rng: StatsRange) -> dict[str, Any]:
     # Assay.completion_time_seconds is the sum of AssayTimeLog.seconds across
     # every collaborator, captured when the last answer was first accepted — so
     # it is hands-on effort, not how long the ToxTemp sat open. It is summed at
-    # write time, so staff or synthetic collaborators cannot be taken out of it
+    # write time, so synthetic collaborators cannot be taken out of it
     # here. Export only.
     completion_times = list(
         _completed_assays(assays)
