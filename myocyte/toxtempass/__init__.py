@@ -282,9 +282,9 @@ class Config:
     stats_rating_bins: Final[tuple[float, ...]] = (1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0)
     # Who does not count as uptake. Besides the seeded demo template and its
     # per-user copies, /stats leaves out ToxTemps created by — or sitting in an
-    # investigation owned by — a staff account (the team's own testing), and
-    # accounts whose e-mail domain marks them as synthetic, which is what the
-    # evaluation harness's factories create.
+    # investigation owned by — accounts whose e-mail domain marks them as
+    # synthetic, which is what the evaluation harness's factories create. Staff
+    # ToxTemps count; staff accounts are only left out of the per-account figures.
     stats_excluded_email_domains: Final[tuple[str, ...]] = ("test.com",)
     # Context-document bands for the completeness chart:
     # (label, lower bound inclusive, upper bound inclusive or None for open).
