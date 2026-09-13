@@ -277,56 +277,30 @@ class Config:
     # Cap for "top N" breakdowns (file MIME types, model rows) before the tail
     # is dropped — keeps a chart under the 8-category legibility limit.
     stats_top_n = 10
-    # Ceiling on the per-ToxTemp marks in the completion strip. Past this the
-    # strip says so rather than rendering thousands of hairlines.
-    stats_unit_marks_max = 600
-    # Recency windows (days) used for the "active users" counters. Exported in
-    # the CSV/JSON but not shown on the page — recency is a monitoring question.
-    stats_active_user_windows: Final[tuple[int, ...]] = (7, 30, 90)
     # Bin edges for the feedback usefulness histogram. The rating slider is
     # 1–5 with 0.1 steps (see answer_extras/feedback_export.html).
     stats_rating_bins: Final[tuple[float, ...]] = (1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0)
+    # Who does not count as uptake. Besides the seeded demo template and its
+    # per-user copies, /stats leaves out ToxTemps created by — or sitting in an
+    # investigation owned by — a staff account (the team's own testing), and
+    # accounts whose e-mail domain marks them as synthetic, which is what the
+    # evaluation harness's factories create.
+    stats_excluded_email_domains: Final[tuple[str, ...]] = ("test.com",)
+    # Context-document bands for the completeness chart:
+    # (label, lower bound inclusive, upper bound inclusive or None for open).
+    stats_document_bands: Final[tuple[tuple[str, int, int | None], ...]] = (
+        ("0", 0, 0),
+        ("1", 1, 1),
+        ("2–3", 2, 3),
+        ("4–7", 4, 7),
+        ("8–15", 8, 15),
+        ("16+", 16, None),
+    )
 
     # ── /stats visual language ────────────────────────────────────────────────
-    # The dashboard uses the app's own colours: the filled headline card is
-    # Bootstrap's $primary, the same blue as the site header, and the data marks
-    # are steps of Bootstrap's blue scale. Text is a dark slate rather than
-    # black, and panels are separated by hairlines rather than drop shadows.
-    stats_ink = "#212529"       # Bootstrap $gray-900, the app's body text colour
-    stats_ink_2 = "#6c757d"     # $gray-600
-    stats_ink_3 = "#adb5bd"     # $gray-500
-    stats_paper = "#f1f3f5"     # a shade of $gray-100 for the page plane
-    stats_rule = "#dee2e6"      # $gray-300
-    stats_brand = "#0d6efd"     # $primary — matches the header, white text on it
-                                # clears 4.5:1 (Bootstrap's own .text-bg-primary)
-    # Chart colours: $primary paired with $teal. Validated as a categorical pair
-    # on a white panel — adjacent ΔE 30.4 protan / 32.5 normal, clear of the
-    # colourblind-separation floor. $warning and $info fall outside the
-    # lightness band, and $danger was ruled out on meaning rather than measure:
-    # a red series on a growth chart reads as something going wrong. Slot 1
-    # carries every single-series chart; slot 2 only joins it when a second
-    # series shares the axis.
-    stats_chart_series = ("#0d6efd", "#20c997")
-    # Ordinal ramp from Bootstrap's blue scale ($blue-300/-500/-600): monotone
-    # lightness and the light end clears 2:1 on white ($blue-200 does not, at
-    # 1.77:1, so the ramp starts at -300). Used where categories are ordered —
-    # the accepted / awaiting / undrafted progress bands.
-    stats_chart_ordinal = ("#6ea8fe", "#0d6efd", "#0a58ca")
-    stats_chart_grid = "#dde5ea"
-    stats_chart_axis = "#8697a4"
-    # Panel background — doubles as the 2px spacer between stacked bar segments.
-    stats_chart_surface = "#ffffff"
-    # Typeface for the dashboard. Plex was drawn for engineering documentation
-    # and carries true tabular figures; the Mono cut sets the measured values so
-    # digits align down a column and the hero figures read as an instrument
-    # readout. Served from Google Fonts — see the note in stats.html if the
-    # deployment needs these self-hosted instead.
-    stats_font_css = (
-        "https://fonts.googleapis.com/css2"
-        "?family=IBM+Plex+Mono:wght@300;400;500"
-        "&family=IBM+Plex+Sans:wght@400;500;600"
-        "&display=swap"
-    )
+    # Colours and fonts are not configured here: stats.html uses Bootstrap's own
+    # CSS variables (--bs-primary, --bs-font-monospace, ...) so the page follows
+    # the app theme.
 
     license_url = "https://www.gnu.org/licenses/agpl-3.0.html"
     version = os.getenv("GIT_TAG", "") + "-beta"
@@ -340,6 +314,11 @@ class Config:
     )
     reference_toxtempassistant_zenodo_publication = ""
     github_repo_url = "https://github.com/johannehouweling/ToxTempAssistant"
+    # Source JSON of a questionnaire version, as loaded by `init_db --label <label>`.
+    questionnaire_json_url_template = (
+        "https://github.com/johannehouweling/ToxTempAssistant/blob/main/myocyte/"
+        "ToxTemp_{label}.json"
+    )
     git_hash = os.getenv("GIT_HASH", "")
     reference_toxtemp = "https://doi.org/10.14573/altex.1909271"
     max_size_mb = 30

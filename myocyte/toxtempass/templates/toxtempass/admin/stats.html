@@ -7,14 +7,16 @@ Staff-only usage stats.
 Everything rendered here comes from toxtempass.stats.build_stats(), which emits
 aggregates only. Do NOT add a widget that surfaces a user's name, e-mail, ORCID
 iD, assay title or free-text feedback — the whole point of the module boundary
-is that this template cannot leak what it never receives.
+is that this template cannot leak what it never receives. Institution names and
+the names of workspaces in shared use are the deliberate exceptions; the stats
+module docstring gives the reasoning.
 
 On the style block: the project convention is Bootstrap utilities over custom
 CSS, and the structure below still uses Bootstrap's grid and spacing. These
 rules are the page's visual language — display type, the ink card, the stacked
 progress bars — which Bootstrap has no vocabulary for. Everything is scoped
-under .readout so it cannot reach any other page, and every colour is read from
-Config rather than written twice.
+under .readout so it cannot reach any other page, and every colour is a Bootstrap
+CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the theme.
 {% endcomment %}
 
 {% block title %}Usage stats — ToxTempAssistant{% endblock %}
@@ -22,22 +24,23 @@ Config rather than written twice.
 {% block content %}
 {{ chart_data|json_script:"kpiChartData" }}
 
-<link rel="stylesheet" href="{{ config.stats_font_css }}">
 <style>
   /* Ships only with this page, so the body rule cannot affect the rest of the app. */
-  body { background: {{ config.stats_paper }}; }
+  body { background: var(--bs-tertiary-bg); }
 
   .readout {
-    --ink:   {{ config.stats_ink }};
-    --ink-2: {{ config.stats_ink_2 }};
-    --ink-3: {{ config.stats_ink_3 }};
-    --rule:  {{ config.stats_rule }};
-    --panel: {{ config.stats_chart_surface }};
-    --brand:       {{ config.stats_brand }};
-    --accent:      {{ config.stats_chart_ordinal.2 }};
-    --accent-soft: {{ config.stats_chart_ordinal.0 }};
-    --accent-mid:  {{ config.stats_chart_ordinal.1 }};
-    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* Every colour is a Bootstrap CSS variable, so the page follows the app's
+       theme. Blue is $primary — the header's bg-primary — and the lighter blue
+       is that same primary at half opacity, never a second hue. */
+    --ink:   var(--bs-body-color);
+    --ink-2: var(--bs-secondary-color);
+    --ink-3: var(--bs-gray-500);
+    --rule:  var(--bs-border-color);
+    --panel: var(--bs-body-bg);
+    --brand:       var(--bs-primary);
+    --accent:      var(--bs-primary);
+    --accent-soft: rgba(var(--bs-primary-rgb), .5);
+    --on-brand:    var(--bs-white-rgb);
     font-size: .9375rem;
     line-height: 1.55;
     color: var(--ink);
@@ -57,8 +60,8 @@ Config rather than written twice.
   .readout .fig-md   { font-size: 1.625rem; }
   .readout .fig sub  { font-size: .35em; font-weight: 500; letter-spacing: 0;
                        vertical-align: baseline; color: var(--ink-2); }
-  /* Mono is kept for table columns, where fixed width does an actual job. */
-  .readout .val { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  /* Numbers stay in the body font; tabular figures keep their digits aligned. */
+  .readout .val { font-variant-numeric: tabular-nums; }
   .readout .unit { color: var(--ink-2); font-size: .8125rem; }
   .readout .note { color: var(--ink-2); font-size: .8125rem; max-width: 62ch; }
 
@@ -67,10 +70,10 @@ Config rather than written twice.
   .readout .stat { background: var(--panel); border: 1px solid var(--rule);
                    border-radius: 4px; padding: 1.375rem 1.5rem; height: 100%; }
   .readout .stat-label { color: var(--ink-2); font-size: .875rem; margin-top: .5rem; }
-  .readout .stat-brand { background: var(--brand); border-color: var(--brand); color: #fff;
+  .readout .stat-brand { background: var(--brand); border-color: var(--brand); color: rgb(var(--on-brand));
                        display: flex; flex-direction: column; }
   .readout .stat-brand .stat-label,
-  .readout .stat-brand .unit { color: rgba(255,255,255,.88); }
+  .readout .stat-brand .unit { color: rgba(var(--on-brand), .88); }
 
   /* Panels for the detail sections below the cards. */
   .readout .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
@@ -86,58 +89,55 @@ Config rather than written twice.
                          letter-spacing: .01em; margin: 2rem 0 .75rem; }
 
   /* Stacked bars. Segment widths always sum to 100, so the bar needs no track
-     behind it; the 1px gaps are the surface showing through between bands. */
+     behind it; the 1px gaps are the surface showing through between bands.
+     Answer bands: blues carry an answer (b1 accepted, b2 drafted), greys carry
+     none (bn answer not found, b3 empty). */
   .readout .bar { display: flex; height: 9px; border-radius: 2px; overflow: hidden; gap: 1px; }
   .readout .bar > i { display: block; min-width: 0; }
   .readout .bar-tall { height: 14px; border-radius: 3px; }
   .readout .b1 { background: var(--accent); }
   .readout .b2 { background: var(--accent-soft); }
+  .readout .bn { background: var(--ink-3); }
   .readout .b3 { background: var(--rule); }
   /* On the brand card the same three bands become a white ramp, so the most
      important one (complete) is the highest-contrast. */
-  .readout .stat-brand .b1 { background: #fff; }
-  .readout .stat-brand .b2 { background: rgba(255,255,255,.48); }
-  .readout .stat-brand .b3 { background: rgba(255,255,255,.2); }
+  .readout .stat-brand .b1 { background: rgb(var(--on-brand)); }
+  .readout .stat-brand .b2 { background: rgba(var(--on-brand), .48); }
+  .readout .stat-brand .b3 { background: rgba(var(--on-brand), .2); }
   .readout .key { display: inline-flex; align-items: baseline; gap: .4rem; font-size: .8125rem; }
   .readout .key::before { content: ""; width: .55rem; height: .55rem; border-radius: 2px;
                           background: currentColor; flex: none; transform: translateY(.05rem); }
   .readout .key.b1 { color: var(--accent); background: none; }
   .readout .key.b2 { color: var(--accent-soft); background: none; }
+  .readout .key.bn { color: var(--ink-3); background: none; }
   .readout .key.b3 { color: var(--rule); background: none; }
   .readout .key > span { color: var(--ink-2); }
   .readout .key > span b { font-weight: 600; color: var(--ink); }
-  .readout .stat-brand .key.b1 { color: #fff; }
-  .readout .stat-brand .key.b2 { color: rgba(255,255,255,.48); }
-  .readout .stat-brand .key.b3 { color: rgba(255,255,255,.2); }
-  .readout .stat-brand .key > span { color: rgba(255,255,255,.88); }
-  .readout .stat-brand .key > span b { color: #fff; }
+  .readout .stat-brand .key.b1 { color: rgb(var(--on-brand)); }
+  .readout .stat-brand .key.b2 { color: rgba(var(--on-brand), .48); }
+  .readout .stat-brand .key.b3 { color: rgba(var(--on-brand), .2); }
+  .readout .stat-brand .key > span { color: rgba(var(--on-brand), .88); }
+  .readout .stat-brand .key > span b { color: rgb(var(--on-brand)); }
 
-  .readout table { font-size: .875rem; }
-  .readout thead th { font-weight: 500; color: var(--ink-2); border-bottom: 1px solid var(--rule); padding-bottom: .4rem; }
-  .readout tbody td { border-bottom: 1px solid var(--rule); padding: .5rem 0; }
-  .readout tbody tr:last-child td { border-bottom: 0; }
-  .readout td.num, .readout th.num { text-align: right; font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
-  /* A long institution name was starving the numeric columns until their
-     headers wrapped into run-on words. The name column takes what is left after
-     the numbers have their room, and wraps inside itself instead. */
-  .readout th.num, .readout td.num { white-space: nowrap; width: 1%; padding-left: 1rem; }
-  .readout td.name, .readout th.name { width: auto; overflow-wrap: anywhere; }
-  /* Inline scale in the institutions table: the row is its own bar chart, so
-     the panel does not need a second chart repeating the same numbers. */
-  .readout .rowbar { display: block; height: 3px; width: var(--w); min-width: 2px;
-                     background: var(--accent-mid); border-radius: 2px; margin-top: .3rem; }
+  /* Tables are Bootstrap's own .table; numeric columns only keep their digits
+     aligned (text-end and text-nowrap do the rest). */
+  .readout td.text-end { font-variant-numeric: tabular-nums; }
+  /* Bootstrap 5.3 paints table text in --bs-emphasis-color (pure black); body
+     colour for cells and the secondary colour for headers reads softer. */
+  .readout .table { --bs-table-color: var(--bs-body-color); }
+  .readout .table thead { --bs-table-color: var(--bs-secondary-color); }
 
   .readout .seg a { border: 1px solid var(--rule); color: var(--ink-2); background: var(--panel); padding: .25rem .7rem; font-size: .8125rem; text-decoration: none; }
   .readout .seg a + a { border-left: 0; }
   .readout .seg a:first-child { border-radius: 4px 0 0 4px; }
   .readout .seg a:last-child { border-radius: 0 4px 4px 0; }
-  .readout .seg a[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .readout .seg a[aria-current="page"] { background: var(--brand); border-color: var(--brand); color: rgb(var(--on-brand)); }
   /* Sits in the same control as the range tabs but reads as secondary: no
      label, icon only, and it never takes the selected state. */
   .readout .seg-refresh { color: var(--ink-3); padding-inline: .55rem; }
   .readout .seg-refresh:hover { color: var(--brand); }
   .readout .seg a:hover { color: var(--ink); }
-  .readout .seg a[aria-current="page"]:hover { color: #fff; }
+  .readout .seg a[aria-current="page"]:hover { color: rgb(var(--on-brand)); }
   .readout a:focus-visible, .readout .seg a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 
@@ -188,7 +188,7 @@ Config rather than written twice.
           <div class="d-flex flex-wrap gap-4 mt-3">
             <span class="key b1"><span><b>{{ stats.headline.completed_assays.period|intcomma }}</b> complete</span></span>
             <span class="key b2"><span><b>{{ stats.headline.assays.in_progress|intcomma }}</b> in progress</span></span>
-            <span class="key b3"><span><b>{{ stats.headline.assays.untouched|intcomma }}</b> none accepted yet</span></span>
+            <span class="key b3"><span><b>{{ stats.headline.assays.untouched|intcomma }}</b> not started</span></span>
           </div>
         </div>
       </div>
@@ -199,7 +199,7 @@ Config rather than written twice.
         <div class="col-6">
           <div class="stat">
             <div class="fig fig-lg">{{ stats.headline.organisations.period|intcomma }}</div>
-            <div class="stat-label">institutions</div>
+            <div class="stat-label">{% if stats.range.is_all_time %}institutions{% else %}new institutions{% endif %}</div>
           </div>
         </div>
         <div class="col-6">
@@ -210,31 +210,37 @@ Config rather than written twice.
         </div>
         <div class="col-6">
           <div class="stat">
-            <div class="fig fig-lg">{{ stats.engagement.median_completion_display }}</div>
+            <div class="fig fig-lg">{{ stats.engagement.median_to_export_display }}</div>
             <div class="stat-label" data-bs-toggle="tooltip"
-                 title="Hands-on time: the active minutes every collaborator spent in the editor, summed, for a median finished ToxTemp. Not how long it sat open — that is {{ stats.engagement.median_elapsed_display }} end to end.">
-              hands-on time to finish one <i class="bi bi-info-circle" aria-hidden="true"></i>
+                 title="An estimate, as a median. Exports are not logged, but a rating is required before a ToxTemp's first export, so the rating marks that moment. The clock starts when the first AI draft finished, or when the ToxTemp was created if no draft run was recorded.">
+              time from first draft to export <i class="bi bi-info-circle" aria-hidden="true"></i>
             </div>
+            <div class="unit mt-1">n = {{ stats.engagement.export_samples|intcomma }} exported</div>
           </div>
         </div>
         <div class="col-6">
+          {% with p=stats.progress %}
           <div class="stat">
-            <div class="fig fig-lg">{{ stats.progress.accepted|floatformat:0 }}<sub>%</sub></div>
+            <div class="fig fig-lg">{{ p.accepted|floatformat:0 }}<sub>%</sub></div>
             <div class="stat-label">of answers accepted by an expert</div>
-            {% comment %} Each key states its own band, not the cumulative total: the b2
-               segment is drafted-minus-accepted, so labelling it with the full
-               drafted figure would point a swatch at the wrong width. {% endcomment %}
+            {% comment %} Each key states its own band; the big figure is the accepted
+               band, so only the other three need a key. The same four labels are
+               used in the section bars below. {% endcomment %}
             <div class="bar mt-3" role="img"
-                 aria-label="{{ stats.progress.accepted }} percent accepted, {{ stats.progress.awaiting }} percent drafted but not yet accepted, {{ stats.progress.undrafted }} percent with no draft">
-              <i class="b1" style="width: {{ stats.progress.accepted }}%"></i>
-              <i class="b2" style="width: {{ stats.progress.awaiting }}%"></i>
-              <i class="b3" style="width: {{ stats.progress.undrafted }}%"></i>
+                 aria-label="{{ p.accepted }} percent accepted by an expert, {{ p.drafted }} percent drafted, {{ p.not_found }} percent answer not found, {{ p.empty }} percent empty">
+              <i class="b1" style="width: {{ p.accepted }}%"></i>
+              <i class="b2" style="width: {{ p.drafted }}%"></i>
+              <i class="bn" style="width: {{ p.not_found }}%"></i>
+              <i class="b3" style="width: {{ p.empty }}%"></i>
             </div>
             <div class="d-flex flex-wrap gap-3 mt-2">
-              <span class="key b2"><span><b>{{ stats.progress.awaiting }}%</b> awaiting sign-off</span></span>
-              <span class="key b3"><span><b>{{ stats.progress.undrafted }}%</b> no draft</span></span>
+              <span class="key b2"><span><b>{{ p.drafted }}%</b> drafted</span></span>
+              <span class="key bn"><span><b>{{ p.not_found }}%</b> answer not found</span></span>
+              <span class="key b3"><span><b>{{ p.empty }}%</b> empty</span></span>
             </div>
+            <div class="note mt-2">Average over the {{ p.assays|intcomma }} ToxTemp{{ p.assays|pluralize }} with answers{% if p.without_answers %}; {{ p.without_answers|intcomma }} of the {{ stats.headline.assays.period|intcomma }} created have none yet, because no documents were uploaded{% endif %}.</div>
           </div>
+          {% endwith %}
         </div>
       </div>
     </div>
@@ -247,7 +253,7 @@ Config rather than written twice.
      the curve itself — the endpoint is the payoff. {% endcomment %}
   <div class="panel">
     <div class="panel-hd">
-      <h2>Growth</h2>
+      <h2>Uptake</h2>
       <p class="note mb-0 mt-1">Registered users and ToxTemps created, counted cumulatively.</p>
     </div>
     <div class="panel-bd">
@@ -261,33 +267,26 @@ Config rather than written twice.
   <div class="panel">
     <div class="panel-hd">
       <h2>Institutions using ToxTempAssistant</h2>
-      <p class="note mb-0 mt-1">
-        {{ stats.headline.organisations.total|intcomma }} named institution{{ stats.headline.organisations.total|pluralize }},
-        all time. Accounts with no institution on file are pooled into one row.
-      </p>
     </div>
     <div class="row g-0">
       <div class="col-12 col-lg-8">
         <div class="panel-bd">
-          <table class="w-100">
-            <thead>
+          <table class="table table-sm align-middle mb-0">
+            <thead class="small">
               <tr>
-                <th scope="col" class="name">Institution</th>
-                <th scope="col" class="num">Users</th>
-                <th scope="col" class="num">ToxTemps</th>
-                <th scope="col" class="num">Completed</th>
+                <th scope="col">Institution</th>
+                <th scope="col" class="text-end text-nowrap">Users</th>
+                <th scope="col" class="text-end text-nowrap">ToxTemps</th>
+                <th scope="col" class="text-end text-nowrap">Completed</th>
               </tr>
             </thead>
             <tbody>
               {% for row in stats.organisations %}
               <tr>
-                <td class="name">
-                  {{ row.organisation }}
-                  <span class="rowbar" style="--w: {{ row.share }}%"></span>
-                </td>
-                <td class="num">{{ row.users|intcomma }}</td>
-                <td class="num">{{ row.assays|intcomma }}</td>
-                <td class="num">{{ row.completed|intcomma }}</td>
+                <td class="text-break">{{ row.organisation }}</td>
+                <td class="text-end text-nowrap">{{ row.users|intcomma }}</td>
+                <td class="text-end text-nowrap">{{ row.assays|intcomma }}</td>
+                <td class="text-end text-nowrap">{{ row.completed|intcomma }}</td>
               </tr>
               {% empty %}
               <tr><td colspan="4" class="note">No institutions recorded yet.</td></tr>
@@ -299,23 +298,18 @@ Config rather than written twice.
 
       <div class="col-12 col-lg-4 split">
         <div class="panel-bd">
-          <div class="mb-4">
-            <div class="fig fig-md">{{ stats.collaboration.shared_workspaces|intcomma }}</div>
-            <div class="unit" data-bs-toggle="tooltip"
-                 title="Workspaces with more than one member. A workspace nobody has been invited to is not counted — {{ stats.collaboration.workspaces_created|intcomma }} were created in total.">
-              shared workspaces <i class="bi bi-info-circle" aria-hidden="true"></i>
-            </div>
+          <div class="fig fig-md">{{ stats.collaboration.shared_workspaces|intcomma }}</div>
+          <div class="unit" data-bs-toggle="tooltip"
+               title="Workspaces created in this period with more than one member and at least one ToxTemp in an investigation shared into them. {{ stats.collaboration.workspaces_created|intcomma }} workspace{{ stats.collaboration.workspaces_created|pluralize }} were created in total.">
+            shared workspaces <i class="bi bi-info-circle" aria-hidden="true"></i>
           </div>
-          <div>
-            <div class="fig fig-md">{{ stats.collaboration.collaborating_users|intcomma }}</div>
-            <div class="unit">people in a shared workspace</div>
-            {% if stats.collaboration.cross_institution_workspaces %}
-            <div class="note mt-2">
-              {{ stats.collaboration.cross_institution_workspaces|intcomma }} of those
-              workspaces span more than one institution.
-            </div>
-            {% endif %}
-          </div>
+          {% if stats.collaboration.workspaces %}
+          <ul class="list-group list-group-flush small mt-3 mb-0">
+            {% for workspace in stats.collaboration.workspaces %}
+            <li class="list-group-item px-0 py-2 text-break">{{ workspace.name }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -324,30 +318,28 @@ Config rather than written twice.
   {# ── Progress by section ──────────────────────────────────────────────── #}
   <div class="panel">
     <div class="panel-hd">
-      <h2>Progress by section</h2>
-      {% if stats.section_progress.question_set %}
-      <p class="note mb-0 mt-1">
-        Each ToxTemp is scored on its own questionnaire, then those scores are
-        averaged. So a bar reads: of this section's questions, this is the share
-        a typical ToxTemp has got through. ToxTemp
-        {{ stats.section_progress.question_set }}, over
-        {{ stats.section_progress.assays|intcomma }} ToxTemp{{ stats.section_progress.assays|pluralize }} using that version.
-      </p>
-      {% endif %}
+      <h2>Progress by section
+        {% if stats.section_progress.question_set %}
+        <i class="bi bi-info-circle fs-6 text-secondary" tabindex="0" data-bs-toggle="tooltip"
+           aria-label="How the section bars are calculated"
+           title="Each drafted ToxTemp is scored on its own answers, then those scores are averaged. So a bar reads: of this section's questions, this is the share a typical ToxTemp has in each state. ToxTemp {{ stats.section_progress.question_set }}, averaged over {{ stats.section_progress.assays|intcomma }} drafted ToxTemp{{ stats.section_progress.assays|pluralize }} using that version."></i>
+        {% endif %}
+      </h2>
     </div>
     <div class="panel-bd">
       {% if stats.section_progress.sections %}
       <div class="d-flex flex-wrap gap-4 mb-4">
         <span class="key b1"><span>accepted by an expert</span></span>
-        <span class="key b2"><span>drafted, not yet accepted</span></span>
-        <span class="key b3"><span>no draft answer</span></span>
+        <span class="key b2"><span>drafted</span></span>
+        <span class="key bn"><span>answer not found</span></span>
+        <span class="key b3"><span>empty</span></span>
       </div>
-      {# A column header, so the trailing figure is not read as the whole
-         coloured extent of the bar — it is the accepted band alone. #}
+      {% comment %} A column header, so the trailing figure is not read as the whole
+         coloured extent of the bar — it is the accepted band alone. {% endcomment %}
       <div class="row align-items-end g-3 mb-2">
-        <div class="col-12 col-md-4"><span class="unit">Section</span></div>
-        <div class="col-10 col-md-7"><span class="unit">Average progress per ToxTemp</span></div>
-        <div class="col-2 col-md-1 text-end"><span class="unit">Accepted</span></div>
+        <div class="col-12 col-md-4 small fw-semibold">Section</div>
+        <div class="col-10 col-md-7 small fw-semibold">Answer states, averaged over ToxTemps</div>
+        <div class="col-2 col-md-1 text-end small fw-semibold">Accepted</div>
       </div>
       {% for section in stats.section_progress.sections %}
       <div class="row align-items-center g-3 mb-3">
@@ -357,17 +349,18 @@ Config rather than written twice.
         </div>
         <div class="col-10 col-md-7">
           <div class="bar" role="img"
-               aria-label="{{ section.title }}: {{ section.accepted }} percent accepted, {{ section.awaiting }} percent drafted but not accepted, {{ section.undrafted }} percent with no draft">
+               aria-label="{{ section.title }}: {{ section.accepted }} percent accepted by an expert, {{ section.drafted }} percent drafted, {{ section.not_found }} percent answer not found, {{ section.empty }} percent empty">
             <i class="b1" style="width: {{ section.accepted }}%"></i>
-            <i class="b2" style="width: {{ section.awaiting }}%"></i>
-            <i class="b3" style="width: {{ section.undrafted }}%"></i>
+            <i class="b2" style="width: {{ section.drafted }}%"></i>
+            <i class="bn" style="width: {{ section.not_found }}%"></i>
+            <i class="b3" style="width: {{ section.empty }}%"></i>
           </div>
         </div>
         <div class="col-2 col-md-1 text-end val">{{ section.accepted|floatformat:0 }}%</div>
       </div>
       {% endfor %}
       {% else %}
-      <p class="note mb-0">No ToxTemps with a questionnaire attached in this period.</p>
+      <p class="note mb-0">No drafted ToxTemps with a questionnaire attached in this period.</p>
       {% endif %}
     </div>
   </div>
@@ -379,29 +372,38 @@ Config rather than written twice.
       {% if stats.question_sets %}
       <p class="note mb-0 mt-1">
         ToxTemp questionnaire {{ stats.question_sets|length|pluralize:"version,versions" }} in use:
-        {% for row in stats.question_sets %}{{ row.label }} ({{ row.count|intcomma }} ToxTemp{{ row.count|pluralize }}){% if not forloop.last %}, {% endif %}{% endfor %}
+        {% for row in stats.question_sets %}{% if row.url %}<a href="{{ row.url }}" target="_blank" rel="noopener">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %} ({{ row.count|intcomma }} ToxTemp{{ row.count|pluralize }}){% if not forloop.last %}, {% endif %}{% endfor %}
       </p>
       {% endif %}
     </div>
     <div class="row g-0">
       <div class="col-12 col-lg-7">
         <div class="panel-bd">
+          {% with c=stats.completeness %}
           <div class="row g-4">
             <div class="col-6">
-              <div class="fig fig-md">{{ stats.grounding.median_documents|floatformat:0 }}</div>
-              <div class="unit">context documents supplied per ToxTemp, typically</div>
+              <div class="fig fig-md">{% if stats.grounding.median_documents is None %}—{% else %}{{ stats.grounding.median_documents|floatformat:0 }}{% endif %}</div>
+              <div class="unit">median nr of context documents per ToxTemp, over {{ stats.grounding.assays|intcomma }} drafted ToxTemp{{ stats.grounding.assays|pluralize }}</div>
             </div>
             <div class="col-6">
-              <div class="fig fig-md">{{ stats.answers.not_found|intcomma }}<span class="unit"> · {{ stats.answers.not_found_pct|default:"0" }}%</span></div>
-              <div class="unit">questions the documents did not answer</div>
+              {% if c.assays %}
+              <div class="fig fig-md">{{ c.share|floatformat:0 }}<span class="unit"> %</span></div>
+              {% else %}
+              <div class="fig fig-md">—</div>
+              {% endif %}
+              <div class="unit" data-bs-toggle="tooltip"
+                   title="Per drafted ToxTemp, the share of its questions with an answer drafted from the documents (anything but “Answer not found in documents.”), averaged over those ToxTemps.">
+                average completeness <i class="bi bi-info-circle" aria-hidden="true"></i>
+              </div>
             </div>
           </div>
-          <p class="note mt-4 mb-0">
-            Across {{ stats.answers.total|intcomma }} questions in
-            {{ stats.grounding.assays_with_documents|intcomma }} ToxTemps with documents
-            attached. The more source material a team supplies, the fewer questions
-            come back unanswered — these two read together.
-          </p>
+          {% if c.assays %}
+          <div class="unit mt-4 mb-2">Average completeness by number of context documents</div>
+          <div style="height:160px"><canvas id="chartCompleteness"></canvas></div>
+          {% else %}
+          <p class="note mt-4 mb-0">No drafted ToxTemps in this period.</p>
+          {% endif %}
+          {% endwith %}
         </div>
       </div>
 
@@ -425,48 +427,48 @@ Config rather than written twice.
   <div class="panel">
     <div class="panel-hd"><h2>LLM costs</h2></div>
     <div class="row g-0">
-      <div class="col-12 col-lg-7">
+      <div class="col-12 col-lg-8">
         <div class="panel-bd">
-          <p class="note mb-3">
-            What each model was billed for. Tokens are the units models charge in —
-            roughly three quarters of a word each.
-          </p>
           {% if stats.llm.by_model %}
           {% comment %} No chart here: with a handful of models the bar repeated the table
              sitting under it, so the table carries it alone. {% endcomment %}
-          <table class="w-100 mt-3">
-            <thead>
+          <table class="table table-sm align-middle mb-0">
+            <thead class="small">
               <tr>
-                <th scope="col" class="name">Model</th>
-                <th scope="col" class="num">Tokens read</th>
-                <th scope="col" class="num">Tokens written</th>
-                <th scope="col" class="num">Total cost</th>
+                <th scope="col">Model</th>
+                <th scope="col" class="text-end text-nowrap">Tokens read</th>
+                <th scope="col" class="text-end text-nowrap">Tokens written</th>
+                <th scope="col" class="text-end text-nowrap">Total cost <i class="bi bi-info-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" aria-label="About missing costs" title="A model showing tokens but no cost is missing its price tag in the deployment config."></i></th>
               </tr>
             </thead>
             <tbody>
               {% for row in stats.llm.by_model %}
               <tr>
-                <td class="name">{{ row.model }}</td>
-                <td class="num">{{ row.input_tokens|intcomma }}</td>
-                <td class="num">{{ row.output_tokens|intcomma }}</td>
-                <td class="num">{{ stats.llm.currency }}{{ row.cost_total|floatformat:2 }}</td>
+                <td class="text-break">{{ row.model }}</td>
+                <td class="text-end text-nowrap text-body-secondary">{{ row.input_tokens|intcomma }}</td>
+                <td class="text-end text-nowrap text-body-secondary">{{ row.output_tokens|intcomma }}</td>
+                <td class="text-end text-nowrap fw-semibold">{{ stats.llm.currency }}{{ row.cost_total|floatformat:2 }}</td>
               </tr>
               {% endfor %}
-              <tr style="border-top:1px solid var(--rule)">
-                <td>All models, {{ stats.llm.runs|intcomma }} drafting run{{ stats.llm.runs|pluralize }}</td>
-                <td class="num">{{ stats.llm.input_tokens|intcomma }}</td>
-                <td class="num">{{ stats.llm.output_tokens|intcomma }}</td>
-                <td class="num">{{ stats.llm.currency }}{{ stats.llm.cost_total|floatformat:2 }}</td>
-              </tr>
             </tbody>
+            <tfoot class="table-group-divider fw-semibold">
+              <tr>
+                {% comment %} Not "drafting runs": AssayCost keeps one row per ToxTemp and
+                   model, updated on each re-draft, so a row count would undercount
+                   runs. The ToxTemp count is what the rows can actually tell. {% endcomment %}
+                <td>All models, {{ stats.llm.assays|intcomma }} ToxTemp{{ stats.llm.assays|pluralize }} drafted</td>
+                <td class="text-end text-nowrap">{{ stats.llm.input_tokens|intcomma }}</td>
+                <td class="text-end text-nowrap">{{ stats.llm.output_tokens|intcomma }}</td>
+                <td class="text-end text-nowrap">{{ stats.llm.currency }}{{ stats.llm.cost_total|floatformat:2 }}</td>
+              </tr>
+            </tfoot>
           </table>
-          <p class="note mt-2 mb-0">A model showing tokens but no cost is missing its price tag in the deployment config.</p>
           {% else %}
           <p class="note mb-0">No drafting runs recorded in this period.</p>
           {% endif %}
         </div>
       </div>
-      <div class="col-12 col-lg-5 split">
+      <div class="col-12 col-lg-4 split">
         {% comment %} Totals live in the table on the left; this column carries only what
            is not already there. {% endcomment %}
         <div class="panel-bd">
@@ -477,6 +479,16 @@ Config rather than written twice.
           <div>
             <div class="fig fig-md">{{ stats.files.megabytes|intcomma }}<span class="unit"> MB</span></div>
             <div class="unit">of context documents stored</div>
+            {% if stats.files.by_type %}
+            <ul class="list-unstyled note mt-2 mb-0">
+              {% for entry in stats.files.by_type %}
+              <li class="d-flex justify-content-between gap-3">
+                <span class="text-break">{{ entry.content_type }}</span>
+                <span class="val">{{ entry.count|intcomma }}</span>
+              </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -490,8 +502,21 @@ Config rather than written twice.
   const D = JSON.parse(document.getElementById('kpiChartData').textContent);
   if (typeof Chart === 'undefined') return;   // CDN blocked — the tables still carry every number
 
-  const P = D.palette;
-  Chart.defaults.font.family = '"IBM Plex Sans", system-ui, -apple-system, sans-serif';
+  // A canvas cannot read CSS variables, so the Bootstrap theme colours are
+  // resolved once here: primary carries every single-series chart, and
+  // Bootstrap's pink joins it only where a second series shares the axis —
+  // vivid beside blue, legible as label text on white, and not a warning hue.
+  // ponytail: fade() parses 6-digit hex, which Bootstrap 5.3 emits for these two.
+  const css = getComputedStyle(document.documentElement);
+  const bs = (name) => css.getPropertyValue(`--bs-${name}`).trim();
+  const P = {
+    series: [bs('primary'), bs('pink')],
+    ink: bs('body-color'),
+    ink2: bs('secondary-color'),
+    grid: bs('border-color'),
+    surface: bs('body-bg'),
+  };
+  Chart.defaults.font.family = bs('font-sans-serif');
   Chart.defaults.font.size = 12;
   Chart.defaults.color = P.ink2;
   Chart.defaults.maintainAspectRatio = false;
@@ -507,9 +532,10 @@ Config rather than written twice.
   const noGrid = { display: false };
 
   // ── Growth, cumulative ────────────────────────────────────────────────────
-  // Two series on one shared count axis — never a second y-scale. Filled so
-  // the accumulation reads as mass, monotone interpolation so a cumulative
-  // curve can never dip below a value it already reached.
+  // Two series on one shared count axis — never a second y-scale. Only the
+  // ToxTemps series is filled: two translucent areas over each other mix blue
+  // and pink into a muddy tone. Monotone interpolation so a cumulative curve
+  // can never dip below a value it already reached.
   function fade(hex, top, bottom) {
     return (ctx) => {
       const area = ctx.chart.chartArea;
@@ -537,7 +563,7 @@ Config rather than written twice.
         if (!last) return;
         const text = Number(ds.data[ds.data.length - 1]).toLocaleString();
         c.save();
-        c.font = '600 15px "IBM Plex Sans", system-ui, sans-serif';
+        c.font = `600 15px ${bs('font-sans-serif')}`;
         const w = c.measureText(text).width;
         c.fillStyle = P.surface;
         c.beginPath();
@@ -559,12 +585,12 @@ Config rather than written twice.
       labels: D.growth.labels,
       datasets: [
         { label: 'ToxTemps', data: D.growth.assays_cumulative,
-          borderColor: P.series[1], backgroundColor: fade(P.series[1], .22, .01),
+          borderColor: P.series[0], backgroundColor: fade(P.series[0], .34, .03),
           borderWidth: 2.5, fill: 'origin', pointRadius: 0, pointHoverRadius: 5,
           cubicInterpolationMode: 'monotone' },
         { label: 'Users', data: D.growth.users_cumulative,
-          borderColor: P.series[0], backgroundColor: fade(P.series[0], .22, .01),
-          borderWidth: 2.5, fill: 'origin', pointRadius: 0, pointHoverRadius: 5,
+          borderColor: P.series[1], backgroundColor: P.series[1],
+          borderWidth: 2.5, fill: false, pointRadius: 0, pointHoverRadius: 5,
           cubicInterpolationMode: 'monotone' },
       ],
     },
@@ -584,6 +610,37 @@ Config rather than written twice.
       },
     },
   });
+
+  // ── Completeness by context documents ─────────────────────────────────────
+  // One bar per document band; a band with no ToxTemps carries null and so
+  // draws no bar rather than a misleading zero. n is in the tooltip.
+  const completeness = document.getElementById('chartCompleteness');
+  if (completeness) {
+    const bands = D.completeness;
+    new Chart(completeness, {
+      type: 'bar',
+      data: {
+        labels: bands.map(b => b.label),
+        datasets: [{ label: 'Average completeness', data: bands.map(b => b.completeness),
+          backgroundColor: P.series[0], borderRadius: 3, borderSkipped: 'bottom', barPercentage: .85 }],
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: {
+            title: (items) => `${items[0].label} context document${items[0].label === '1' ? '' : 's'}`,
+            label: (item) => `${item.parsed.y}% complete · n = ${bands[item.dataIndex].assays}`,
+          } },
+        },
+        scales: {
+          x: { grid: noGrid, border: { display: false }, ticks: { font: { size: 10 } },
+               title: { display: true, text: 'context documents', font: { size: 11 } } },
+          y: { min: 0, max: 100, grid: grid, border: { display: false },
+               ticks: { maxTicksLimit: 5, callback: (v) => `${v}%` } },
+        },
+      },
+    });
+  }
 
   // ── Usefulness ratings ────────────────────────────────────────────────────
   const ratings = document.getElementById('chartRatings');

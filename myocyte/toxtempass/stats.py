@@ -3,8 +3,22 @@
 Everything in here returns **aggregates only**. No row of the returned payload
 may identify a natural person: no names, e-mail addresses, ORCID iDs, assay or
 investigation titles, IP addresses, or free-text feedback ever leave this
-module. The single identifying dimension we do expose is
-``Person.organization`` — institutions, not people (see ``organisation_rows``).
+module. Two named dimensions are exposed, deliberately:
+
+* Institutions — ``Person.organization``, grouped by its ROR match — which are
+  organisations, not people (see ``organisation_rows``).
+* Names of shared workspaces (see ``collaboration``). This is a reasoned
+  exception: a workspace name is a label a team chose for a joint project, not
+  an attribute of a person, and naming the collaborations is what makes the
+  count credible to a stakeholder. It is limited to workspaces that are
+  evidently collaborations in use — more than one member and at least one
+  counted ToxTemp shared into them — so a private or abandoned workspace, whose
+  name is likelier to be personal, never appears. Nothing else about a
+  workspace (owner, members, contents) is exposed, and the page is staff-only.
+
+Who counts is decided in one place, :func:`real_assays` and :func:`people`.
+Every query below starts from one of them, so demo content, the team's own
+staff accounts and synthetic evaluation accounts never reach a figure.
 
 The module is deliberately free of HTTP concerns so the same payload can be
 rendered as HTML, serialised to JSON, or flattened to CSV by
@@ -14,8 +28,10 @@ rendered as HTML, serialised to JSON, or flattened to CSV by
 from __future__ import annotations
 
 import datetime as dt
+from collections import Counter
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 from django.conf import settings
@@ -24,7 +40,7 @@ from django.db.models import (
     Avg,
     Count,
     F,
-    Max,
+    Min,
     Q,
     QuerySet,
     Sum,
@@ -38,15 +54,14 @@ from toxtempass.models import (
     Assay,
     AssayCost,
     AssayTimeLog,
-    AssayView,
     Feedback,
     FileAsset,
-    FileDownloadLog,
     Investigation,
     LLMStatus,
     Person,
+    Question,
+    QuestionSet,
     Section,
-    Study,
     Workspace,
     WorkspaceInvestigation,
     WorkspaceMember,
@@ -104,20 +119,42 @@ def resolve_range(key: str | None, now: dt.datetime | None = None) -> StatsRange
 REAL_ASSAY_Q = Q(demo_template=False, demo_lock=False, demo_source__isnull=True)
 
 
+def _exclude_non_users(qs: QuerySet, prefix: str = "") -> QuerySet:
+    """Drop rows whose person at ``prefix`` is staff or has an excluded e-mail domain.
+
+    Chained ``exclude()`` calls rather than one OR'd ``Q``: across a nullable
+    foreign key Django keeps the rows where the relation is NULL (a ToxTemp with
+    no recorded creator is not thrown out), and an exclude on a forward key can
+    never fan one row out into duplicates.
+    """
+    qs = qs.exclude(**{f"{prefix}is_staff": True})
+    for domain in config.stats_excluded_email_domains:
+        qs = qs.exclude(**{f"{prefix}email__iendswith": f"@{domain}"})
+    return qs
+
+
 def real_assays() -> QuerySet[Assay]:
-    """All assays created by users, excluding the seeded demo template/copies."""
-    return Assay.objects.filter(REAL_ASSAY_Q)
+    """ToxTemps that count as uptake.
+
+    Leaves out the seeded demo template and its per-user copies, and ToxTemps
+    created by — or sitting in an investigation owned by — a staff account or an
+    account in ``Config.stats_excluded_email_domains``. A ToxTemp with no
+    recorded creator is judged on its investigation owner alone.
+    """
+    qs = _exclude_non_users(Assay.objects.filter(REAL_ASSAY_Q), "created_by__")
+    return _exclude_non_users(qs, "study__investigation__owner__")
 
 
 def people() -> QuerySet[Person]:
-    """All real accounts, excluding django-guardian's AnonymousUser sentinel.
+    """Accounts that count as users.
 
-    Guardian materialises a Person row for anonymous object-permission lookups
-    (``ANONYMOUS_USER_NAME``, default ``"AnonymousUser"``). It is not a user of
-    the app, so counting it would offset every per-account KPI by one.
+    Excludes django-guardian's AnonymousUser sentinel — guardian materialises a
+    Person row for anonymous object-permission lookups (``ANONYMOUS_USER_NAME``,
+    default ``"AnonymousUser"``), which would offset every per-account KPI by one
+    — plus staff accounts and accounts in ``Config.stats_excluded_email_domains``.
     """
     sentinel = getattr(settings, "ANONYMOUS_USER_NAME", "AnonymousUser")
-    qs = Person.objects.all()
+    qs = _exclude_non_users(Person.objects.all())
     if sentinel:
         qs = qs.exclude(**{Person.USERNAME_FIELD: sentinel})
     return qs
@@ -170,12 +207,19 @@ def _median(values: list[int | float]) -> float | None:
     return (ordered[mid - 1] + ordered[mid]) / 2.0
 
 
+def _mean(values: list[int | float]) -> float | None:
+    """Mean of ``values`` rounded to one decimal (empty list yields ``None``)."""
+    if not values:
+        return None
+    return round(sum(values) / len(values), 1)
+
+
 def humanize_seconds(seconds: float | None) -> str:
     """Render a duration as ``9d 4h`` / ``4h 12m`` / ``38m`` / ``45s``.
 
-    Days matter because the elapsed figure spans calendar time — without them a
-    two-week ToxTemp reads as "336h 00m", which nobody can parse at a glance.
-    ``None`` renders as an em dash.
+    Days matter because the draft-to-export figure spans calendar time — without
+    them a two-week ToxTemp reads as "336h 00m", which nobody can parse at a
+    glance. ``None`` renders as an em dash.
     """
     if seconds is None:
         return "—"
@@ -215,13 +259,57 @@ def _timeseries(qs: QuerySet, field: str, rng: StatsRange) -> dict[dt.date, int]
     return out
 
 
+# ── Institutions ─────────────────────────────────────────────────────────────
+
+
+def _institution_key(ror_id: str, organization: str) -> str:
+    """Identity of an institution: the ROR id when matched, else the folded name.
+
+    ``""`` means no institution on file.
+    """
+    return (ror_id or "").strip() or (organization or "").strip().casefold()
+
+
+def _institutions() -> tuple[dict[int, str], dict[str, dict[str, Any]]]:
+    """Group :func:`people` by institution.
+
+    Returns ``(person id -> institution key, key -> group)``. Each group carries
+    its ``users`` count, the ``first_joined`` date of its earliest account, and
+    the ``name`` to show: the ROR display name when matched, else the most
+    common raw spelling among its accounts (ties broken alphabetically).
+
+    A ROR match is trusted only while ``ror_checked_organization`` still equals
+    ``organization``: after an edit whose lookup has not run (or failed), the
+    old id belongs to the old name, so the account falls back to its raw text.
+    """
+    person_key: dict[int, str] = {}
+    spellings: dict[str, Counter[str]] = {}
+    groups: dict[str, dict[str, Any]] = {}
+    rows = people().values_list(
+        "pk", "ror_id", "ror_name", "ror_checked_organization", "organization",
+        "date_joined",
+    )
+    for pk, ror_id, ror_name, checked, organization, joined in rows:
+        if checked != organization:
+            ror_id = ror_name = ""
+        key = _institution_key(ror_id, organization)
+        person_key[pk] = key
+        group = groups.setdefault(key, {"users": 0, "first_joined": joined})
+        group["users"] += 1
+        group["first_joined"] = min(group["first_joined"], joined)
+        matched = (ror_id or "").strip() and (ror_name or "").strip()
+        name = ror_name.strip() if matched else (organization or "").strip()
+        if name:
+            spellings.setdefault(key, Counter())[name] += 1
+    for key, group in groups.items():
+        names = spellings.get(key)
+        group["name"] = (
+            min(names.items(), key=lambda kv: (-kv[1], kv[0]))[0] if names else ""
+        )
+    return person_key, groups
+
+
 # ── Section builders ─────────────────────────────────────────────────────────
-
-
-def _cost_sum(qs: QuerySet[AssayCost]) -> Decimal:
-    """Return combined input + output cost over ``qs`` (missing prices count as 0)."""
-    agg = qs.aggregate(cost_in=Sum("cost_input"), cost_out=Sum("cost_output"))
-    return (agg["cost_in"] or Decimal(0)) + (agg["cost_out"] or Decimal(0))
 
 
 def headline(rng: StatsRange) -> dict[str, Any]:
@@ -230,14 +318,9 @@ def headline(rng: StatsRange) -> dict[str, Any]:
     persons = people()
     completed = _completed_assays(assays)
 
-    answers = Answer.objects.filter(assay__in=assays.values("pk"))
-    n_answers = answers.count()
-    n_accepted = answers.filter(accepted=True).count()
-
-    named = persons.exclude(organization="")
-    n_orgs = named.values("organization").distinct().count()
-    n_orgs_period = (
-        _scoped(named, "date_joined", rng).values("organization").distinct().count()
+    named = [group for key, group in _institutions()[1].items() if key]
+    n_new_orgs = sum(
+        1 for group in named if rng.since is None or group["first_joined"] >= rng.since
     )
 
     in_period = _scoped(assays, "submission_date", rng)
@@ -255,9 +338,10 @@ def headline(rng: StatsRange) -> dict[str, Any]:
             "total": persons.count(),
             "period": _scoped(persons, "date_joined", rng).count(),
         },
-        # "period" counts institutions whose first account arrived inside the
-        # window, so it reads on the same basis as the users figure beside it.
-        "organisations": {"total": n_orgs, "period": n_orgs_period},
+        # "period" counts institutions whose earliest counted account joined
+        # inside the window — institutions new to the tool — so a short range
+        # does not re-count every institution that merely had a later signup.
+        "organisations": {"total": len(named), "period": n_new_orgs},
         "assays": {
             "total": assays.count(),
             "period": n_period,
@@ -278,21 +362,19 @@ def headline(rng: StatsRange) -> dict[str, Any]:
             # a string — Django's `add` filter silently returns "" for that.
             "fraction": f"{n_completed}/{n_period}",
         },
-        "acceptance_rate": _pct(n_accepted, n_answers),
-        "llm_cost": {
-            "total": _f(_cost_sum(AssayCost.objects.all())),
-            "period": _f(
-                _cost_sum(_scoped(AssayCost.objects.all(), "created_at", rng))
-            ),
-            "currency": _currency_symbol(),
-        },
     }
 
 
+def _real_costs() -> QuerySet[AssayCost]:
+    """Cost rows of counted ToxTemps only."""
+    return AssayCost.objects.filter(assay__in=real_assays().values("pk"))
+
+
 def _currency_symbol() -> str:
-    """Most frequently recorded cost-unit symbol across all cost rows."""
+    """Most frequently recorded cost-unit symbol across counted ToxTemps' cost rows."""
     row = (
-        AssayCost.objects.exclude(cost_unit="")
+        _real_costs()
+        .exclude(cost_unit="")
         .values("cost_unit")
         .annotate(n=Count("pk"))
         .order_by("-n")
@@ -305,17 +387,26 @@ def _currency_symbol() -> str:
     return cost_unit_symbol(row["cost_unit"])
 
 
-def _fill_buckets(keys: list[dt.date], bucket: str) -> list[dt.date]:
-    """Return ``keys`` with interior gaps filled, so the x-axis stays even.
+def _bucket_start(day: dt.date, bucket: str) -> dt.date:
+    """First day of the bucket ``day`` falls in (weeks start Monday, as TruncWeek)."""
+    if bucket == "month":
+        return day.replace(day=1)
+    if bucket == "week":
+        return day - dt.timedelta(days=day.weekday())
+    return day
+
+
+def _bucket_keys(start: dt.date, end: dt.date, bucket: str) -> list[dt.date]:
+    """Every bucket from the one holding ``start`` through ``end``.
 
     A month with no signups must render as a zero, not vanish — dropping it
-    silently compresses the time axis and makes the trend read wrong.
+    silently compresses the time axis and makes the trend read wrong. Running
+    through the current bucket also shows a quiet spell at the right edge,
+    instead of ending the line on the last busy month.
     """
-    if len(keys) < 2:
-        return keys
     out: list[dt.date] = []
-    current, last = keys[0], keys[-1]
-    while current <= last and len(out) < 400:
+    current = _bucket_start(start, bucket)
+    while current <= end and len(out) < 400:
         out.append(current)
         if bucket == "month":
             year, month = divmod(current.month, 12)
@@ -342,12 +433,20 @@ def growth(rng: StatsRange) -> dict[str, Any]:
     per-bucket counts are too spiky to read, and the question stakeholders ask
     is how far the tool has got, not what happened last month. Both series are
     kept in the payload so the CSV/JSON export can answer either question.
+
+    The axis runs from the window start (the first bucket with data, for all
+    time) through the current bucket, zero-filled.
     """
     all_people, all_assays = people(), real_assays()
     users = _timeseries(all_people, "date_joined", rng)
     assays = _timeseries(all_assays, "submission_date", rng)
 
-    keys = _fill_buckets(sorted(set(users) | set(assays)), rng.bucket)
+    today = _bucket_start(timezone.localdate(), rng.bucket)
+    if rng.since is not None:
+        start = timezone.localtime(rng.since).date()
+    else:
+        start = min(set(users) | set(assays), default=today)
+    keys = _bucket_keys(start, today, rng.bucket)
     fmt = _BUCKET_FMT[rng.bucket]
 
     # A windowed view still shows the true cumulative line, so the curve does
@@ -366,56 +465,6 @@ def growth(rng: StatsRange) -> dict[str, Any]:
         "users_cumulative": _running_total(per_user, before_users),
         "assays_cumulative": _running_total(per_assay, before_assays),
         "bucket": rng.bucket,
-    }
-
-
-def completion_marks(rng: StatsRange) -> dict[str, Any]:
-    """One mark per ToxTemp, bucketed by how much of the template is accepted.
-
-    Drives the unit strip at the top of the dashboard: every ToxTemp created in
-    the window gets its own mark, sorted most-complete first so the strip reads
-    as a distribution rather than noise. Buckets are ordinal (0 = nothing
-    accepted ... 3 = every answer accepted), which is what lets the strip use a
-    single-hue ramp instead of arbitrary categorical colours.
-    """
-    rows = (
-        _scoped(real_assays(), "submission_date", rng)
-        .annotate(
-            n_answers=Count("answers", distinct=True),
-            n_accepted=Count(
-                "answers", filter=Q(answers__accepted=True), distinct=True
-            ),
-        )
-        .values_list("n_answers", "n_accepted")
-    )
-
-    shares = []
-    for n_answers, n_accepted in rows:
-        shares.append(n_accepted / n_answers if n_answers else 0.0)
-    shares.sort(reverse=True)
-
-    def _bucket(share: float) -> int:
-        if share >= 1.0:
-            return 3
-        if share >= 0.5:
-            return 2
-        if share > 0.0:
-            return 1
-        return 0
-
-    marks = [_bucket(s) for s in shares]
-    limit = config.stats_unit_marks_max
-    counts = [marks.count(i) for i in range(4)]
-    return {
-        "marks": marks[:limit],
-        "total": len(marks),
-        "truncated": len(marks) > limit,
-        "legend": [
-            {"key": 3, "label": "complete", "count": counts[3]},
-            {"key": 2, "label": "over half accepted", "count": counts[2]},
-            {"key": 1, "label": "under half accepted", "count": counts[1]},
-            {"key": 0, "label": "not started", "count": counts[0]},
-        ],
     }
 
 
@@ -438,199 +487,254 @@ def assay_status(rng: StatsRange) -> list[dict[str, Any]]:
     ]
 
 
-def funnel(rng: StatsRange) -> list[dict[str, Any]]:
-    """Return the created -> drafted -> partly -> fully accepted stages."""
-    qs = _scoped(real_assays(), "submission_date", rng)
-    created = qs.count()
+# ── Answer bands ─────────────────────────────────────────────────────────────
 
-    drafted = qs.filter(answers__answer_text__gt="").distinct().count()
-    partly = qs.filter(answers__accepted=True).distinct().count()
-    done = _completed_assays(qs).count()
-
-    stages = [
-        ("Created", created),
-        ("Draft answers generated", drafted),
-        ("At least one answer accepted", partly),
-        ("Fully accepted", done),
-    ]
-    return [
-        {"label": label, "count": n, "pct": _pct(n, created)} for label, n in stages
-    ]
+# The four mutually exclusive states of one answer, in the order they are drawn:
+#   accepted  — accepted by an expert, whatever the text;
+#   drafted   — not accepted, with text other than the not-found sentence;
+#   not_found — not accepted, and the model wrote Config.not_found_string;
+#   empty     — not accepted, no text.
+_BANDS = ("accepted", "drafted", "not_found", "empty")
+# ``accepted`` is a nullable boolean and a fresh answer is NULL, so "not
+# accepted" has to name both values — NOT (accepted = true) drops the NULLs.
+_NOT_ACCEPTED = Q(accepted=False) | Q(accepted__isnull=True)
 
 
-def _progress_split(total: int, drafted: int, accepted: int) -> dict[str, float]:
-    """Split one questionnaire into accepted / awaiting / undrafted percentages.
-
-    The three always sum to 100 so a stacked bar can be rendered straight from
-    them. ``accepted`` is a subset of ``drafted``, so the middle band is the
-    answers that have a draft nobody has signed off yet.
-    """
-    if not total:
-        return {"accepted": 0.0, "awaiting": 0.0, "undrafted": 100.0, "drafted": 0.0}
-    accepted_pct = 100.0 * accepted / total
-    drafted_pct = 100.0 * drafted / total
+def _band_annotations() -> dict[str, Count]:
+    """Count annotations for grouping Answer rows into the four bands."""
+    not_found = Q(answer_text__icontains=config.not_found_string)
     return {
-        "accepted": round(accepted_pct, 1),
-        "awaiting": round(drafted_pct - accepted_pct, 1),
-        "undrafted": round(100.0 - drafted_pct, 1),
-        "drafted": round(drafted_pct, 1),
+        "n_total": Count("pk"),
+        "n_accepted": Count("pk", filter=Q(accepted=True)),
+        "n_not_found": Count("pk", filter=_NOT_ACCEPTED & not_found),
+        "n_empty": Count("pk", filter=_NOT_ACCEPTED & Q(answer_text="")),
+        "n_any_not_found": Count("pk", filter=not_found),
+        "n_any_empty": Count("pk", filter=Q(answer_text="")),
     }
 
 
-def average_progress(rng: StatsRange) -> dict[str, Any]:
-    """Mean progress per ToxTemp, split into drafted and expert-accepted.
+def _bands_from_row(row: dict[str, Any]) -> dict[str, int]:
+    """Turn one annotated row into band counts plus ``answered``.
 
-    Each ToxTemp is scored on its own questionnaire and the scores are then
-    averaged, so every ToxTemp counts the same regardless of how many questions
-    its questionnaire version has. A ToxTemp with no questions seeded yet counts
-    as 0% rather than being dropped — it was still created.
+    ``answered`` is the completeness measure: answers with real text, accepted or
+    not — so an accepted not-found sentence is not an answer from the documents.
     """
-    rows = (
-        _scoped(real_assays(), "submission_date", rng)
-        .annotate(
-            n_total=Count("answers", distinct=True),
-            n_drafted=Count(
-                "answers", filter=Q(answers__answer_text__gt=""), distinct=True
-            ),
-            n_accepted=Count(
-                "answers", filter=Q(answers__accepted=True), distinct=True
-            ),
-        )
-        .values_list("n_total", "n_drafted", "n_accepted")
-    )
+    total = row["n_total"]
+    accepted, not_found, empty = row["n_accepted"], row["n_not_found"], row["n_empty"]
+    return {
+        "total": total,
+        "accepted": accepted,
+        "drafted": total - accepted - not_found - empty,
+        "not_found": not_found,
+        "empty": empty,
+        "answered": total - row["n_any_empty"] - row["n_any_not_found"],
+    }
 
-    drafted_shares, accepted_shares, unseeded = [], [], 0
-    for total, drafted, accepted in rows:
-        if not total:
-            unseeded += 1
-            drafted_shares.append(0.0)
-            accepted_shares.append(0.0)
+
+def _band_shares(entries: list[dict[str, int]]) -> dict[str, float]:
+    """Mean per-ToxTemp share (%) of each band over ``entries``.
+
+    Each ToxTemp is scored on its own answers and the scores are then averaged,
+    so every ToxTemp counts the same regardless of questionnaire size. An entry
+    with no answer rows (a section a ToxTemp has none for) scores as all empty.
+    """
+    if not entries:
+        return dict.fromkeys(_BANDS, 0.0)
+    sums = dict.fromkeys(_BANDS, 0.0)
+    for entry in entries:
+        if not entry["total"]:
+            sums["empty"] += 100.0
             continue
-        drafted_shares.append(100.0 * drafted / total)
-        accepted_shares.append(100.0 * accepted / total)
-
-    n = len(drafted_shares)
-    drafted_pct = round(sum(drafted_shares) / n, 1) if n else 0.0
-    accepted_pct = round(sum(accepted_shares) / n, 1) if n else 0.0
-    return {
-        "assays": n,
-        "assays_without_questions": unseeded,
-        "drafted": drafted_pct,
-        "accepted": accepted_pct,
-        "awaiting": round(drafted_pct - accepted_pct, 1),
-        "undrafted": round(100.0 - drafted_pct, 1),
-    }
+        for band in _BANDS:
+            sums[band] += 100.0 * entry[band] / entry["total"]
+    return {band: round(sums[band] / len(entries), 1) for band in _BANDS}
 
 
-def section_progress(rng: StatsRange) -> dict[str, Any]:
-    """Mean per-ToxTemp progress for each section of the questionnaire.
+def _drafted_assays(rng: StatsRange) -> dict[int, dict[str, Any]]:
+    """Per-ToxTemp answer bands for ToxTemps created in the window that have answers.
 
-    Scoped to whichever QuestionSet the most ToxTemps in the window use, since
-    sections are not comparable across questionnaire versions — merging a v1
-    section with a similarly titled v2 one would silently average two different
-    question lists. Sections keep their seeded order (pk), which is the order
-    they appear in the ToxTemp itself.
+    Answer rows are seeded on the first document upload, not when a ToxTemp is
+    created, so a ToxTemp without any has never been drafted. It is left out of
+    every average built on this — its bands would be undefined, not zero — and
+    each figure states this base. ``documents`` is the number of distinct
+    context-document names across the ToxTemp's answers (0 when none).
+    ``questions`` is how many questions the ToxTemp's questionnaire defines —
+    never fewer than its answer rows, which is also the fallback when it has no
+    questionnaire.
     """
-    assays = _scoped(real_assays(), "submission_date", rng).exclude(question_set=None)
-    busiest = (
-        assays.values("question_set_id", "question_set__label",
-                      "question_set__display_name")
-        .annotate(n=Count("pk"))
-        .order_by("-n")
-        .first()
+    assay_ids = _scoped(real_assays(), "submission_date", rng).values("pk")
+    rows = list(
+        Answer.objects.filter(assay__in=assay_ids)
+        .values("assay_id", "assay__question_set_id")
+        .annotate(**_band_annotations())
+        .order_by()
     )
-    if not busiest:
+    sizes = dict(
+        Question.objects.filter(
+            subsection__section__question_set_id__in={
+                row["assay__question_set_id"] for row in rows
+            }
+        )
+        .values("subsection__section__question_set_id")
+        .annotate(n=Count("pk"))
+        .order_by()
+        .values_list("subsection__section__question_set_id", "n")
+    )
+    out: dict[int, dict[str, Any]] = {}
+    for row in rows:
+        bands = _bands_from_row(row)
+        out[row["assay_id"]] = {
+            **bands,
+            "question_set": row["assay__question_set_id"],
+            "questions": max(sizes.get(row["assay__question_set_id"], 0), bands["total"]),
+            "documents": 0,
+        }
+
+    # Answer.answer_documents holds the document names that were in the payload
+    # for that drafting run — what the user supplied, not what the model cited.
+    # It is written whether or not the user consented to storing the files, so
+    # it sees grounding that FileAsset cannot. Every answer of one run carries
+    # the same list, so DISTINCT collapses the rows to about one per run.
+    names: dict[int, set[str]] = {}
+    documents = (
+        Answer.objects.filter(assay__in=assay_ids, answer_documents__isnull=False)
+        .values_list("assay_id", "answer_documents")
+        .order_by()
+        .distinct()
+    )
+    for assay_id, docs in documents:
+        if docs:
+            names.setdefault(assay_id, set()).update(docs)
+    for assay_id, docs in names.items():
+        if assay_id in out:
+            out[assay_id]["documents"] = len(docs)
+    return out
+
+
+def average_progress(drafted: dict[int, dict[str, Any]]) -> dict[str, Any]:
+    """Mean per-ToxTemp share of answers in each band, over drafted ToxTemps."""
+    return {"assays": len(drafted), **_band_shares(list(drafted.values()))}
+
+
+def section_progress(
+    rng: StatsRange, drafted: dict[int, dict[str, Any]]
+) -> dict[str, Any]:
+    """Mean per-ToxTemp answer bands for each section of the questionnaire.
+
+    Scoped to whichever QuestionSet the most drafted ToxTemps in the window use,
+    since sections are not comparable across questionnaire versions — merging a
+    v1 section with a similarly titled v2 one would silently average two
+    different question lists. Sections keep their seeded order (pk), which is the
+    order they appear in the ToxTemp itself. ``questions`` is how many questions
+    that section of the questionnaire defines.
+    """
+    usage = Counter(e["question_set"] for e in drafted.values() if e["question_set"])
+    if not usage:
         return {"question_set": None, "assays": 0, "sections": []}
+    qset_id, n_assays = usage.most_common(1)[0]
+    base = [pk for pk, entry in drafted.items() if entry["question_set"] == qset_id]
 
-    qset_id = busiest["question_set_id"]
-    assay_ids = assays.filter(question_set_id=qset_id).values("pk")
-
-    # One row per (ToxTemp, section): how many of that section's questions are
-    # drafted and accepted in that ToxTemp.
+    # One row per (ToxTemp, section) with that section's band counts.
     rows = (
         Answer.objects.filter(
-            assay__in=assay_ids, question__subsection__section__question_set_id=qset_id
+            assay__in=_scoped(real_assays(), "submission_date", rng)
+            .filter(question_set_id=qset_id)
+            .values("pk"),
+            question__subsection__section__question_set_id=qset_id,
         )
         .values("assay_id", "question__subsection__section_id")
-        .annotate(
-            total=Count("pk"),
-            drafted=Count("pk", filter=Q(answer_text__gt="")),
-            accepted=Count("pk", filter=Q(accepted=True)),
-        )
+        .annotate(**_band_annotations())
+        .order_by()
     )
-
-    per_section: dict[int, list[tuple[int, int, int]]] = {}
+    per_section: dict[int, dict[int, dict[str, int]]] = {}
     for row in rows:
-        section_id = row["question__subsection__section_id"]
-        per_section.setdefault(section_id, []).append(
-            (row["total"], row["drafted"], row["accepted"])
-        )
+        per_section.setdefault(row["question__subsection__section_id"], {})[
+            row["assay_id"]
+        ] = _bands_from_row(row)
 
-    titles = dict(
+    questions = dict(
+        Question.objects.filter(subsection__section__question_set_id=qset_id)
+        .values("subsection__section_id")
+        .annotate(n=Count("pk"))
+        .order_by()
+        .values_list("subsection__section_id", "n")
+    )
+    titles = (
         Section.objects.filter(question_set_id=qset_id)
         .order_by("pk")
         .values_list("pk", "title")
     )
-
+    no_rows = {"total": 0}
     sections = []
-    for section_id, title in titles.items():
-        entries = per_section.get(section_id, [])
-        if not entries:
-            sections.append(
-                {"title": title, "questions": 0, "accepted": 0.0, "awaiting": 0.0,
-                 "undrafted": 100.0, "drafted": 0.0}
-            )
-            continue
-        splits = [_progress_split(*entry) for entry in entries]
-        count = len(splits)
+    for section_id, title in titles:
+        entries = per_section.get(section_id, {})
         sections.append(
             {
                 "title": title,
-                "questions": max(entry[0] for entry in entries),
-                "accepted": round(sum(s["accepted"] for s in splits) / count, 1),
-                "awaiting": round(sum(s["awaiting"] for s in splits) / count, 1),
-                "undrafted": round(sum(s["undrafted"] for s in splits) / count, 1),
-                "drafted": round(sum(s["drafted"] for s in splits) / count, 1),
+                "questions": questions.get(section_id, 0),
+                **_band_shares([entries.get(pk, no_rows) for pk in base]),
             }
         )
 
+    qset = QuestionSet.objects.values("label", "display_name").get(pk=qset_id)
     return {
-        "question_set": busiest["question_set__display_name"]
-        or busiest["question_set__label"],
-        "assays": busiest["n"],
+        "question_set": qset["display_name"] or qset["label"],
+        "assays": n_assays,
         "sections": sections,
     }
 
 
-def grounding(rng: StatsRange) -> dict[str, Any]:
-    """How much source material users gave the model to work from.
+def grounding(drafted: dict[int, dict[str, Any]]) -> dict[str, Any]:
+    """How much source material users gave the model, per drafted ToxTemp.
 
-    Reads ``Answer.answer_documents``, which ``process_llm_async`` fills with
-    the document names that were in the payload for that drafting run — what the
-    user supplied, not what the model ended up citing. It is written for every
-    answer regardless of whether the user consented to the files being stored,
-    so it counts grounding that ``FileAsset`` cannot see.
+    A drafted ToxTemp with no document names recorded counts as 0, so the median
+    is over every ToxTemp in the base rather than only the ones with documents.
     """
-    rows = (
-        Answer.objects.filter(
-            assay__in=_scoped(real_assays(), "submission_date", rng).values("pk")
-        )
-        .exclude(answer_documents=None)
-        .values_list("assay_id", "answer_documents")
-    )
-
-    per_assay: dict[int, set[str]] = {}
-    for assay_id, documents in rows:
-        if not documents:
-            continue
-        per_assay.setdefault(assay_id, set()).update(documents)
-
-    counts = sorted(len(names) for names in per_assay.values())
+    counts = sorted(entry["documents"] for entry in drafted.values())
     return {
-        "assays_with_documents": len(counts),
+        "assays": len(counts),
+        "assays_with_documents": sum(1 for c in counts if c),
         "median_documents": _median(counts),
         "max_documents": counts[-1] if counts else 0,
         "distinct_documents": sum(counts),
+    }
+
+
+def completeness(drafted: dict[int, dict[str, Any]]) -> dict[str, Any]:
+    """Questions answered from the documents, per drafted ToxTemp on average.
+
+    An answer counts when it has text that is not the not-found sentence,
+    accepted or not. ``questions_mean`` is the mean size of those ToxTemps'
+    questionnaires, and each share is taken over the questionnaire, so a
+    question with no answer row counts as unanswered. ``bands`` splits the mean
+    share by context-document count (``Config.stats_document_bands``); a band
+    with no ToxTemps has ``completeness`` None and draws no bar.
+    """
+    entries = list(drafted.values())
+
+    def _share(entry: dict[str, Any]) -> float:
+        """Share of this ToxTemp's questions answered from the documents."""
+        return 100.0 * entry["answered"] / entry["questions"]
+
+    bands = []
+    for label, low, high in config.stats_document_bands:
+        members = [
+            e for e in entries
+            if e["documents"] >= low and (high is None or e["documents"] <= high)
+        ]
+        bands.append(
+            {
+                "label": label,
+                "assays": len(members),
+                "completeness": _mean([_share(e) for e in members]),
+            }
+        )
+    return {
+        "assays": len(entries),
+        "answered_mean": _mean([e["answered"] for e in entries]),
+        "questions_mean": _mean([e["questions"] for e in entries]),
+        "share": _mean([_share(e) for e in entries]),
+        "bands": bands,
     }
 
 
@@ -677,48 +781,61 @@ def organisation_rows() -> list[dict[str, Any]]:
     """All-time per-institution usage.
 
     Institutions — never individuals — are the finest grain exposed anywhere in
-    this dashboard. Users who left ``organization`` blank are pooled under a
-    single "Not specified" row rather than listed separately.
+    this dashboard. Accounts are grouped by ROR id when matched, else by their
+    case- and whitespace-folded organisation name. A ToxTemp belongs to the
+    institution of its creator, or of the investigation owner when no creator
+    was recorded. Accounts with no institution are pooled under a single "Not
+    specified" row, which carries no inline bar (``share`` None) and does not
+    set the scale — it is not an institution, so it must not dwarf the real ones.
     """
-    def _by_org(qs: QuerySet, field: str) -> dict[str, int]:
-        """Group ``qs`` by the organisation reachable at ``field`` -> {org: count}."""
-        return {
-            row[field] or "": row["n"]
-            for row in qs.values(field).annotate(n=Count("pk"))
-        }
+    person_key, groups = _institutions()
 
-    owner_org = "study__investigation__owner__organization"
-    users = _by_org(people(), "organization")
-    investigations = _by_org(Investigation.objects.all(), "owner__organization")
-    assays = _by_org(real_assays(), owner_org)
-    # _completed_assays() already carries Count annotations; grouping again on
-    # top of them would fold those into the GROUP BY, so resolve to ids first.
-    completed_ids = list(_completed_assays(real_assays()).values_list("pk", flat=True))
-    completed = _by_org(Assay.objects.filter(pk__in=completed_ids), owner_org)
+    completed_ids = set(_completed_assays(real_assays()).values_list("pk", flat=True))
+    assays: Counter[str] = Counter()
+    completed: Counter[str] = Counter()
+    rows = real_assays().values_list(
+        "pk", "created_by_id", "study__investigation__owner_id"
+    )
+    for pk, creator_id, owner_id in rows:
+        key = person_key.get(creator_id if creator_id is not None else owner_id, "")
+        assays[key] += 1
+        if pk in completed_ids:
+            completed[key] += 1
+    # Only investigations holding a counted ToxTemp: every account gets a seeded
+    # demo investigation, which would otherwise add one per user.
+    investigations = Counter(
+        person_key.get(owner_id, "")
+        for owner_id in Investigation.objects.filter(
+            owner__in=people(), pk__in=real_assays().values("study__investigation_id")
+        ).values_list("owner_id", flat=True)
+    )
 
-    rows = []
-    for org in set(users) | set(investigations) | set(assays):
-        rows.append(
+    out = []
+    for key in set(groups) | set(assays) | set(investigations):
+        out.append(
             {
-                "organisation": org or config.stats_unknown_organisation,
-                "users": users.get(org, 0),
-                "investigations": investigations.get(org, 0),
-                "assays": assays.get(org, 0),
-                "completed": completed.get(org, 0),
+                "organisation": groups[key]["name"]
+                if key
+                else config.stats_unknown_organisation,
+                "users": groups.get(key, {}).get("users", 0),
+                "investigations": investigations.get(key, 0),
+                "assays": assays.get(key, 0),
+                "completed": completed.get(key, 0),
+                "named": bool(key),
             }
         )
-    rows.sort(key=lambda r: (-r["assays"], -r["users"], r["organisation"]))
-    # Each row carries its own share of the busiest institution, so the table can
-    # draw an inline scale instead of needing a chart beside it.
-    busiest = max((r["assays"] for r in rows), default=0)
-    for row in rows:
-        row["share"] = _pct(row["assays"], busiest) or 0.0
-    return rows
+    out.sort(key=lambda r: (-r["assays"], -r["users"], r["organisation"]))
+    # Each named row carries its share of the busiest named institution, so the
+    # table can draw an inline scale instead of needing a chart beside it.
+    busiest = max((r["assays"] for r in out if r["named"]), default=0)
+    for row in out:
+        row["share"] = (_pct(row["assays"], busiest) or 0.0) if row.pop("named") else None
+    return out
 
 
 def llm_usage(rng: StatsRange) -> dict[str, Any]:
     """Token and cost totals for the window, broken down per model."""
-    qs = _scoped(AssayCost.objects.all(), "created_at", rng)
+    qs = _scoped(_real_costs(), "created_at", rng)
     totals = qs.aggregate(
         input_tokens=Sum("input_tokens"),
         output_tokens=Sum("output_tokens"),
@@ -733,8 +850,6 @@ def llm_usage(rng: StatsRange) -> dict[str, Any]:
             "runs": row["runs"],
             "input_tokens": row["input_tokens"] or 0,
             "output_tokens": row["output_tokens"] or 0,
-            "cost_input": _f(row["cost_input"]) or 0.0,
-            "cost_output": _f(row["cost_output"]) or 0.0,
             "cost_total": round(
                 (_f(row["cost_input"]) or 0.0) + (_f(row["cost_output"]) or 0.0), 6
             ),
@@ -765,90 +880,89 @@ def llm_usage(rng: StatsRange) -> dict[str, Any]:
     }
 
 
-def _elapsed_completion(completed: QuerySet[Assay]) -> list[float]:
-    """Wall-clock seconds from creating a ToxTemp to accepting its last answer.
+def _draft_to_export_seconds(rng: StatsRange) -> list[float]:
+    """Seconds from first AI draft to first export, per ToxTemp exported in the window.
 
-    Nothing records a completion timestamp, so this reads the latest history row
-    on an accepted answer as the moment the ToxTemp was signed off. Accepting
-    calls save(), which writes a history row, so the approximation is close —
-    but a later edit to an already-accepted answer moves that row forward, which
-    can only stretch the figure. Treat it as an upper bound, and read it beside
-    the hands-on time rather than instead of it.
+    Exports are not logged, but a rating is required before a ToxTemp's first
+    export and ``Feedback`` is one-to-one with the ToxTemp, so its submission
+    date is the first-export moment. The start is the earliest ``AssayCost``
+    row written before the export, when the first tracked drafting run finished;
+    a ToxTemp with no such row (drafted before cost tracking, perhaps re-drafted
+    after the export) falls back to its creation date. Non-positive spans are
+    dropped. An estimate, and labelled as one on the page.
     """
-    created = dict(completed.values_list("pk", "submission_date"))
-    if not created:
-        return []
-
-    rows = (
-        Answer.history.model.objects.filter(assay__in=created, accepted=True)
-        .values("assay_id")
-        .annotate(signed_off=Max("history_date"))
+    feedback = _scoped(
+        Feedback.objects.filter(assay__in=real_assays().values("pk")),
+        "submission_date",
+        rng,
     )
-    out = []
-    for row in rows:
-        start = created.get(row["assay_id"])
-        if start and row["signed_off"]:
-            seconds = (row["signed_off"] - start).total_seconds()
-            if seconds > 0:
-                out.append(seconds)
-    return out
+    exported = list(
+        feedback.values_list("assay_id", "submission_date", "assay__submission_date")
+    )
+    first_draft = dict(
+        AssayCost.objects.filter(
+            assay__in=feedback.values("assay_id"),
+            created_at__lt=F("assay__feedback__submission_date"),
+        )
+        .values("assay_id")
+        .annotate(first=Min("created_at"))
+        .order_by()
+        .values_list("assay_id", "first")
+    )
+    spans = []
+    for assay_id, exported_at, created_at in exported:
+        seconds = (exported_at - first_draft.get(assay_id, created_at)).total_seconds()
+        if seconds > 0:
+            spans.append(seconds)
+    return spans
 
 
 def engagement(rng: StatsRange) -> dict[str, Any]:
-    """Active-time, recency and view/download counters for the window."""
+    """Active time and time from first draft to export for the window."""
     assays = _scoped(real_assays(), "submission_date", rng)
-    assay_ids = assays.values("pk")
 
     seconds = (
-        AssayTimeLog.objects.filter(assay__in=assay_ids).aggregate(s=Sum("seconds"))["s"]
+        _exclude_non_users(
+            AssayTimeLog.objects.filter(assay__in=assays.values("pk")), "user__"
+        ).aggregate(s=Sum("seconds"))["s"]
         or 0
     )
     # Assay.completion_time_seconds is the sum of AssayTimeLog.seconds across
     # every collaborator, captured when the last answer was first accepted — so
-    # it is hands-on effort, not how long the ToxTemp sat open.
+    # it is hands-on effort, not how long the ToxTemp sat open. It is summed at
+    # write time, so staff or synthetic collaborators cannot be taken out of it
+    # here. Export only.
     completion_times = list(
         _completed_assays(assays)
         .exclude(completion_time_seconds=None)
         .values_list("completion_time_seconds", flat=True)
     )
-    elapsed = _elapsed_completion(_completed_assays(assays))
-
-    now = timezone.now()
-    active = {
-        window: people().filter(
-            last_login__gte=now - dt.timedelta(days=window)
-        ).count()
-        for window in config.stats_active_user_windows
-    }
+    spans = _draft_to_export_seconds(rng)
 
     return {
         "active_seconds": seconds,
         "active_hours": round(seconds / 3600.0, 1),
         "median_completion_seconds": _median(completion_times),
-        "median_completion_display": humanize_seconds(_median(completion_times)),
-        "median_elapsed_seconds": _median(elapsed),
-        "median_elapsed_display": humanize_seconds(_median(elapsed)),
-        "elapsed_samples": len(elapsed),
         "completion_samples": len(completion_times),
-        "active_users": active,
-        "assay_views": AssayView.objects.filter(assay__in=assay_ids).count(),
-        "file_downloads": _scoped(
-            FileDownloadLog.objects.all(), "downloaded_at", rng
-        ).count(),
-        "orcid_linked": people().exclude(orcid_id=None).count(),
-        "tos_accepted": people().filter(has_accepted_tos=True).count(),
-        "users_total": people().count(),
+        "median_to_export_seconds": _median(spans),
+        "median_to_export_display": humanize_seconds(_median(spans)),
+        "export_samples": len(spans),
     }
 
 
 def feedback_stats(rng: StatsRange) -> dict[str, Any]:
     """Rating count/mean and a half-point histogram. Free text is never read."""
-    qs = _scoped(Feedback.objects.all(), "submission_date", rng)
+    qs = _scoped(
+        Feedback.objects.filter(assay__in=real_assays().values("pk")),
+        "submission_date",
+        rng,
+    )
     ratings = [
         r for r in qs.values_list("usefulness_rating", flat=True) if r is not None
     ]
     edges = config.stats_rating_bins
     top = edges[-1]
+    created = _scoped(real_assays(), "submission_date", rng)
 
     def _in_bin(rating: float, lo: float, hi: float) -> bool:
         """Half-open bin — the top bin also takes the closing 5.0 endpoint."""
@@ -868,15 +982,26 @@ def feedback_stats(rng: StatsRange) -> dict[str, Any]:
         if ratings
         else None,
         "bins": bins,
+        # Share of ToxTemps created in the window that have been rated — both
+        # counts on the same base, so a short window cannot exceed 100%.
         "response_rate": _pct(
-            qs.count(), _scoped(real_assays(), "submission_date", rng).count()
+            created.filter(feedback__isnull=False).count(), created.count()
         ),
     }
 
 
 def file_stats(rng: StatsRange) -> dict[str, Any]:
-    """Upload volume, stored bytes and the MIME mix for the window."""
-    available = FileAsset.objects.filter(status=FileAsset.Status.AVAILABLE)
+    """Upload volume, stored bytes and the MIME mix for the window.
+
+    FileAsset has no ToxTemp of its own. It reaches one through ``Answer.files``,
+    but that link is written only on the first upload into a ToxTemp, so a
+    re-upload has none. Files are therefore filtered on their uploader, and
+    those linked to any ToxTemp that does not count are dropped as well.
+    """
+    uncounted = Assay.objects.exclude(pk__in=real_assays().values("pk"))
+    available = _exclude_non_users(
+        FileAsset.objects.filter(status=FileAsset.Status.AVAILABLE), "uploaded_by__"
+    ).exclude(answers__assay__in=uncounted)
     qs = _scoped(available, "created_at", rng)
     agg = qs.aggregate(n=Count("pk"), size=Sum("size_bytes"))
     by_type = [
@@ -894,88 +1019,97 @@ def file_stats(rng: StatsRange) -> dict[str, Any]:
 
 
 def collaboration(rng: StatsRange) -> dict[str, Any]:
-    """Workspace counts and sharing reach for the window.
+    """Shared workspaces created in the window, and their names.
 
-    ``Workspace.save()`` adds the owner as a member the moment a workspace is
-    created, so a one-member workspace is one nobody has been invited to. Only
-    workspaces with a second member count as shared here — counting every row
-    would report every private workspace as collaboration.
+    A workspace counts as shared when it has a second member — ``Workspace.save()``
+    adds the owner the moment it is created, so one member means nobody was
+    invited — and at least one counted ToxTemp sits in an investigation shared
+    into it, so an invitation that never led to joint work is not reported as
+    collaboration. The names are listed with that ToxTemp count; the module
+    docstring explains why names are allowed here.
     """
-    qs = _scoped(Workspace.objects.all(), "created_at", rng)
-    created = qs.count()
-
-    shared_ids = list(
-        qs.annotate(n_members=Count("memberships", distinct=True))
+    qs = _scoped(Workspace.objects.filter(owner__in=people()), "created_at", rng)
+    counted = Q(memberships__user__in=people())
+    multi_member = list(
+        qs.annotate(n_members=Count("memberships", filter=counted, distinct=True))
         .filter(n_members__gt=1)
         .values_list("pk", flat=True)
     )
-    memberships = WorkspaceMember.objects.filter(workspace__in=shared_ids)
+    workspace_field = "study__investigation__shared_in_workspaces__workspace_id"
+    assay_counts = dict(
+        real_assays()
+        .filter(**{f"{workspace_field}__in": multi_member})
+        .values(workspace_field)
+        .annotate(n=Count("pk", distinct=True))
+        .order_by()
+        .values_list(workspace_field, "n")
+    )
+    names = dict(
+        Workspace.objects.filter(pk__in=list(assay_counts)).values_list("pk", "name")
+    )
+    workspaces = sorted(
+        ({"name": names[pk], "assays": n} for pk, n in assay_counts.items()),
+        key=lambda w: (-w["assays"], w["name"]),
+    )
 
-    # A workspace spans institutions when its members name more than one
-    # employer. Blank organisations are ignored rather than treated as their own
-    # institution, so an unfilled profile cannot manufacture a crossing.
-    per_workspace: dict[int, set[str]] = {}
-    for workspace_id, org in memberships.values_list(
-        "workspace_id", "user__organization"
-    ):
-        if org:
-            per_workspace.setdefault(workspace_id, set()).add(org)
-    cross_institution = sum(1 for orgs in per_workspace.values() if len(orgs) > 1)
-
+    shared_ids = list(assay_counts)
     n_shared = len(shared_ids)
-    n_memberships = memberships.count()
+    n_memberships = WorkspaceMember.objects.filter(
+        workspace__in=shared_ids, user__in=people()
+    ).count()
     return {
-        "workspaces_created": created,
+        "workspaces_created": qs.count(),
         "shared_workspaces": n_shared,
-        "cross_institution_workspaces": cross_institution,
         "members": n_memberships,
         "avg_members": round(n_memberships / n_shared, 1) if n_shared else None,
         "shared_investigations": WorkspaceInvestigation.objects.filter(
-            workspace__in=shared_ids
+            workspace__in=shared_ids,
+            investigation__in=real_assays().values("study__investigation_id"),
         ).count(),
-        "collaborating_users": memberships.values("user").distinct().count(),
+        "workspaces": workspaces,
     }
 
 
 def question_set_mix(rng: StatsRange) -> list[dict[str, Any]]:
-    """Which questionnaire version assays created in the window are using."""
-    qs = _scoped(real_assays(), "submission_date", rng)
+    """Which questionnaire versions ToxTemps created in the window use.
+
+    ToxTemps with no questionnaire are left out. A version is named by its
+    display name, falling back to its label when that is blank; when two
+    versions would read the same, both show "display name (label)". ``url``
+    links the version's source JSON, but only when ``ToxTemp_<label>.json``
+    ships with this deployment — a link to a missing file is worse than none.
+    """
+    qs = _scoped(real_assays(), "submission_date", rng).exclude(question_set=None)
     total = qs.count()
-    rows = (
+    rows = list(
         qs.values("question_set__label", "question_set__display_name")
         .annotate(n=Count("pk"))
         .order_by("-n")
     )
-    return [
-        {
-            "label": row["question_set__display_name"]
-            or row["question_set__label"]
-            or "unassigned",
-            "count": row["n"],
-            "pct": _pct(row["n"], total),
-        }
+    shown = [
+        (row["question_set__display_name"] or "").strip()
+        or (row["question_set__label"] or "")
         for row in rows
     ]
-
-
-def content_totals(rng: StatsRange) -> dict[str, Any]:
-    """Raw object counts for the window, all-time counterparts alongside."""
-    investigations = Investigation.objects.all()
-    studies = Study.objects.all()
-    return {
-        "investigations": {
-            "total": investigations.count(),
-            "period": _scoped(investigations, "submission_date", rng).count(),
-        },
-        "studies": {
-            "total": studies.count(),
-            "period": _scoped(studies, "submission_date", rng).count(),
-        },
-        "assays": {
-            "total": real_assays().count(),
-            "period": _scoped(real_assays(), "submission_date", rng).count(),
-        },
-    }
+    clashes = Counter(shown)
+    out = []
+    for row, name in zip(rows, shown, strict=True):
+        label = row["question_set__label"] or ""
+        display = (row["question_set__display_name"] or "").strip()
+        if clashes[name] > 1 and display and label:
+            name = f"{display} ({label})"
+        has_json = label and (Path(settings.BASE_DIR) / f"ToxTemp_{label}.json").is_file()
+        out.append(
+            {
+                "label": name,
+                "url": config.questionnaire_json_url_template.format(label=label)
+                if has_json
+                else None,
+                "count": row["n"],
+                "pct": _pct(row["n"], total),
+            }
+        )
+    return out
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
@@ -988,19 +1122,24 @@ def build_stats(range_key: str | None = None) -> dict[str, Any]:
     JSON, or export as CSV without further redaction.
     """
     rng = resolve_range(range_key)
+    drafted = _drafted_assays(rng)
+    head = headline(rng)
+    progress = average_progress(drafted)
+    # ToxTemps created in the window that never got answer rows: rows are seeded
+    # on the first document upload, so these stopped before it. Shown next to the
+    # per-ToxTemp averages so their smaller base is not a mystery.
+    progress["without_answers"] = head["assays"]["period"] - progress["assays"]
     return {
         "generated_at": timezone.now(),
         "range": rng,
         "ranges": [(key, spec[0]) for key, spec in config.stats_ranges.items()],
-        "headline": headline(rng),
-        "content": content_totals(rng),
+        "headline": head,
         "growth": growth(rng),
-        "completion": completion_marks(rng),
-        "progress": average_progress(rng),
-        "grounding": grounding(rng),
-        "section_progress": section_progress(rng),
+        "progress": progress,
+        "grounding": grounding(drafted),
+        "completeness": completeness(drafted),
+        "section_progress": section_progress(rng, drafted),
         "assay_status": assay_status(rng),
-        "funnel": funnel(rng),
         "answers": answer_quality(rng),
         "organisations": organisation_rows(),
         "llm": llm_usage(rng),
@@ -1017,7 +1156,7 @@ def cached_stats(
 ) -> dict[str, Any]:
     """Return :func:`build_stats` for ``range_key``, recomputed at most daily.
 
-    A full build is roughly thirty aggregate queries over every answer in the
+    A full build is a few dozen aggregate queries over every answer in the
     database. Nothing here moves fast enough to be worth paying that on each
     page view, so the payload is cached for ``Config.stats_cache_seconds`` and
     the ``generated_at`` it carries becomes the "as of" time shown on the page.
@@ -1065,22 +1204,25 @@ def to_csv_rows(stats: dict[str, Any]) -> list[list[Any]]:
     add("meta", "since", rng.since.isoformat() if rng.since else "all time")
 
     for name, block in stats["headline"].items():
-        if isinstance(block, dict):
-            for sub, value in block.items():
-                add("headline", f"{name}.{sub}", value)
+        for sub, value in block.items():
+            add("headline", f"{name}.{sub}", value)
+
+    for section in ("progress", "grounding", "answers", "engagement"):
+        for metric, value in stats[section].items():
+            add(section, metric, value)
+    for metric, value in stats["completeness"].items():
+        if metric == "bands":
+            for entry in value:
+                add("completeness", f"documents {entry['label']}.assays", entry["assays"])
+                add(
+                    "completeness",
+                    f"documents {entry['label']}.completeness",
+                    entry["completeness"],
+                )
         else:
-            add("headline", name, block)
-
-    for name, block in stats["content"].items():
-        add("content", f"{name}.total", block["total"])
-        add("content", f"{name}.period", block["period"])
-
-    for stage in stats["funnel"]:
-        add("funnel", stage["label"], stage["count"])
+            add("completeness", metric, value)
     for entry in stats["assay_status"]:
         add("assay_status", entry["label"], entry["count"])
-    for metric, value in stats["answers"].items():
-        add("answers", metric, value)
     for metric, value in stats["llm"].items():
         if metric != "by_model":
             add("llm", metric, value)
@@ -1088,12 +1230,6 @@ def to_csv_rows(stats: dict[str, Any]) -> list[list[Any]]:
         for metric, value in entry.items():
             if metric != "model":
                 add("llm_by_model", f"{entry['model']}.{metric}", value)
-    for metric, value in stats["engagement"].items():
-        if metric == "active_users":
-            for window, count in value.items():
-                add("engagement", f"active_users.{window}d", count)
-        else:
-            add("engagement", metric, value)
     for metric, value in stats["feedback"].items():
         if metric == "bins":
             for entry in value:
@@ -1107,7 +1243,11 @@ def to_csv_rows(stats: dict[str, Any]) -> list[list[Any]]:
         else:
             add("files", metric, value)
     for metric, value in stats["collaboration"].items():
-        add("collaboration", metric, value)
+        if metric == "workspaces":
+            for entry in value:
+                add("collaboration", f"workspace {entry['name']}", entry["assays"])
+        else:
+            add("collaboration", metric, value)
     for entry in stats["question_sets"]:
         add("question_sets", entry["label"], entry["count"])
 

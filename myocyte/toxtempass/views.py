@@ -701,9 +701,9 @@ def toggle_beta_admitted(request: HttpRequest) -> HttpResponse:
 # ── Staff KPI dashboard ──────────────────────────────────────────────────────
 # Every payload rendered by the three views below comes from toxtempass.stats,
 # which returns aggregates only — no names, e-mail addresses, ORCID iDs, assay
-# titles, IP addresses or free-text feedback. `organization` is the single
-# identifying dimension exposed, deliberately, since institutions are not
-# natural persons.
+# titles, IP addresses or free-text feedback. Institutions (not natural persons)
+# and the names of workspaces in active shared use are the only named
+# dimensions, deliberately — see the toxtempass.stats module docstring.
 
 
 @staff_member_required(login_url="/login/")
@@ -725,21 +725,13 @@ def stats_dashboard(request: HttpRequest) -> HttpResponse:
         {
             "stats": stats,
             # Only what the page actually draws. Operational series (processing
-            # status, login recency, download counts) stay in build_stats() for
-            # the CSV/JSON export but are not charted: this page is a standing
+            # status, active hours, edit counts) stay in build_stats() for the
+            # CSV/JSON export but are not charted: this page is a standing
             # record of uptake, not a monitor.
             "chart_data": {
                 "growth": stats["growth"],
                 "ratings": stats["feedback"]["bins"],
-                "palette": {
-                    "series": list(config.stats_chart_series),
-                    "ordinal": list(config.stats_chart_ordinal),
-                    "grid": config.stats_chart_grid,
-                    "axis": config.stats_chart_axis,
-                    "surface": config.stats_chart_surface,
-                    "ink": config.stats_ink,
-                    "ink2": config.stats_ink_2,
-                },
+                "completeness": stats["completeness"]["bands"],
                 "currency": stats["llm"]["currency"],
             },
         },
