@@ -274,9 +274,20 @@ if _LOG_FILE_AVAILABLE:
 
 _logger_handlers = ["console", "errors"] if _LOG_FILE_AVAILABLE else ["console"]
 
+# Unhandled server errors (HTTP 5xx) are emailed to ADMINS, only when DEBUG is off.
+_log_handlers_base["mail_admins"] = {
+    "level": "ERROR",
+    "filters": ["require_debug_false"],
+    "class": "django.utils.log.AdminEmailHandler",
+}
+_log_handlers_base["null"] = {"class": "logging.NullHandler"}
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+    },
     "handlers": _log_handlers_base,
     "formatters": {
         "detailed": {
@@ -285,6 +296,24 @@ LOGGING = {
         },
     },
     "loggers": {
+        # Overrides Django's default "django" logger, which also mails admins, so
+        # that "django.request" below is the only logger that sends emails.
+        "django": {
+            "handlers": _logger_handlers,
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": [*_logger_handlers, "mail_admins"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        # nginx forwards any Host header, so bots probing the IP would flood the
+        # maintainers' inbox with DisallowedHost errors.
+        "django.security.DisallowedHost": {
+            "handlers": ["null"],
+            "propagate": False,
+        },
         "toxtempass.apps": {
             "handlers": _logger_handlers,
             "level": "INFO",
@@ -344,6 +373,18 @@ if bool(EMAIL_HOST_USER) != bool(EMAIL_HOST_PASSWORD):
     _LOG.error("Email not configured!")
 
 EMAIL_SUBJECT_PREFIX = "[ToxTempAssistant] "
+# Error reports are sent inline from the failing request; don't let a stalled
+# SMTP server hang the worker.
+EMAIL_TIMEOUT = 10
+
+# Maintainers receiving server error reports (see "mail_admins" in LOGGING).
+ADMINS = [
+    email.strip() for email in os.getenv("DJANGO_ADMINS", "").split(",") if email.strip()
+]
+if not ADMINS and not (DEBUG or TESTING):
+    _LOG.warning("DJANGO_ADMINS is not set; server errors will not be emailed.")
+# Sender for error reports; Django's default root@localhost is rejected by SMTP.
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
