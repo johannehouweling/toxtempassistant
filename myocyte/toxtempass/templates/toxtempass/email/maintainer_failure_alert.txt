@@ -1,0 +1,13 @@
+{% extends "toxtempass/email/base.txt" %}{% block content %}Since {{ since }} (Amsterdam time): {{ email_count }} failed email{{ email_count|pluralize }}, {{ run_count }} failed LLM draft{{ run_count|pluralize }} and {{ task_count }} failed background task{{ task_count|pluralize }}. The most recent ones are listed below; full tracebacks are in logs/django-errors.log.
+{% if emails %}
+Emails:{% for email in emails %}
+- {{ email.kind }} to {{ email.recipient }}: {{ email.error }}{% endfor %}
+{% endif %}{% if runs %}
+LLM drafts:{% for run in runs %}
+- Assay {{ run.assay_id|default:"(deleted)" }}{% if run.user %} by {{ run.user }}{% endif %}{% if run.model %}, {{ run.model }}{% endif %}: {{ run.error }}{% endfor %}
+{% endif %}{% if tasks %}
+Background tasks:{% for task in tasks %}
+- {{ task.func }} ({{ task.name }}): {{ task.error }}{% endfor %}
+{% endif %}
+You get at most one of these alerts per hour.
+{% endblock %}

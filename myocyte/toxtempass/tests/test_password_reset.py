@@ -269,10 +269,8 @@ class PasswordResetViewTests(TestCase):
         )
         self.assertTrue(logged_in)
 
-    def test_login_page_contains_forgot_password_text(self):
-        """The login page must contain the disabled 'Forgot your password?' text."""
+    def test_login_page_links_to_password_reset(self):
+        """The login page links 'Forgot your password?' to the reset page."""
         response = self.client.get(reverse("login"))
-        # The link is intentionally disabled (email setup pending); the text must
-        # still be present but must NOT be an active hyperlink to the reset page.
-        self.assertContains(response, "Forgot")
-        self.assertNotContains(response, reverse("password_reset"))
+        self.assertContains(response, "Forgot your password?")
+        self.assertContains(response, f'href="{reverse("password_reset")}"')

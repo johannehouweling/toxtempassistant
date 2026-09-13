@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 
 import factory
+from django.utils import timezone
 from factory.django import DjangoModelFactory
 
 from toxtempass.filehandling import get_text_or_bytes_perfile_dict
@@ -35,6 +36,8 @@ class PersonFactory(DjangoModelFactory):
     email = factory.LazyAttributeSequence(
         lambda obj, n: f"{obj.first_name}.{obj.last_name}.{n}@test.com"
     )
+    # A working account. Pass email_confirmed_at=None to test unconfirmed users.
+    email_confirmed_at = factory.LazyFunction(timezone.now)
 
 
 class InvestigationFactory(DjangoModelFactory):

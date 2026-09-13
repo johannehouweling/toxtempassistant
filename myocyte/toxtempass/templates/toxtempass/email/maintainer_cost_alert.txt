@@ -1,0 +1,10 @@
+{% extends "toxtempass/email/base.txt" %}{% block content %}LLM runs on {{ date }} (Amsterdam time) have cost EUR {{ total }} so far, more than the EUR {{ limit }} limit, across {{ run_count }} run{{ run_count|pluralize }}. You get at most one of these alerts per day.
+
+Top users:{% for row in top_users %}
+- {{ row.name }}: EUR {{ row.spend }} ({{ row.runs }} run{{ row.runs|pluralize }}){% endfor %}
+
+Top models:{% for row in top_models %}
+- {{ row.name }}: EUR {{ row.spend }} ({{ row.runs }} run{{ row.runs|pluralize }}){% endfor %}
+
+Only runs priced in EUR are counted. All LLM runs: {{ runs_url }}
+{% endblock %}

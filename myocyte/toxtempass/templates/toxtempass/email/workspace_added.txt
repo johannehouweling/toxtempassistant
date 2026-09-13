@@ -1,0 +1,9 @@
+{% extends "toxtempass/email/base.txt" %}{% block content %}Hi {{ user.get_full_name|default:user.email }},
+
+{% if workspaces|length == 1 %}You were added to a workspace:{% else %}You were added to {{ workspaces|length }} workspaces:{% endif %}
+{% for workspace in workspaces %}
+- {{ workspace.name }}, as {{ workspace.role|lower }}{% if workspace.added_by %}, added by {{ workspace.added_by }}{% endif %}{% endfor %}
+
+Members of a workspace can view and work on the investigations shared into it. You find your workspaces in the user menu of ToxTempAssistant:
+{{ overview_url }}
+{% endblock %}

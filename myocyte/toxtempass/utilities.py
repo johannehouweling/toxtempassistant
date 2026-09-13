@@ -1,10 +1,12 @@
 import hashlib
 import logging
+import time
 from pathlib import Path
 from typing import Callable
 
 from django.db import transaction
 from django.db.models import Model
+from django.http import HttpRequest
 
 from toxtempass import config
 from toxtempass.models import Assay, Investigation, Person, Study
@@ -175,6 +177,63 @@ def verify_beta_token(token: str, max_age_days: int = 30) -> None|dict:
         return None
 
 
+def generate_email_confirmation_token(person: Person) -> str:
+    """Return a signed token that confirms ``person.email``.
+
+    The address is part of the payload, so the link stops working when the
+    address changes. Check it with :func:`verify_email_confirmation_token`.
+    """
+    from django.core.signing import dumps
+
+    return dumps(
+        {"person_id": person.pk, "email": person.email},
+        salt="toxtempass-email-confirmation",
+    )
+
+
+def verify_email_confirmation_token(token: str) -> Person | None:
+    """Return the Person a confirmation token belongs to, or None if it is invalid.
+
+    Invalid means tampered with, older than ``_email_confirmation_valid_days``,
+    or issued for an address the account no longer has.
+    """
+    from django.core.signing import BadSignature, loads
+
+    max_age = config._email_confirmation_valid_days * 24 * 60 * 60
+    try:
+        data = loads(token, salt="toxtempass-email-confirmation", max_age=max_age)
+    except BadSignature:  # SignatureExpired is a subclass
+        return None
+    person = Person.objects.filter(pk=data.get("person_id")).first()
+    if person is None or person.email != data.get("email"):
+        return None
+    return person
+
+
+def generate_unsubscribe_token(person: Person, kind: str) -> str:
+    """Return a signed token that switches off one kind of email for ``person``.
+
+    It never expires: an unsubscribe link has to keep working.
+    """
+    from django.core.signing import dumps
+
+    return dumps({"person_id": person.pk, "kind": kind}, salt="toxtempass-unsubscribe")
+
+
+def verify_unsubscribe_token(token: str) -> tuple[Person, str] | None:
+    """Return ``(person, kind)`` for a valid unsubscribe token, otherwise None."""
+    from django.core.signing import BadSignature, loads
+
+    try:
+        data = loads(token, salt="toxtempass-unsubscribe")
+    except BadSignature:
+        return None
+    person = Person.objects.filter(pk=data.get("person_id")).first()
+    if person is None or not data.get("kind"):
+        return None
+    return person, data["kind"]
+
+
 def set_beta_requested(person, comment: str | None = None) -> None:
     """Mark a Person as having requested access to the beta program.
 
@@ -199,17 +258,24 @@ def set_beta_requested(person, comment: str | None = None) -> None:
 
 def set_beta_admitted(
     person: Person, admitted: bool, comment: str | None = None
-) -> None:
+) -> bool:
     """Admit or revoke a Person's beta status.
 
     Sets:
       - beta_admitted = bool(admitted)
       - beta_admitted_at = ISO timestamp when admitted, or None when revoked
       - beta_comment = comment (if provided)
+
+    Emails the person when this admits them. Admitting someone who already was,
+    or revoking, sends nothing. Returns whether the person was newly admitted.
     """
     from django.utils import timezone
 
+    was_admitted = False
+
     def mutate(prefs: dict) -> bool:
+        nonlocal was_admitted
+        was_admitted = bool(prefs.get("beta_admitted"))
         prefs["beta_admitted"] = bool(admitted)
         prefs["beta_admitted_at"] = (
             timezone.now().isoformat() if admitted else None
@@ -218,27 +284,40 @@ def set_beta_admitted(
             prefs["beta_comment"] = comment
         return True
 
-    update_prefs_atomic(person, mutate)
+    prefs = update_prefs_atomic(person, mutate)
+    newly_admitted = bool(admitted) and not was_admitted
+    if newly_admitted:
+        from toxtempass import notifications  # notifications imports this module
+
+        notifications.queue_email(
+            notifications.BETA_APPROVED,
+            user=person,
+            dedup_key=(
+                f"{notifications.BETA_APPROVED}:{person.pk}:{prefs['beta_admitted_at']}"
+            ),
+        )
+    return newly_admitted
 
 
 # ---------------------------------------------------------------------------
-# Password reset rate-limiting helpers
+# Rate-limiting helpers: per account (password reset, confirmation resend) and
+# per client IP (signup, login, ...)
 # ---------------------------------------------------------------------------
 
 
-def get_password_reset_wait_seconds(person: "Person") -> float:
-    """Return seconds the user must still wait before a new reset request.
+def get_attempt_wait_seconds(
+    person: "Person", prefs_key: str, wait_periods: tuple[int, ...]
+) -> float:
+    """Return seconds the user must still wait before another attempt.
 
-    Returns 0.0 if the user is allowed to request immediately.
-    The wait schedule (between consecutive attempts) is:
-    1 min → 5 min → 1 hour → 1 day.
+    Attempt timestamps live in ``person.preferences[prefs_key]``. The wait after
+    the n-th attempt is ``wait_periods[n-1]``, and the last period repeats.
+    Returns 0.0 if the user may try immediately.
     """
     import datetime
 
-    from toxtempass import Config
-
     prefs = person.preferences or {}
-    attempts: list[str] = prefs.get("pw_reset_attempts", [])
+    attempts: list[str] = prefs.get(prefs_key, [])
     if not attempts:
         return 0.0
 
@@ -253,24 +332,89 @@ def get_password_reset_wait_seconds(person: "Person") -> float:
     from django.utils import timezone as tz
 
     elapsed = (tz.now() - last_attempt).total_seconds()
-    idx = min(len(attempts) - 1, len(Config._pw_reset_wait_periods) - 1)
-    required_wait = Config._pw_reset_wait_periods[idx]
-    return max(0.0, required_wait - elapsed)
+    idx = min(len(attempts) - 1, len(wait_periods) - 1)
+    return max(0.0, wait_periods[idx] - elapsed)
+
+
+def record_attempt(person: "Person", prefs_key: str, max_stored: int) -> None:
+    """Append a timestamp for a new attempt to ``person.preferences[prefs_key]``."""
+    from django.utils import timezone as tz
+
+    def mutate(prefs: dict) -> bool:
+        attempts = list(prefs.get(prefs_key, []))
+        attempts.append(tz.now().isoformat())
+        prefs[prefs_key] = attempts[-max_stored:]
+        return True
+
+    update_prefs_atomic(person, mutate)
+
+
+def get_password_reset_wait_seconds(person: "Person") -> float:
+    """Return seconds the user must still wait before a new reset request.
+
+    Returns 0.0 if the user is allowed to request immediately.
+    The wait schedule (between consecutive attempts) is:
+    1 min → 5 min → 1 hour → 1 day.
+    """
+    from toxtempass import Config
+
+    return get_attempt_wait_seconds(
+        person, "pw_reset_attempts", Config._pw_reset_wait_periods
+    )
 
 
 def record_password_reset_attempt(person: "Person") -> None:
     """Append a timestamp for a new password reset attempt to the user's preferences."""
-    from django.utils import timezone as tz
-
     from toxtempass import Config
 
-    def mutate(prefs: dict) -> bool:
-        attempts = list(prefs.get("pw_reset_attempts", []))
-        attempts.append(tz.now().isoformat())
-        prefs["pw_reset_attempts"] = attempts[-Config._pw_reset_max_stored :]
-        return True
+    record_attempt(person, "pw_reset_attempts", Config._pw_reset_max_stored)
 
-    update_prefs_atomic(person, mutate)
+
+def client_ip(request: HttpRequest) -> str:
+    """Return the client's address as seen by the reverse proxy in front of Django.
+
+    nginx (legacy) and Traefik (swarm) both append the address they received the
+    request from to X-Forwarded-For, so the last entry is the one they vouch for.
+    Earlier entries are whatever the client sent and can be forged.
+    """
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if forwarded:
+        return forwarded.split(",")[-1].strip()
+    return request.META.get("REMOTE_ADDR", "") or "unknown"
+
+
+def is_rate_limited(request: HttpRequest, scope: str) -> bool:
+    """Count this request against the client IP's limit for ``scope``.
+
+    Limits are ``(max requests, window in seconds)`` from ``_ip_rate_limits``; the
+    window starts with the first request. Returns True once the limit is exceeded.
+    Kept in the cache, so a restart or cache clear forgets the counts.
+    """
+    from django.core.cache import cache
+
+    limit, window = config._ip_rate_limits[scope]
+    key = f"toxtempass:ratelimit:{scope}:{client_ip(request)}"
+    now = time.time()
+    count, started = cache.get(key) or (0, now)
+    if now - started >= window:
+        count, started = 0, now
+    count += 1
+    cache.set(key, (count, started), timeout=max(1, int(started + window - now)))
+    return count > limit
+
+
+def absolute_url(path: str) -> str:
+    """Return ``path`` prefixed with ``settings.SITE_URL``, for links in emails.
+
+    Falls back to the bare path, with a warning, when SITE_URL is not set.
+    """
+    from django.conf import settings
+
+    base = getattr(settings, "SITE_URL", "")
+    if not base:
+        logger.warning("SITE_URL is not set; emailing a relative link to %s", path)
+        return path
+    return f"{base}{path}"
 
 
 def provenance_label_for_item(

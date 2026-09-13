@@ -1,11 +1,11 @@
-Hello {{ person.get_full_name }},
+{% extends "toxtempass/email/base.txt" %}{% block content %}Hi {{ user.get_full_name|default:user.email }},
 
-Good news — your account has been admitted to the ToxTempAssistant beta program.
+Good news: your account has been admitted to the ToxTempAssistant beta, so you can now use the application.
+{% if needs_confirmation %}
+Please also confirm your email address with the link we sent you when you signed up. You need that to generate drafts; you can request a new link after signing in.
+{% endif %}
+Sign in here:
+{{ login_url }}
 
-You can sign in here:
-  - {{login_url}} 
-
-If you have any questions, reply to the site maintainer.
-
-Regards,
-The ToxTempAssistant team
+If you have questions, use the email button in the user menu of the application to contact the maintainers.
+{% endblock %}

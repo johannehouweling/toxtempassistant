@@ -2,6 +2,7 @@ import logging
 from typing import Dict
 
 from .workspace import get_workspace_list
+from django.http import HttpRequest
 from django.utils.functional import SimpleLazyObject
 from toxtempass import config
 
@@ -171,4 +172,18 @@ def llm_info(request) -> dict:
         "llm_signature": signature,
         "llm_choices": choices,
         "llm_current": current,
+    }
+
+
+def email_preferences(request: HttpRequest) -> dict:
+    """Expose the email notifications the user can switch off, for the offcanvas."""
+    user = getattr(request, "user", None)
+    if not user or not getattr(user, "is_authenticated", False):
+        return {"email_settings": []}
+    from toxtempass.notifications import email_settings_for
+
+    return {
+        "email_settings": email_settings_for(user),
+        # Shown in the banner asking unconfirmed users to confirm their address.
+        "unconfirmed_account_delete_days": config._unconfirmed_account_delete_days,
     }

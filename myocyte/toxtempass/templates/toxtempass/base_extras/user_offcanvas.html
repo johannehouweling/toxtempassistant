@@ -134,6 +134,44 @@
     </script>
     {% endif %}
 
+    {% if email_settings %}
+    <hr>
+    <div class="mb-3">
+        <h5 class="mb-1">Email notifications</h5>
+        <p class="mb-2 text-muted">Emails about your account, like confirmations and password changes, are always sent.</p>
+        {% for setting in email_settings %}
+        <div class="form-check form-switch">
+            <input class="form-check-input js-email-setting" type="checkbox" role="switch" id="email-setting-{{ setting.kind }}" data-kind="{{ setting.kind }}"{% if setting.enabled %} checked{% endif %}>
+            <label class="form-check-label" for="email-setting-{{ setting.kind }}">{{ setting.label }}</label>
+        </div>
+        {% endfor %}
+        <div id="email-setting-alert" class="alert alert-danger mt-2 py-2 px-3 small" role="alert" hidden></div>
+    </div>
+    <script>
+    (function () {
+      const alertBox = document.getElementById('email-setting-alert');
+      document.querySelectorAll('.js-email-setting').forEach(function (toggle) {
+        toggle.addEventListener('change', async function () {
+          alertBox.hidden = true;
+          const fd = new FormData();
+          fd.append('kind', toggle.dataset.kind);
+          fd.append('enabled', toggle.checked ? '1' : '0');
+          fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+          try {
+            const r = await fetch('{% url "set_email_preference" %}', { method: 'POST', body: fd });
+            const data = await r.json();
+            if (!data.success) throw new Error(data.error);
+          } catch (e) {
+            toggle.checked = !toggle.checked;
+            alertBox.textContent = 'Could not save the setting. Please try again.';
+            alertBox.hidden = false;
+          }
+        });
+      });
+    })();
+    </script>
+    {% endif %}
+
     <hr>
     {% include "toxtempass/base_extras/workspaces/workspace_list_partial.html" %}
 </div>

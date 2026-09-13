@@ -17,6 +17,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.views.decorators.http import require_POST
 from guardian.shortcuts import assign_perm, remove_perm
 
+from toxtempass import notifications
 from toxtempass.forms import (
     WorkspaceForm,
     WorkspaceInvestigationForm,
@@ -231,6 +232,10 @@ def delete_workspace(request: HttpRequest, pk: int) -> HttpResponseRedirect:
                         )
                         raise
 
+        for member in members:
+            notifications.notify_access_lost(
+                member, actor=request.user, reason=notifications.REASON_DELETED
+            )
         workspace.delete()
     return redirect("overview")
 
@@ -276,7 +281,10 @@ def add_workspace_member(request: HttpRequest, pk: int) -> JsonResponse:
 
         try:
             with transaction.atomic():
-                WorkspaceMember.objects.create(workspace=workspace, user=user, role=role)
+                member = WorkspaceMember.objects.create(
+                    workspace=workspace, user=user, role=role, added_by=request.user
+                )
+                notifications.notify_member_added(member, request.user)
 
                 # Ensure the newly added member receives object permissions for any
                 # Investigations already shared into this workspace.
@@ -347,7 +355,10 @@ def add_workspace_member_by_email(request: HttpRequest, pk: int) -> JsonResponse
 
     try:
         with transaction.atomic():
-            WorkspaceMember.objects.create(workspace=workspace, user=user, role=role)
+            member = WorkspaceMember.objects.create(
+                workspace=workspace, user=user, role=role, added_by=request.user
+            )
+            notifications.notify_member_added(member, request.user)
 
             # Assign view permissions for all investigations already shared into this workspace
             shared_invs = WorkspaceInvestigation.objects.filter(
@@ -429,6 +440,9 @@ def remove_workspace_member(request: HttpRequest, pk: int, user_id: int) -> Json
                     "view_investigation", member_to_remove.user, winv.investigation
                 )
 
+            notifications.notify_access_lost(
+                member_to_remove, actor=request.user, reason=notifications.REASON_REMOVED
+            )
             member_to_remove.delete()
     except Exception:
         logger.exception(
@@ -521,6 +535,9 @@ def remove_workspace_member_by_email(request: HttpRequest, pk: int) -> JsonRespo
                     continue
                 remove_perm("view_investigation", user, winv.investigation)
 
+            notifications.notify_access_lost(
+                gm, actor=request.user, reason=notifications.REASON_REMOVED
+            )
             gm.delete()
     except Exception:
         logger.exception(
