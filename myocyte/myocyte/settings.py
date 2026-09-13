@@ -360,22 +360,30 @@ USE_I18N = True
 USE_TZ = True
 
 # Email
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = os.getenv("SMTP_HOST", "")
-EMAIL_PORT = int(os.getenv("SMTP_PORT", "587"))
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv("SMTP_USERNAME", "")
-EMAIL_HOST_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+_SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
+_SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+if bool(_SMTP_USERNAME) != bool(_SMTP_PASSWORD):
+    _LOG.error("Email not configured!")
+
+MAILERS = {
+    "default": {
+        "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+        "OPTIONS": {
+            "host": os.getenv("SMTP_HOST", ""),
+            "port": int(os.getenv("SMTP_PORT", "587")),
+            "username": _SMTP_USERNAME,
+            "password": _SMTP_PASSWORD,
+            "use_tls": True,
+            # Error reports are sent inline from the failing request; don't let a
+            # stalled SMTP server hang the worker.
+            "timeout": 10,
+        },
+    },
+}
 DEFAULT_FROM_EMAIL = os.getenv(
     "SMTP_FROM_EMAIL", "toxtempassistant@rivm.nl"
 )
-if bool(EMAIL_HOST_USER) != bool(EMAIL_HOST_PASSWORD):
-    _LOG.error("Email not configured!")
-
 EMAIL_SUBJECT_PREFIX = "[ToxTempAssistant] "
-# Error reports are sent inline from the failing request; don't let a stalled
-# SMTP server hang the worker.
-EMAIL_TIMEOUT = 10
 
 # Maintainers receiving server error reports (see "mail_admins" in LOGGING).
 ADMINS = [

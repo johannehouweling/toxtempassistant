@@ -1,7 +1,6 @@
 import logging
 import os
 from collections.abc import Sequence
-from pathlib import Path
 
 from django.conf import settings
 from django.core.mail import EmailMessage, EmailMultiAlternatives
@@ -9,10 +8,8 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django_q.tasks import async_task
 
-from toxtempass import utilities
+from toxtempass import config, utilities
 from toxtempass.models import Person
-from toxtempass import config 
-
 
 _LOG = logging.getLogger(__name__)
 
@@ -52,7 +49,8 @@ def send_email_task(
         text_body = render_to_string(template_text, ctx) if template_text else ""
         html_body = render_to_string(template_html, ctx) if template_html else None
 
-        # choose best base: have text? use EmailMultiAlternatives for alt HTML; else use HTML as base
+        # choose best base: have text? use EmailMultiAlternatives for alt HTML;
+        # else use HTML as base
         if text_body:
             msg = EmailMultiAlternatives(subject=subject, body=text_body, to=list(to))
             if html_body is not None:
@@ -161,7 +159,7 @@ def send_beta_signup_notification(person_id: int) -> str:
             approve_path,
         )
 
-    # Recipient: maintainer defined in toxtempass.config, else settings.EMAIL_HOST_USER
+    # Recipient: maintainer defined in toxtempass.config
     recipient_email = getattr(config, "maintainer_email", None)
     if not recipient_email:
         _LOG.error("No maintainer email configured; cannot send beta notification.")
@@ -171,7 +169,10 @@ def send_beta_signup_notification(person_id: int) -> str:
         "approve_url": approve_url,
     }
 
-    subject = f"[ToxTempAssistant Beta signup] {person.email or person.username} requested beta access"
+    subject = (
+        f"[ToxTempAssistant Beta signup] {person.email or person.username} "
+        "requested beta access"
+    )
     task_id = queue_email(
         to=[recipient_email],
         subject=subject,
@@ -180,6 +181,11 @@ def send_beta_signup_notification(person_id: int) -> str:
         context=context,
         group="emails",
     )
-    _LOG.info("Queued beta signup notification for person %s to %s (task %s)", person_id, recipient_email, task_id)
+    _LOG.info(
+        "Queued beta signup notification for person %s to %s (task %s)",
+        person_id,
+        recipient_email,
+        task_id,
+    )
     return task_id
 
