@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.41.1 (2026-09-13)
+
+### Bug Fixes
+
+- **stats**: Key the dashboard cache on the payload source
+  ([`8d17044`](https://github.com/johannehouweling/toxtempassistant/commit/8d17044eeab664d8392950b7e8e415d6c2019ae4))
+
+
 ## v3.41.0 (2026-09-13)
 
 ### Features
