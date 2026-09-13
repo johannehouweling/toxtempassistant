@@ -28,6 +28,7 @@ rendered as HTML, serialised to JSON, or flattened to CSV by
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 from collections import Counter
 from dataclasses import dataclass
 from decimal import Decimal
@@ -1151,6 +1152,19 @@ def build_stats(range_key: str | None = None) -> dict[str, Any]:
     }
 
 
+# The cache lives in the database, so a payload outlives a deploy. Without this,
+# a new release reads the previous release's payload for up to a day and fails
+# on any key it added (KeyError 'completeness' after v3.41.0). Keying on this
+# module's source puts every change to the payload shape on a fresh key; the
+# old entries are never read again and expire on their own.
+_PAYLOAD_FINGERPRINT = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
+
+
+def _cache_key(range_key: str) -> str:
+    """Return the cache key for a resolved range key, scoped to this module's source."""
+    return f"{config.stats_cache_key_prefix}{_PAYLOAD_FINGERPRINT}:{range_key}"
+
+
 def cached_stats(
     range_key: str | None = None, *, refresh: bool = False
 ) -> dict[str, Any]:
@@ -1164,7 +1178,7 @@ def cached_stats(
     ``refresh=True`` skips the read and recomputes, which is what the dashboard's
     recalculate control does.
     """
-    key = f"{config.stats_cache_key_prefix}{resolve_range(range_key).key}"
+    key = _cache_key(resolve_range(range_key).key)
     if not refresh:
         cached = cache.get(key)
         if cached is not None:
@@ -1176,9 +1190,7 @@ def cached_stats(
 
 def clear_stats_cache() -> None:
     """Drop every cached range, so the next read of any of them recomputes."""
-    cache.delete_many(
-        [f"{config.stats_cache_key_prefix}{key}" for key in config.stats_ranges]
-    )
+    cache.delete_many([_cache_key(key) for key in config.stats_ranges])
 
 
 def to_json_payload(stats: dict[str, Any]) -> dict[str, Any]:
