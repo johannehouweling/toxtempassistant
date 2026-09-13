@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.41.3 (2026-09-13)
+
+### Bug Fixes
+
+- **stats**: Count staff accounts as users
+  ([`60ad3f4`](https://github.com/johannehouweling/toxtempassistant/commit/60ad3f4aca921453e4238d275ff96ee779a4b7ed))
+
+
 ## v3.41.2 (2026-09-13)
 
 ### Bug Fixes
