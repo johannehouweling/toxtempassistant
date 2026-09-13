@@ -1,16 +1,12 @@
 """Tests for the password reset feature: rate limiting, views, templates."""
 import datetime
 
-from django.contrib.auth.tokens import default_token_generator
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
 
 from toxtempass import Config, utilities
 from toxtempass.tests.fixtures.factories import PersonFactory
-
 
 # ---------------------------------------------------------------------------
 # Unit tests for rate-limiting utility functions
@@ -155,10 +151,7 @@ class PasswordResetRateLimitTests(TestCase):
 # ---------------------------------------------------------------------------
 
 
-@override_settings(
-    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-    PASSWORD_RESET_TIMEOUT=3600,
-)
+@override_settings(PASSWORD_RESET_TIMEOUT=3600)
 class PasswordResetViewTests(TestCase):
     """Integration tests for the password reset request page."""
 
@@ -258,7 +251,11 @@ class PasswordResetViewTests(TestCase):
         self.assertContains(get_response, "Set a new password")
 
         # 4. POST the new password.
-        post_url = get_response.redirect_chain[-1][0] if get_response.redirect_chain else confirm_path
+        post_url = (
+            get_response.redirect_chain[-1][0]
+            if get_response.redirect_chain
+            else confirm_path
+        )
         post_response = self.client.post(
             post_url,
             {"new_password1": "NewSecurePass42!", "new_password2": "NewSecurePass42!"},

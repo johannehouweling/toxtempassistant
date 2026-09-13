@@ -24,7 +24,6 @@ urlpatterns = [
     ROOT_URLCONF=__name__,
     DEBUG=False,
     ALLOWED_HOSTS=["testserver"],
-    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     ADMINS=["maintainer-one@example.com", "maintainer-two@example.com"],
 )
 class ServerErrorEmailTests(TestCase):
