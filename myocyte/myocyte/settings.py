@@ -218,6 +218,7 @@ Q_CLUSTER = {
 }
 if DEBUG or TESTING:
     Q_CLUSTER["sync"] = True  # Use Django ORM for development
+ROR_LOOKUP_ENABLED = not (TESTING or "pytest" in sys.modules)  # no network in tests
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators

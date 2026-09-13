@@ -49,8 +49,11 @@ logger = logging.getLogger(__name__)
 
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
-    list_display = ("first_name", "last_name", "email", "orcid_id")
+    list_display = (
+        "first_name", "last_name", "email", "orcid_id", "organization", "ror_name"
+    )
     search_fields = ("first_name", "last_name", "email", "orcid_id")
+    readonly_fields = ("ror_id", "ror_name", "ror_checked_organization")
 
 
 @admin.register(Investigation)
