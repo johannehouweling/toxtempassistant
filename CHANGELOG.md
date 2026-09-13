@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.41.0 (2026-09-13)
+
+### Features
+
+- **settings**: Email server errors to maintainers
+  ([`aaf19a9`](https://github.com/johannehouweling/toxtempassistant/commit/aaf19a90aaabf8ae2e4bbe607d33d4be1312f304))
+
+
 ## v3.40.0 (2026-09-13)
 
 ### Features
