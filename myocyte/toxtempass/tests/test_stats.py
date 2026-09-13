@@ -7,6 +7,7 @@ import json
 import tempfile
 import uuid
 from pathlib import Path
+from unittest.mock import patch
 
 from django.core.cache import cache
 from django.db import connection
@@ -794,6 +795,18 @@ class StatsCacheTests(TestCase):
         clear_stats_cache()
         self.assertEqual(cached_stats("all")["headline"]["assays"]["period"], 2)
         self.assertEqual(cached_stats("12m")["headline"]["assays"]["period"], 2)
+
+    def test_payload_cached_by_a_previous_release_is_not_served(self):
+        # v3.40.0 cached under the bare prefix + range and had no "completeness"
+        # block; v3.41.0 read that copy after deploying and raised KeyError.
+        cache.set(f"{config.stats_cache_key_prefix}all", {"headline": {}}, 3600)
+        self.assertIn("completeness", cached_stats("all"))
+
+    def test_changed_payload_source_uses_a_fresh_key(self):
+        cached_stats("all")
+        _assay_for(self.user)
+        with patch("toxtempass.stats._PAYLOAD_FINGERPRINT", "changed"):
+            self.assertEqual(cached_stats("all")["headline"]["assays"]["period"], 2)
 
 
 @override_settings(
