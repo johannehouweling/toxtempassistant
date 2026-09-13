@@ -23,6 +23,13 @@ def test_about_page_renders_for_anonymous_visitors():
 
 
 @pytest.mark.django_db
+def test_about_page_mentions_vhp4safety_as_a_toxtemp_user():
+    """The About copy should mention VHP4Safety alongside the other named projects."""
+    html = Client().get(reverse("about")).content.decode()
+    assert "projects such as RISK-HUNT3R, ONTOX and VHP4Safety" in html
+
+
+@pytest.mark.django_db
 def test_about_faq_structured_data_matches_visible_faq():
     """FAQPage data must mirror the visible FAQ, or search engines ignore it."""
     html = Client().get(reverse("about")).content.decode()
