@@ -1,0 +1,8 @@
+{% extends "toxtempass/email/base.txt" %}{% block content %}Hi {{ user.get_full_name|default:user.email }},
+{% for workspace in workspaces %}
+- {% if workspace.deleted %}The workspace "{{ workspace.name }}" was deleted{% else %}You were removed from the workspace "{{ workspace.name }}"{% endif %}{% if workspace.actor %} by {{ workspace.actor }}{% endif %}.{% endfor %}
+
+You no longer have access to the investigations that were shared there, including the studies and assays you created in them, unless they are also shared with you through another workspace. Your own investigations are not affected.
+
+If you think this is a mistake, contact the owner of the workspace.
+{% endblock %}

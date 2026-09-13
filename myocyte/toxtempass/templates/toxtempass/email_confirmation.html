@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Email confirmation | ToxTempAssistant{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-body">
+        {% if status == "invalid" %}
+        <h1 class="card-title fs-3">This link does not work</h1>
+        <p class="card-text">
+          The confirmation link is invalid or has expired, or it was sent for a different
+          email address.
+        </p>
+        {% if user.is_authenticated %}
+        <p class="card-text">Use the banner at the top of the page to get a new link.</p>
+        {% else %}
+        <p class="card-text"><a href="{% url 'login' %}">Sign in</a> to get a new link.</p>
+        {% endif %}
+        {% else %}
+        <h1 class="card-title fs-3">Email address confirmed</h1>
+        <p class="card-text">
+          {% if status == "already" %}{{ email }} was already confirmed.{% else %}Thank you, {{ email }} is now confirmed.{% endif %}
+        </p>
+        <a class="btn btn-primary" href="{% url 'overview' %}">Continue to ToxTempAssistant</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

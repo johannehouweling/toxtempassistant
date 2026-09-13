@@ -1,55 +1,23 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>ToxTempAssistant — Beta Approved</title>
-  </head>
-  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background:#f6f8fb; margin:0; padding:20px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:720px;margin:0 auto;background:transparent;">
-      <tr>
-        <td align="center" style="padding:20px 0;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;box-shadow:0 2px 6px rgba(16,24,40,0.06);overflow:hidden;">
-            <tr>
-              <td style="padding:24px 28px 8px 28px;">
-                <h1 style="margin:0;font-size:20px;color:#0f172a;">ToxTempAssistant — Beta access approved</h1>
-              </td>
-            </tr>
-
-            <tr>
-              <td style="padding:8px 28px 20px 28px;color:#334155;line-height:1.5;font-size:15px;">
-                <p style="margin:0 0 12px 0;">Hi {{ person.get_full_name }},</p>
-
-                <p style="margin:0 0 12px 0;">
-                  Good news — your account has been admitted to the ToxTempAssistant beta program.
-                  You now have access to the application.
-                </p>
-
-                <div style="margin:18px 0;">
-                  <a href="{{ login_url|default:'/' }}" style="display:inline-block;padding:12px 18px;background:#0d6efd;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">
-                    Sign in to ToxTempAssistant
-                  </a>
-                </div>
-
-                <p style="margin:0 0 12px 0;color:#475569;">
-                  If you have questions, contact the site maintainer. This inbox is not actively monitored.
-                </p>
-
-                <p style="margin:18px 0 0 0;color:#94a3b8;font-size:13px;">
-                  Regards,<br/>
-                  The ToxTempAssistant team
-                </p>
-              </td>
-            </tr>
-
-            <tr>
-              <td style="background:#f8fafc;padding:12px 20px;text-align:center;font-size:12px;color:#9aa4b2;">
-                <span>Need help? Visit the site or reach out to the maintainer.</span>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>
+{% extends "toxtempass/email/base.html" %}
+{% block title %}Beta access approved{% endblock %}
+{% block heading %}Beta access approved{% endblock %}
+{% block content %}
+<p style="margin:0 0 12px 0;">Hi {{ user.get_full_name|default:user.email }},</p>
+<p style="margin:0 0 12px 0;">
+  Good news: your account has been admitted to the ToxTempAssistant beta, so you can now
+  use the application.
+</p>
+{% if needs_confirmation %}
+<p style="margin:0 0 12px 0;">
+  Please also confirm your email address with the link we sent you when you signed up.
+  You need that to generate drafts; you can request a new link after signing in.
+</p>
+{% endif %}
+<p style="margin:18px 0;">
+  <a href="{{ login_url }}" style="display:inline-block;padding:12px 18px;background:#0d6efd;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">Sign in to ToxTempAssistant</a>
+</p>
+<p style="margin:0;color:#475569;">
+  If you have questions, use the email button in the user menu of the application to
+  contact the maintainers.
+</p>
+{% endblock %}

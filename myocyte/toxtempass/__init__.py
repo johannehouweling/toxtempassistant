@@ -377,6 +377,45 @@ class Config:
     # Keep only the most recent N attempt timestamps in Person.preferences.
     _pw_reset_max_stored: Final[int] = 10
 
+    # ── Email notifications (see toxtempass/notifications.py) ─────────────────
+    # Days are counted in this timezone for the beta digest and the cost alert.
+    _email_timezone: Final[str] = "Europe/Amsterdam"
+    # How often the scheduled job sends due emails and runs the daily checks.
+    _email_jobs_interval_minutes: Final[int] = 2
+    # Workspace emails wait this long, so an add that is quickly undone sends
+    # nothing and several changes arrive as one email.
+    _email_cooloff_minutes: Final[int] = 10
+    # A grouped email is held back at most this long while new changes keep coming.
+    _email_group_max_wait_minutes: Final[int] = 60
+    # Cap on emails to one user per rolling day, whatever triggered them.
+    _email_max_per_recipient_per_day: Final[int] = 20
+    # Wait before each retry of a failed send; after the last retry it stays failed.
+    _email_retry_delays_minutes: Final[tuple[int, ...]] = (5, 30)
+    # A send claimed this long ago that never finished (worker crash) is retried.
+    _email_stuck_sending_minutes: Final[int] = 30
+    # How long the link in a confirmation email works.
+    _email_confirmation_valid_days: Final[int] = 3
+    # New signups still unconfirmed after this many days are deleted.
+    _unconfirmed_account_delete_days: Final[int] = 7
+    # Local hour (in _email_timezone) from which the daily beta digest is sent.
+    _beta_digest_hour: Final[int] = 8
+    # Maintainers get one alert per day once the day's LLM spend (EUR) exceeds this.
+    _llm_daily_cost_alert_limit: Final[int] = 10
+    # At most one failure alert per this many minutes.
+    _failure_alert_interval_minutes: Final[int] = 60
+    # Per client IP and endpoint: (max requests, window in seconds).
+    _ip_rate_limits: Final[Mapping[str, tuple[int, int]]] = MappingProxyType({
+        "signup": (5, 3600),
+        "login": (20, 600),
+        "password_reset": (10, 3600),
+        "confirmation_resend": (10, 3600),
+    })
+    _email_confirmation_required_message: Final[str] = (
+        "Please confirm your email address before generating drafts. Use the link "
+        "in the email we sent you, or request a new one."
+    )
+    _rate_limited_message: Final[str] = "Too many attempts. Please try again later."
+
     # Validation settings
     # These are used in the validation pipeline to estimate performance of the LLM
     # Not used in the actual application, but for validation purposes only.

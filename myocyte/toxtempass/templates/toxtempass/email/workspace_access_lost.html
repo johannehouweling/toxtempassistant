@@ -1,0 +1,17 @@
+{% extends "toxtempass/email/base.html" %}
+{% block title %}You lost access to a workspace{% endblock %}
+{% block heading %}{% if workspaces|length == 1 %}You lost access to a workspace{% else %}You lost access to {{ workspaces|length }} workspaces{% endif %}{% endblock %}
+{% block content %}
+<p style="margin:0 0 12px 0;">Hi {{ user.get_full_name|default:user.email }},</p>
+<ul style="margin:0 0 12px 0;padding-left:20px;">
+  {% for workspace in workspaces %}
+  <li>{% if workspace.deleted %}The workspace <strong>{{ workspace.name }}</strong> was deleted{% else %}You were removed from the workspace <strong>{{ workspace.name }}</strong>{% endif %}{% if workspace.actor %} by {{ workspace.actor }}{% endif %}.</li>
+  {% endfor %}
+</ul>
+<p style="margin:0 0 12px 0;">
+  You no longer have access to the investigations that were shared there, including the
+  studies and assays you created in them, unless they are also shared with you through
+  another workspace. Your own investigations are not affected.
+</p>
+<p style="margin:0;color:#475569;">If you think this is a mistake, contact the owner of the workspace.</p>
+{% endblock %}

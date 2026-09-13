@@ -68,6 +68,13 @@ class LoginForm(forms.Form):
 
 
 class SignupFormOrcid(UserCreationForm):
+    # Honeypot: hidden in the signup template, so only bots fill it in.
+    website = forms.CharField(
+        required=False,
+        label="Leave this field empty",
+        widget=forms.TextInput(attrs={"autocomplete": "off", "tabindex": "-1"}),
+    )
+
     def __init__(self, *args, **kwargs):
         """Initialize signup form fields."""
         super().__init__(*args, **kwargs)
@@ -102,6 +109,9 @@ class SignupFormOrcid(UserCreationForm):
     def clean(self) -> dict:
         """Clean."""
         cleaned_data = super().clean()
+        if cleaned_data.get("website"):
+            logger.warning("Signup rejected: the honeypot field was filled in")
+            raise forms.ValidationError("Your signup could not be processed.")
         email = cleaned_data.get("email")
         if email:
             email = cleaned_data.get("email").lower()
@@ -506,7 +516,8 @@ class AssayAnswerForm(forms.Form):
         The user is checked against the assay's access permissions.
         """
         self.assay = kwargs.pop("assay")
-        user = kwargs.pop("user", None)
+        self.user = kwargs.pop("user", None)
+        user = self.user
         if user is not None and not self.assay.is_accessible_by(user):
             raise PermissionDenied("You do not have access to this assay.")
         super().__init__(*args, **kwargs)
@@ -738,8 +749,13 @@ class AssayAnswerForm(forms.Form):
             return False
 
         if uploaded_files and earmarked_answers:
+            # The edits above are kept; only the LLM update needs a confirmed address.
+            if self.user is not None and not self.user.has_confirmed_email:
+                self.add_error("file_upload", config._email_confirmation_required_message)
+                return False
             answer_ids = [answer.id for answer in earmarked_answers]
             try:
+                from toxtempass.llm import current_llm_key
                 from toxtempass.views import process_llm_async
 
                 for answer in earmarked_answers:
@@ -753,6 +769,10 @@ class AssayAnswerForm(forms.Form):
                     doc_dict,
                     extract_images,
                     answer_ids,
+                    user_id=getattr(self.user, "pk", None),
+                    # Snapshot the model now, like new_form_view, so the run and its
+                    # cost record use the model chosen when the update was requested.
+                    llm_model=current_llm_key(self.user) if self.user else None,
                 )
                 self.assay.save(update_fields=["status", "user_alerts"])
                 self.async_enqueued = True

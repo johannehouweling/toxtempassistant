@@ -141,6 +141,38 @@
 
 
         <div class="container px-3 py-4">
+            {% if user.is_authenticated and not user.has_confirmed_email %}
+            <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2" role="alert">
+                <i class="bi bi-envelope-exclamation"></i>
+                <span class="me-auto">
+                    Please confirm your email address with the link we sent to <strong>{{ user.email }}</strong>.
+                    You need it to generate drafts{% if user.delete_if_unconfirmed %}, and unconfirmed accounts are deleted after {{ unconfirmed_account_delete_days }} days{% endif %}.
+                </span>
+                <button type="button" class="btn btn-sm btn-outline-dark" id="resendConfirmationBtn" data-url="{% url 'resend_confirmation_email' %}">Send the link again</button>
+                <span class="small w-100" id="resendConfirmationResult" hidden></span>
+            </div>
+            <script>
+              document.addEventListener("DOMContentLoaded", function () {
+                const button = document.getElementById("resendConfirmationBtn");
+                const result = document.getElementById("resendConfirmationResult");
+                button.addEventListener("click", async function () {
+                  button.disabled = true;
+                  try {
+                    const response = await fetch(button.dataset.url, {
+                      method: "POST",
+                      headers: {"X-CSRFToken": csrftoken},
+                    });
+                    const data = await response.json();
+                    result.textContent = data.message || data.error || "";
+                  } catch (error) {
+                    result.textContent = "Could not send the email. Please try again later.";
+                  }
+                  result.hidden = false;
+                  button.disabled = false;
+                });
+              });
+            </script>
+            {% endif %}
             {% block content %}
             <!-- Page content goes here -->
             {% endblock %}

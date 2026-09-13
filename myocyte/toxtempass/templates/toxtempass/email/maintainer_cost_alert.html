@@ -1,0 +1,31 @@
+{% extends "toxtempass/email/base.html" %}
+{% block title %}LLM spend passed the daily limit{% endblock %}
+{% block heading %}LLM spend passed the daily limit{% endblock %}
+{% block content %}
+<p style="margin:0 0 12px 0;">
+  LLM runs on {{ date }} (Amsterdam time) have cost <strong>€{{ total }}</strong> so far,
+  more than the €{{ limit }} limit, across {{ run_count }} run{{ run_count|pluralize }}.
+  You get at most one of these alerts per day.
+</p>
+<p style="margin:12px 0 4px 0;"><strong>Top users</strong></p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
+  {% for row in top_users %}
+  <tr>
+    <td style="padding:4px 0;border-top:1px solid #e2e8f0;">{{ row.name }}</td>
+    <td style="padding:4px 0;border-top:1px solid #e2e8f0;text-align:right;">€{{ row.spend }} ({{ row.runs }} run{{ row.runs|pluralize }})</td>
+  </tr>
+  {% endfor %}
+</table>
+<p style="margin:12px 0 4px 0;"><strong>Top models</strong></p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
+  {% for row in top_models %}
+  <tr>
+    <td style="padding:4px 0;border-top:1px solid #e2e8f0;">{{ row.name }}</td>
+    <td style="padding:4px 0;border-top:1px solid #e2e8f0;text-align:right;">€{{ row.spend }} ({{ row.runs }} run{{ row.runs|pluralize }})</td>
+  </tr>
+  {% endfor %}
+</table>
+<p style="margin:12px 0 0 0;color:#475569;">
+  Only runs priced in EUR are counted. <a href="{{ runs_url }}" style="color:#0d6efd;">See all LLM runs</a>
+</p>
+{% endblock %}

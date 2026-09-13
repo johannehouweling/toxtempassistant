@@ -1,0 +1,27 @@
+{% extends "toxtempass/email/base.html" %}
+{% block title %}Beta requests waiting for approval{% endblock %}
+{% block heading %}Beta requests waiting for approval{% endblock %}
+{% block content %}
+<p style="margin:0 0 12px 0;">
+  These people confirmed their email address and are waiting for beta access. Approving
+  asks you to sign in as staff; the person is then emailed automatically.
+</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;margin:0 0 12px 0;">
+  {% for request in requests %}
+  <tr>
+    <td style="padding:10px 0;border-top:1px solid #e2e8f0;vertical-align:top;">
+      <strong>{{ request.name }}</strong><br>
+      {{ request.email }}{% if request.organization %}<br>{{ request.organization }}{% endif %}
+      {% if request.requested_at %}<br><span style="color:#64748b;">Requested {{ request.requested_at|date:"j M Y, H:i" }} UTC</span>{% endif %}
+    </td>
+    <td style="padding:10px 0;border-top:1px solid #e2e8f0;vertical-align:top;text-align:right;">
+      <a href="{{ request.approve_url }}" style="display:inline-block;padding:8px 14px;background:#0d6efd;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">Approve</a>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+<p style="margin:0;color:#475569;">
+  Approve links work for 30 days. To leave a request open, do nothing; it appears again in
+  tomorrow's digest. <a href="{{ manage_url }}" style="color:#0d6efd;">Manage all beta users</a>
+</p>
+{% endblock %}

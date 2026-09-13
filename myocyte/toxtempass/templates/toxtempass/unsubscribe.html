@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Unsubscribe | ToxTempAssistant{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-body">
+        {% if status == "invalid" %}
+        <h1 class="card-title fs-3">This link does not work</h1>
+        <p class="card-text">
+          The unsubscribe link is invalid. You can switch email notifications off in the
+          user menu after signing in.
+        </p>
+        {% elif status == "done" %}
+        <h1 class="card-title fs-3">You are unsubscribed</h1>
+        <p class="card-text">
+          {{ email }} no longer gets emails for “{{ label }}”. You can switch them back on
+          under Email notifications in the user menu.
+        </p>
+        {% else %}
+        <h1 class="card-title fs-3">Unsubscribe</h1>
+        <p class="card-text">
+          Stop sending emails to {{ email }} for “{{ label }}”? Emails about your account,
+          like confirmations and password changes, are still sent.
+        </p>
+        <form method="post">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary">Unsubscribe</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

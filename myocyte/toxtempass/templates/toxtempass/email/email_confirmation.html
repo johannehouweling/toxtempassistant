@@ -1,0 +1,27 @@
+{% extends "toxtempass/email/base.html" %}
+{% block title %}Confirm your email address{% endblock %}
+{% block heading %}Confirm your email address{% endblock %}
+{% block content %}
+<p style="margin:0 0 12px 0;">Hi {{ user.get_full_name|default:user.email }},</p>
+{% if existing_account %}
+<p style="margin:0 0 12px 0;">
+  ToxTempAssistant now asks everyone to confirm their email address. Until you do, you
+  can still sign in and work on your ToxTemps, but you cannot generate new drafts.
+</p>
+{% else %}
+<p style="margin:0 0 12px 0;">
+  Thanks for signing up for ToxTempAssistant. Please confirm that this is your email
+  address. Until you do, you can look around but cannot generate drafts, and the
+  maintainers do not see your beta request.
+</p>
+{% endif %}
+<p style="margin:18px 0;">
+  <a href="{{ confirm_url }}" style="display:inline-block;padding:12px 18px;background:#0d6efd;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">Confirm my email address</a>
+</p>
+<p style="margin:0 0 12px 0;color:#475569;">
+  The link works for {{ valid_days }} days. If it has expired, sign in and request a new
+  one.{% if delete_days %} Accounts that are not confirmed within {{ delete_days }} days
+  are deleted.{% endif %}
+</p>
+<p style="margin:0;color:#475569;">If you did not sign up, you can ignore this email.</p>
+{% endblock %}

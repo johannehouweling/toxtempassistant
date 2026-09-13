@@ -1,7 +1,6 @@
 from django.test import TestCase
 
 from toxtempass import utilities
-from toxtempass.tasks import send_beta_signup_notification
 from toxtempass.tests.fixtures.factories import PersonFactory
 
 
@@ -26,10 +25,3 @@ class BetaSignupTests(TestCase):
         p.refresh_from_db()
         self.assertTrue(p.preferences.get("beta_admitted"))
         self.assertIsNotNone(p.preferences.get("beta_admitted_at"))
-
-    def test_send_beta_notification_queues(self):
-        p = PersonFactory.create()
-        # ensure preferences exist
-        utilities.set_beta_requested(p, comment="test")
-        task_id = send_beta_signup_notification(p.id)
-        self.assertIsNotNone(task_id)

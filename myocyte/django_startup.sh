@@ -38,6 +38,8 @@ python3 manage.py createcachetable
 sleep 0.1
 
 if [ "${TESTING:-false}" != "true" ]; then
+  echo ">>> Scheduling the email jobs (see toxtempass/notifications.py)"
+  python3 manage.py setup_email_schedule
   echo ">>> Run clustering tool in background"
   python3 manage.py qcluster &
   sleep 0.1

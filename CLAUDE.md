@@ -180,7 +180,27 @@ Key rules to observe when working in this area:
 
 ### Async tasks
 
-`django-q2` runs in-process via `manage.py qcluster` (started by `django_startup.sh` unless `TESTING=true`). The cluster uses the Django ORM as its broker (`Q_CLUSTER["orm"] = "default"`). When `DEBUG` or `TESTING` is true, `Q_CLUSTER["sync"] = True` so tasks execute inline. Email is the primary task type today (`tasks.queue_email`).
+`django-q2` runs in-process via `manage.py qcluster` (started by `django_startup.sh` unless `TESTING=true`). The cluster uses the Django ORM as its broker (`Q_CLUSTER["orm"] = "default"`). When `DEBUG` or `TESTING` is true, `Q_CLUSTER["sync"] = True` so tasks execute inline. LLM drafting (`process_llm_async`) and ROR lookups run here; emails mostly do not (see below).
+
+### Email notifications
+
+Every email goes through `toxtempass/notifications.py` and starts as an `EmailLog` row, which is both the outbox and the audit trail (visible in the admin).
+
+* **Don't call `send_mail`/`EmailMessage` directly.** Add a kind to `notifications.KINDS`, templates `email/<kind>.txt` and `.html` extending `email/base.*`, and a builder in `_BUILDERS`; then call `notifications.queue_email(kind, user=..., ...)`.
+* **Immediate vs delayed.** Without `send_after`, the email is sent in-process right after the transaction commits, because the single qcluster worker can be busy with an LLM draft for a long time. With `send_after`, `run_email_jobs` sends it. That job runs every `Config._email_jobs_interval_minutes`, scheduled by `manage.py setup_email_schedule` (called from `django_startup.sh`). In tests, call `notifications.run_email_jobs(now=...)` directly, and wrap immediate emails in `django_capture_on_commit_callbacks(execute=True)`.
+* **Spam controls:**
+  * `dedup_key` (unique per logical email).
+  * Per-user opt-out for kinds marked `optional`. Only emails caused by someone else's action are optional, and they carry a one-click unsubscribe link.
+  * A per-recipient daily cap (`Config._email_max_per_recipient_per_day`).
+  * A cool-off for workspace emails (`Config._email_cooloff_minutes`): an undone change sends nothing, and several changes are merged into one email.
+* **Workspace hooks.** Every path that adds or removes a `WorkspaceMember` (views and admin) must call `notify_member_added` after saving and `notify_access_lost` before deleting. Actions on yourself send nothing.
+* **Maintainer emails go to `DJANGO_ADMINS`:**
+  * A beta digest daily from `Config._beta_digest_hour` (Europe/Amsterdam), only when confirmed requests are pending.
+  * A cost alert when the day's `LLMRun` spend passes `Config._llm_daily_cost_alert_limit` EUR. `AssayCost` is overwritten per run; `LLMRun` is append-only.
+  * A failure alert at most hourly, covering failed emails, failed LLM runs and django-q failures.
+* **Email confirmation.** `Person.has_confirmed_email` (staff count as confirmed) gates starting LLM drafts, not browsing. New signups still unconfirmed after `Config._unconfirmed_account_delete_days` are deleted. `delete_if_unconfirmed` is off for accounts that predate confirmation; ask those accounts to confirm with `manage.py send_confirmation_requests`.
+* **Abuse limits.** Per-IP rate limits (`utilities.is_rate_limited`, `Config._ip_rate_limits`) cover signup, login, password reset and confirmation resends. Signup also has a honeypot field.
+* **Development.** With `DEBUG`, emails are printed to the console unless `EMAIL_SEND_IN_DEBUG=true`. Links in emails are built from `SITE_URL`.
 
 ### File storage
 
@@ -202,7 +222,7 @@ Selectors and help text for the in-app tour live in `Config.user_onboarding_help
 
 ## Environment variables
 
-Required for any run (see `.env.dummy` for the full list): `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `AWS_*` (MinIO), and the `SMTP_*` settings used by Django email. `USE_POSTGRES=true` switches from SQLite to Postgres; if `USE_POSTGRES=true` and `TESTING=true`, `POSTGRES_HOST` must equal `postgres_test_for_django` (settings.py raises otherwise). Azure AI Foundry credentials (`AZURE_E<n>_ENDPOINT`, `AZURE_E<n>_KEY`) are required for non-test runs.
+Required for any run (see `.env.dummy` for the full list): `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `AWS_*` (MinIO), the `SMTP_*` settings used by Django email, `SITE_URL` (absolute links in emails) and `DJANGO_ADMINS` (maintainer emails). `USE_POSTGRES=true` switches from SQLite to Postgres; if `USE_POSTGRES=true` and `TESTING=true`, `POSTGRES_HOST` must equal `postgres_test_for_django` (settings.py raises otherwise). Azure AI Foundry credentials (`AZURE_E<n>_ENDPOINT`, `AZURE_E<n>_KEY`) are required for non-test runs.
 
 ## Conventions to honour
 

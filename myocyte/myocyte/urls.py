@@ -19,7 +19,6 @@ Including another URLconf
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth.views import (
-    PasswordResetConfirmView,
     PasswordResetCompleteView,
     PasswordResetDoneView,
 )
@@ -81,10 +80,7 @@ urlpatterns += [
     ),
     path(
         "password-reset/confirm/<uidb64>/<token>/",
-        PasswordResetConfirmView.as_view(
-            template_name="toxtempass/password_reset_confirm.html",
-            success_url="/password-reset/complete/",
-        ),
+        views.PasswordResetConfirmView.as_view(),
         name="password_reset_confirm",
     ),
     path(
@@ -92,6 +88,16 @@ urlpatterns += [
         PasswordResetCompleteView.as_view(template_name="toxtempass/password_reset_complete.html"),
         name="password_reset_complete",
     ),
+    # Email confirmation and unsubscribe links ("resend" must come before <token>)
+    path(
+        "account/confirm-email/resend/",
+        views.resend_confirmation_email,
+        name="resend_confirmation_email",
+    ),
+    path(
+        "account/confirm-email/<str:token>/", views.confirm_email, name="confirm_email"
+    ),
+    path("email/unsubscribe/<str:token>/", views.unsubscribe, name="unsubscribe"),
     # Beta flows
     path("beta/approve/<str:token>/", views.approve_beta, name="approve_beta"),
     path("beta/wait/", views.beta_wait, name="beta_wait"),
@@ -110,6 +116,7 @@ urlpatterns += [
         views.set_llm_preference,
         name="set_llm_preference",
     ),
+    path("settings/email/", views.set_email_preference, name="set_email_preference"),
     # Investigation URLs
     path(
         "investigation/create/",

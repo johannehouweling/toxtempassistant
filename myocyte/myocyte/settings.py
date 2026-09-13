@@ -83,6 +83,9 @@ CSRF_TRUSTED_ORIGINS = (
     else []
 )
 
+# Base URL for links in emails, which are often built outside a request.
+SITE_URL = os.getenv("SITE_URL", "").strip().rstrip("/")
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -160,6 +163,8 @@ TEMPLATES = [
                 "toxtempass.context_processors.workspaces",
                 # LLM selector + signature pill for the offcanvas
                 "toxtempass.context_processors.llm_info",
+                # Switchable email notifications for the offcanvas
+                "toxtempass.context_processors.email_preferences",
             ],
         },
     },
@@ -380,6 +385,10 @@ MAILERS = {
         },
     },
 }
+# A dev machine with a copy of the production database must not email real users,
+# so DEBUG prints emails to the console unless sending is switched on explicitly.
+if DEBUG and os.getenv("EMAIL_SEND_IN_DEBUG", "false").strip().lower() != "true":
+    MAILERS["default"] = {"BACKEND": "django.core.mail.backends.console.EmailBackend"}
 DEFAULT_FROM_EMAIL = os.getenv(
     "SMTP_FROM_EMAIL", "toxtempassistant@rivm.nl"
 )

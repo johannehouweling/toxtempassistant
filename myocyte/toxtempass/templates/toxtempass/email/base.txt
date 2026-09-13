@@ -1,0 +1,7 @@
+{% autoescape off %}{% block content %}{% endblock %}
+The ToxTempAssistant team
+
+--
+{% if unsubscribe_url %}You get this email because "{{ kind_label }}" is switched on in your email notification settings.
+Unsubscribe from these emails: {{ unsubscribe_url }}{% else %}This is an automated message from ToxTempAssistant{% if site_url %} ({{ site_url }}){% endif %}.{% endif %}
+{% endautoescape %}

@@ -141,6 +141,28 @@ class Person(AbstractUser):
         blank=True,
         help_text="Miscelanous stuff about the user can be stored here",
     )
+    email_confirmed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the user clicked the link in the confirmation email.",
+    )
+    delete_if_unconfirmed = models.BooleanField(
+        default=True,
+        help_text=(
+            "Delete the account when its email address is still unconfirmed a week "
+            "after signup. Off for accounts that existed before email confirmation."
+        ),
+    )
+
+    @property
+    def has_confirmed_email(self) -> bool:
+        """Return whether the user may use features that need a confirmed address.
+
+        Staff and superusers count as confirmed: maintainers create those accounts.
+        """
+        return (
+            self.email_confirmed_at is not None or self.is_staff or self.is_superuser
+        )
 
     @property
     def num_assays(self) -> int:
@@ -930,11 +952,19 @@ class Workspace(AccessibleModel):
         is_new = self.pk is None
         super().save(*args, **kwargs)
         if is_new:
-            WorkspaceMember.objects.create(workspace=self, user=self.owner, role=WorkspaceRole.OWNER)
+            # The owner created the workspace themselves: nothing to notify.
+            WorkspaceMember.objects.create(
+                workspace=self,
+                user=self.owner,
+                role=WorkspaceRole.OWNER,
+                notified_at=timezone.now(),
+            )
 
 
 class WorkspaceMember(models.Model):
-    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name="memberships")
+    workspace = models.ForeignKey(
+        Workspace, on_delete=models.CASCADE, related_name="memberships"
+    )
     user = models.ForeignKey(
         Person, on_delete=models.CASCADE, related_name="workspace_memberships"
     )
@@ -942,6 +972,22 @@ class WorkspaceMember(models.Model):
         max_length=20, choices=WorkspaceRole.choices, default=WorkspaceRole.MEMBER
     )
     joined_at = models.DateTimeField(auto_now_add=True)
+    added_by = models.ForeignKey(
+        Person,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Who added this member; empty for the owner's own membership.",
+    )
+    notified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "When the member was emailed about being added. Set straight away for "
+            "the owner and for memberships from before notifications existed."
+        ),
+    )
 
     class Meta:
         unique_together = ("workspace", "user")
@@ -1134,3 +1180,137 @@ class AssayCost(models.Model):
         if self.cost_input is None and self.cost_output is None:
             return None
         return (self.cost_input or 0) + (self.cost_output or 0)
+
+
+class LLMRun(models.Model):
+    """One LLM generation run, appended when the run ends and never updated.
+
+    ``AssayCost`` keeps one row per assay and model that every regeneration
+    overwrites, so it cannot say what was spent on a given day. This log can: the
+    daily cost alert sums it, and failed runs feed the maintainers' failure alert.
+    """
+
+    class Status(models.TextChoices):
+        DONE = "done", "Done"
+        ERROR = "error", "Error"
+
+    assay = models.ForeignKey(
+        "Assay",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="llm_runs",
+        help_text="Empty once the assay is deleted; the spend record stays.",
+    )
+    user = models.ForeignKey(
+        Person,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="llm_runs",
+        help_text="Who started the run, when known.",
+    )
+    status = models.CharField(max_length=10, choices=Status.choices)
+    model_key = models.CharField(
+        max_length=64, blank=True, default="", help_text='Deployment key, e.g. "1:GPT4O".'
+    )
+    model_id = models.CharField(max_length=128, blank=True, default="")
+    input_tokens = models.PositiveBigIntegerField(default=0)
+    output_tokens = models.PositiveBigIntegerField(default=0)
+    cost = models.DecimalField(
+        max_digits=12,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Input plus output cost; empty when the model has no pricing tags.",
+    )
+    cost_unit = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        help_text='Currency unit from the cost-unit tag at run time, e.g. "Eur".',
+    )
+    error = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "LLM run"
+        verbose_name_plural = "LLM runs"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        """Represent as string."""
+        return f"LLMRun {self.status} assay={self.assay_id} model={self.model_key}"
+
+
+class EmailLog(models.Model):
+    """Every email the app sends, from the moment it is requested.
+
+    The row is the outbox and the audit trail at once: delayed emails wait here
+    until ``send_after``, failed sends are rescheduled here, ``dedup_key`` stops
+    the same email from going out twice, and the admin shows whether someone was
+    emailed. See toxtempass/notifications.py.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SENDING = "sending", "Sending"
+        SENT = "sent", "Sent"
+        MERGED = "merged", "Sent together with another email"
+        SKIPPED = "skipped", "Skipped"
+        FAILED = "failed", "Failed"
+
+    kind = models.CharField(max_length=64, db_index=True)
+    user = models.ForeignKey(
+        Person,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="email_logs",
+        help_text="The recipient's account; empty for maintainer emails.",
+    )
+    recipient = models.CharField(
+        max_length=1000,
+        blank=True,
+        default="",
+        help_text="Address(es) the email went to, comma-separated for maintainer emails.",
+    )
+    subject = models.CharField(max_length=255, blank=True, default="")
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True
+    )
+    payload = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Ids and plain values the email is built from; never tokens.",
+    )
+    dedup_key = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Emails sharing a non-empty key are only sent once.",
+    )
+    send_after = models.DateTimeField(null=True, blank=True, db_index=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    error = models.TextField(
+        blank=True, default="", help_text="Why the email failed or was skipped."
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Email"
+        verbose_name_plural = "Emails"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dedup_key"],
+                condition=~Q(dedup_key=""),
+                name="emaillog_unique_dedup_key",
+            )
+        ]
+
+    def __str__(self) -> str:
+        """Represent as string."""
+        return f"{self.kind} to {self.recipient or '-'} ({self.status})"

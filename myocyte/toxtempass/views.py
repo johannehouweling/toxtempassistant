@@ -9,6 +9,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from decimal import Decimal
 from functools import cached_property
 from itertools import product
 
@@ -16,9 +17,14 @@ import requests
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.models import User
+from django.contrib.auth.views import (
+    PasswordResetConfirmView as DjangoPasswordResetConfirmView,
+)
 from django.contrib.auth.views import PasswordResetView as DjangoPasswordResetView
 from django.contrib.humanize.templatetags.humanize import naturaltime
+from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.db.models import QuerySet, Sum
 from django.http import (
@@ -35,8 +41,10 @@ from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.html import format_html
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
 from django.views import View
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from django_q.tasks import async_task
 from django_tables2 import SingleTableView
@@ -47,7 +55,7 @@ from openai import BadRequestError, RateLimitError
 from tqdm.auto import tqdm
 
 from myocyte import settings
-from toxtempass import config
+from toxtempass import config, notifications
 from toxtempass import utilities as beta_util
 from toxtempass.azure_registry import get_model as get_azure_model
 from toxtempass.export import export_assay_to_file
@@ -84,6 +92,7 @@ from toxtempass.models import (
     AssayTimeLog,
     Feedback,
     Investigation,
+    LLMRun,
     LLMStatus,
     Person,
     Question,
@@ -268,6 +277,36 @@ def toxtemp_questions(request: HttpRequest) -> HttpResponse:
     return render(request, "toxtemp.html")
 
 
+def _safe_next_url(request: HttpRequest) -> str:
+    """Return the ``next`` URL of a login request if it stays on this site."""
+    target = request.GET.get("next", "")
+    if target and url_has_allowed_host_and_scheme(
+        target, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return target
+    return ""
+
+
+def _rate_limited_json() -> JsonResponse:
+    """Return the error the login and signup forms show when an IP is rate limited."""
+    return JsonResponse(
+        {"success": False, "errors": {"__all__": [config._rate_limited_message]}},
+        status=429,
+    )
+
+
+def _start_new_account(user: Person) -> None:
+    """Record a new signup's beta request and email them the confirmation link.
+
+    Maintainers see the request in their daily digest once the address is confirmed.
+    """
+    try:
+        beta_util.set_beta_requested(user)
+    except Exception:
+        logger.exception("Failed to record the beta request of user %s", user.pk)
+    notifications.send_email_confirmation(user)
+
+
 class LoginView(View):
     """View to handle user login via GET and POST methods."""
 
@@ -279,7 +318,13 @@ class LoginView(View):
         return render(request, "login.html", {"form": form})
 
     def post(self, request: HttpRequest) -> JsonResponse:
-        """Process login form submission and authenticate user."""
+        """Process login form submission and authenticate user.
+
+        After a successful login the page goes to ``next`` when that stays on this
+        site, e.g. back to an approve link from the beta digest.
+        """
+        if beta_util.is_rate_limited(request, "login"):
+            return _rate_limited_json()
         form = LoginForm(request.POST)
         if form.is_valid():
             username = form.cleaned_data.get("username")
@@ -305,7 +350,7 @@ class LoginView(View):
                     {
                         "success": True,
                         "errors": form.errors,
-                        "redirect_url": reverse("overview"),
+                        "redirect_url": _safe_next_url(request) or reverse("overview"),
                     }
                 )
             else:
@@ -324,21 +369,14 @@ def signup(request: HttpRequest) -> HttpResponse | JsonResponse:
         return redirect(reverse("overview"))
 
     if request.method == "POST":
+        if beta_util.is_rate_limited(request, "signup"):
+            return _rate_limited_json()
         form = SignupForm(request.POST)
         if form.is_valid():
-            # Create the user but ensure the ORCID id is set from the session.
             user = form.save(commit=False)
             user.save()
             login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-            # Mark the user as having requested beta and enqueue notification to mntnr.
-            try:
-                async_task("toxtempass.tasks.send_beta_signup_notification", user.id)
-                beta_util.set_beta_requested(user)
-            except Exception:
-                logger.exception(
-                    "Failed to record/queue beta signup notification for user %s",
-                    getattr(user, "id", None),
-                )
+            _start_new_account(user)
             return JsonResponse(
                 dict(
                     success=True,
@@ -505,14 +543,16 @@ def ror_organization_lookup(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"items": suggestions})
 
 
+@login_required(login_url="/login/")
 def approve_beta(request: HttpRequest, token: str) -> HttpResponse:
-    """One-click approval endpoint reached from the emailed link.
+    """Approval endpoint reached from the link in the maintainers' beta digest.
 
-    Verifies the signed token and, on success, admits the associated Person to
-    the beta program. Sends an approval email to the person and returns a
-    confirmation page. On failure returns an appropriate HTTP error.
+    Needs a staff login, so a forwarded or leaked digest cannot admit anyone.
+    Verifies the signed token and admits the associated Person, which emails them
+    (see utilities.set_beta_admitted). On failure returns an HTTP error.
     """
-    from toxtempass import utilities as beta_util  # local import to avoid cycles
+    if not request.user.is_staff:
+        raise PermissionDenied("Only staff can approve beta requests.")
 
     payload = beta_util.verify_beta_token(token)
     if not payload or "person_id" not in payload:
@@ -525,37 +565,19 @@ def approve_beta(request: HttpRequest, token: str) -> HttpResponse:
         return HttpResponse("Person not found for provided token.", status=404)
 
     try:
-        beta_util.set_beta_admitted(person, True, comment="Approved via email link")
+        emailed = beta_util.set_beta_admitted(
+            person, True, comment=f"Approved via email link by {request.user.email}"
+        )
     except Exception:
         logger.exception("Failed to set beta admitted flag for person %s", person_id)
         return HttpResponse("Failed to admit user; contact maintainer.", status=500)
-
-    # Send approval email to the user (best-effort; do not fail the request if email fails).
-    # Use django-q async_task directly to ensure the job is scheduled consistently.
-    try:
-        recipient = getattr(person, "email", None)
-        if recipient:
-            task_id = async_task(
-                "toxtempass.tasks.send_email_task",
-                to=[recipient],
-                subject="[ToxTempAssistant] Beta access approved",
-                template_text="toxtempass/email/beta_approved_email.txt",
-                template_html="toxtempass/email/beta_approved_email.html",
-                context={
-                    "person": person,
-                    "login_url": request.build_absolute_uri(reverse("login")),
-                },
-                group="emails",
-            )
-            logger.info("Queued approval email task %s for person %s", task_id, person_id)
-    except Exception:
-        logger.exception("Failed to queue approval email for person %s", person_id)
 
     return render(
         request,
         "toxtempass/email/beta_approved.html",
         {
             "person": person,
+            "emailed": emailed,
             "toggle_beta_users_url": request.build_absolute_uri(
                 reverse("admin_beta_user_list")
             ),
@@ -571,6 +593,83 @@ def beta_wait(request: HttpRequest) -> HttpResponse:
     if is_beta_admitted(request.user):
         return redirect(reverse("overview"))
     return render(request, "toxtempass/beta_wait.html")
+
+
+@require_GET
+def confirm_email(request: HttpRequest, token: str) -> HttpResponse:
+    """Confirm the address a confirmation link was issued for.
+
+    Following the link again is harmless: it shows the address as already confirmed.
+    """
+    person = beta_util.verify_email_confirmation_token(token)
+    if person is None:
+        return render(
+            request,
+            "toxtempass/email_confirmation.html",
+            {"status": "invalid"},
+            status=400,
+        )
+    status = "already"
+    if person.email_confirmed_at is None:
+        person.email_confirmed_at = timezone.now()
+        person.save(update_fields=["email_confirmed_at"])
+        status = "confirmed"
+    return render(
+        request,
+        "toxtempass/email_confirmation.html",
+        {"status": status, "email": person.email},
+    )
+
+
+@login_required(login_url="/login/")
+@require_POST
+def resend_confirmation_email(request: HttpRequest) -> JsonResponse:
+    """Send the signed-in user a new confirmation link, within the resend limits."""
+    user = request.user
+    if user.has_confirmed_email:
+        return JsonResponse(
+            {"success": True, "message": "Your email address is already confirmed."}
+        )
+    if beta_util.is_rate_limited(request, "confirmation_resend"):
+        return JsonResponse(
+            {"success": False, "error": config._rate_limited_message}, status=429
+        )
+    wait_seconds = notifications.confirmation_resend_wait_seconds(user)
+    if wait_seconds > 0:
+        wait = _format_wait_duration(wait_seconds)
+        return JsonResponse(
+            {
+                "success": False,
+                "error": f"We recently sent you a link. Please wait {wait} before "
+                "asking for another one.",
+            },
+            status=429,
+        )
+    notifications.send_email_confirmation(user)
+    return JsonResponse(
+        {"success": True, "message": f"We sent a new link to {user.email}."}
+    )
+
+
+@csrf_exempt
+def unsubscribe(request: HttpRequest, token: str) -> HttpResponse:
+    """Switch off one kind of email, from the link in such an email.
+
+    GET only asks for confirmation, because mail scanners follow links. POST
+    unsubscribes. It is CSRF-exempt because mail clients send the RFC 8058
+    one-click POST themselves; the signed token is what authorises it.
+    """
+    template = "toxtempass/unsubscribe.html"
+    verified = beta_util.verify_unsubscribe_token(token)
+    kind = notifications.KINDS.get(verified[1]) if verified else None
+    if kind is None or not kind.optional:
+        return render(request, template, {"status": "invalid"}, status=400)
+    person = verified[0]
+    context = {"email": person.email, "label": kind.label}
+    if request.method == "POST":
+        notifications.set_email_enabled(person, kind.key, enabled=False)
+        return render(request, template, {**context, "status": "done"})
+    return render(request, template, {**context, "status": "confirm"})
 
 
 # --- Password reset ----------------------------------------------------------
@@ -611,6 +710,9 @@ class PasswordResetRequestView(DjangoPasswordResetView):
 
     def form_valid(self, form):
         """Check rate-limiting before sending the reset email."""
+        if beta_util.is_rate_limited(self.request, "password_reset"):
+            form.add_error(None, config._rate_limited_message)
+            return self.form_invalid(form)
         email = form.cleaned_data.get("email", "").strip().lower()
         try:
             user = Person.objects.get(email__iexact=email)
@@ -630,6 +732,27 @@ class PasswordResetRequestView(DjangoPasswordResetView):
 
         record_password_reset_attempt(user)
         return super().form_valid(form)
+
+
+class PasswordResetConfirmView(DjangoPasswordResetConfirmView):
+    """Set a new password from the emailed link, then tell the user it changed.
+
+    Following the link also proves the user owns the address, so an unconfirmed
+    address counts as confirmed from here on.
+    """
+
+    template_name = "toxtempass/password_reset_confirm.html"
+    success_url = reverse_lazy("password_reset_complete")
+
+    def form_valid(self, form: SetPasswordForm) -> HttpResponse:
+        """Save the password, confirm the address and send the security notice."""
+        response = super().form_valid(form)
+        user = form.user
+        if user.email_confirmed_at is None:
+            user.email_confirmed_at = timezone.now()
+            user.save(update_fields=["email_confirmed_at"])
+        notifications.queue_email(notifications.PASSWORD_CHANGED, user=user)
+        return response
 
 
 @method_decorator(user_passes_test(is_admin, login_url="/login/"), name="dispatch")
@@ -872,6 +995,8 @@ def orcid_signup(request: HttpRequest) -> HttpResponse | JsonResponse:
         )
 
     if request.method == "POST":
+        if beta_util.is_rate_limited(request, "signup"):
+            return _rate_limited_json()
         form = SignupFormOrcid(request.POST)
         if form.is_valid():
             # Create the user but ensure the ORCID id is set from the session.
@@ -879,17 +1004,7 @@ def orcid_signup(request: HttpRequest) -> HttpResponse | JsonResponse:
             user.orcid_id = orcid_id
             user.save()
             login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-            # Record beta request and enqueue notification to maintainer.
-            try:
-                from toxtempass import utilities as beta_util  # type: ignore
-
-                async_task("toxtempass.tasks.send_beta_signup_notification", user.id)
-                beta_util.set_beta_requested(user)
-            except Exception:
-                logger.exception(
-                    "Failed to record/queue beta signup notification for ORCID user %s",
-                    getattr(user, "id", None),
-                )
+            _start_new_account(user)
             # Optionally, clear the ORCID data from the session.
             request.session.pop("orcid_id", None)
             request.session.pop("orcid_token_data", None)
@@ -1342,21 +1457,13 @@ def generate_answer(
             return ans.id, "", 0, 0
 
 
-def _save_assay_cost(
-    assay_id: int,
-    model_key: str,
-    input_tokens: int,
-    output_tokens: int,
-) -> None:
-    """Persist (or update) an ``AssayCost`` row for a completed LLM run.
+def _llm_cost_rates(model_key: str) -> tuple[str, Decimal | None, Decimal | None, str]:
+    """Return ``(model_id, input price, output price, cost unit)`` for a deployment.
 
-    Looks up cost-per-million-token rates from the Azure registry and
-    calculates the estimated costs.  Cost fields are left ``None``
-    when the model has no pricing tags configured.  The ``cost_unit``
-    field stores the currency code from the ``cost-unit`` tag (e.g. ``Eur``).
+    Prices are per million tokens, from the Azure registry tags, and ``None``
+    when the model has no pricing tags configured. The unit is the ``cost-unit``
+    tag (e.g. ``Eur``).
     """
-    from decimal import Decimal
-
     from toxtempass.azure_registry import get_model as get_azure_model_entry
 
     cost_input_per_1m = None
@@ -1379,14 +1486,57 @@ def _save_assay_cost(
                 cost_output_per_1m = Decimal(str(cop))
     except Exception as exc:
         logger.warning("Could not resolve cost rates for model %r: %s", model_key, exc)
+    return model_id, cost_input_per_1m, cost_output_per_1m, cost_unit
 
-    cost_input = None
-    cost_output = None
-    if cost_input_per_1m is not None:
-        cost_input = cost_input_per_1m * Decimal(input_tokens) / Decimal("1000000")
-    if cost_output_per_1m is not None:
-        cost_output = cost_output_per_1m * Decimal(output_tokens) / Decimal("1000000")
 
+def _token_cost(price_per_1m: Decimal | None, tokens: int) -> Decimal | None:
+    """Return the cost of ``tokens`` at a per-million price, or None without a price."""
+    if price_per_1m is None:
+        return None
+    return price_per_1m * Decimal(tokens) / Decimal("1000000")
+
+
+def _run_cost(cost_input: Decimal | None, cost_output: Decimal | None) -> Decimal | None:
+    """Return input plus output cost, or None when neither is priced."""
+    if cost_input is None and cost_output is None:
+        return None
+    return (cost_input or 0) + (cost_output or 0)
+
+
+def _save_assay_cost(
+    assay_id: int,
+    model_key: str,
+    input_tokens: int,
+    output_tokens: int,
+    user_id: int | None = None,
+) -> None:
+    """Persist (or update) an ``AssayCost`` row for a completed LLM run.
+
+    Looks up cost-per-million-token rates from the Azure registry and
+    calculates the estimated costs.  Cost fields are left ``None``
+    when the model has no pricing tags configured.  The ``cost_unit``
+    field stores the currency code from the ``cost-unit`` tag (e.g. ``Eur``).
+
+    Also appends an ``LLMRun``: ``AssayCost`` is overwritten by the next run,
+    the run log is what the daily cost alert sums.
+    """
+    model_id, cost_input_per_1m, cost_output_per_1m, cost_unit = _llm_cost_rates(
+        model_key
+    )
+    cost_input = _token_cost(cost_input_per_1m, input_tokens)
+    cost_output = _token_cost(cost_output_per_1m, output_tokens)
+
+    LLMRun.objects.create(
+        assay_id=assay_id,
+        user_id=user_id,
+        status=LLMRun.Status.DONE,
+        model_key=model_key,
+        model_id=model_id,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost=_run_cost(cost_input, cost_output),
+        cost_unit=cost_unit,
+    )
     AssayCost.objects.update_or_create(
         assay_id=assay_id,
         model_key=model_key,
@@ -1411,6 +1561,44 @@ def _save_assay_cost(
         cost_input,
         cost_output,
         cost_unit,
+    )
+
+
+def _record_failed_llm_run(
+    assay_id: int,
+    user_id: int | None,
+    model_key: str,
+    input_tokens: int,
+    output_tokens: int,
+    error: str,
+) -> None:
+    """Append an ``LLMRun`` for a run that ended in an error.
+
+    Feeds the maintainers' failure alert, and counts towards the daily spend:
+    tokens used before the error are paid for too.
+    """
+    cost = None
+    model_id, cost_unit = "", ""
+    if ":" in model_key:
+        model_id, cost_input_per_1m, cost_output_per_1m, cost_unit = _llm_cost_rates(
+            model_key
+        )
+        cost = _run_cost(
+            _token_cost(cost_input_per_1m, input_tokens),
+            _token_cost(cost_output_per_1m, output_tokens),
+        )
+    LLMRun.objects.create(
+        # The run may have failed because the assay was deleted.
+        assay_id=assay_id if Assay.objects.filter(pk=assay_id).exists() else None,
+        user_id=user_id,
+        status=LLMRun.Status.ERROR,
+        model_key=model_key,
+        model_id=model_id,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost=cost,
+        cost_unit=cost_unit,
+        error=error[:2000],
     )
 
 
@@ -1439,6 +1627,9 @@ def process_llm_async(
     several large-context requests fire at once.
     """
     pool_workers = max_workers or config.max_workers_threading
+    # Set before the try, so a fatal error can still record what the run used.
+    total_input_tokens = 0
+    total_output_tokens = 0
     try:
         try:
             assay = Assay.objects.get(pk=assay_id)
@@ -1724,6 +1915,7 @@ def process_llm_async(
                     model_key=llm_model,
                     input_tokens=total_input_tokens,
                     output_tokens=total_output_tokens,
+                    user_id=user_id,
                 )
             except Exception as exc:
                 logger.warning(
@@ -1735,6 +1927,17 @@ def process_llm_async(
 
     except Exception as e:
         logger.exception(f"Fatal error in process_llm_async: {e}")
+        try:
+            _record_failed_llm_run(
+                assay_id,
+                user_id,
+                llm_model or "",
+                total_input_tokens,
+                total_output_tokens,
+                f"{type(e).__name__}: {e}",
+            )
+        except Exception:
+            logger.exception("Could not record the failed LLM run for assay %s", assay_id)
         # Check if assay exists before updating status and context
         try:
             assay.status = LLMStatus.ERROR
@@ -1991,6 +2194,17 @@ def new_form_view(request: HttpRequest) -> HttpResponse | JsonResponse:
                 )
 
             files = request.FILES.getlist("files")
+            # Files mean an LLM draft; that needs a confirmed email address.
+            if files and not request.user.has_confirmed_email:
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "errors": {
+                            "__all__": [config._email_confirmation_required_message]
+                        },
+                    },
+                    status=403,
+                )
             consent_file_storage = form.cleaned_data.get("consent_file_storage", False)
             answers_exist = assay.answers.exists()
 
@@ -2923,3 +3137,20 @@ def set_llm_preference(request: HttpRequest) -> JsonResponse:
             },
         }
     )
+
+
+@login_required(login_url="/login/")
+@require_POST
+def set_email_preference(request: HttpRequest) -> JsonResponse:
+    """Switch one optional kind of email on or off for the signed-in user.
+
+    POST body: ``kind=<email kind>`` and ``enabled=1`` or ``0``.
+    """
+    kind = request.POST.get("kind", "")
+    if kind not in notifications.OPTIONAL_KINDS:
+        return JsonResponse(
+            {"success": False, "error": "Unknown email setting"}, status=400
+        )
+    enabled = request.POST.get("enabled", "") in ("1", "true", "on")
+    notifications.set_email_enabled(request.user, kind, enabled)
+    return JsonResponse({"success": True, "kind": kind, "enabled": enabled})

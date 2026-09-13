@@ -6,7 +6,7 @@
     <div class="card-body">
       <h3 class="card-title">Beta access granted</h3>
       <p class="card-text">
-        {{ person.get_full_name }} has been admitted to the beta program. They will receive an email notification shortly.
+        {% if emailed %}{{ person.get_full_name|default:person.email }} has been admitted to the beta program and emailed about it.{% else %}{{ person.get_full_name|default:person.email }} was already admitted, so no email was sent.{% endif %}
       </p>
       <p>
       <a href="{{ toggle_beta_users_url }}" style="display:inline-block;padding:10px 14px;background:#0d6efd;color:#fff;text-decoration:none;border-radius:4px;">

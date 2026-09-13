@@ -1,0 +1,9 @@
+{% extends "toxtempass/email/base.txt" %}{% block content %}These people confirmed their email address and are waiting for beta access. Approving asks you to sign in as staff; the person is then emailed automatically.
+{% for request in requests %}
+- {{ request.name }} <{{ request.email }}>{% if request.organization %}, {{ request.organization }}{% endif %}{% if request.requested_at %}, requested {{ request.requested_at|date:"j M Y, H:i" }} UTC{% endif %}
+  Approve: {{ request.approve_url }}
+{% endfor %}
+Approve links work for 30 days. To leave a request open, do nothing; it appears again in tomorrow's digest.
+
+Manage all beta users: {{ manage_url }}
+{% endblock %}

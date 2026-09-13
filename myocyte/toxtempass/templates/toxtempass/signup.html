@@ -25,7 +25,9 @@
     <form method="post" action="{{action}}" novalidate>
       <div id="non-field-errors"></div>
       {% csrf_token %}
-      {% bootstrap_form form %}
+      {% bootstrap_form form exclude="website" %}
+      {# Honeypot: hidden from people, filled in by bots. See SignupFormOrcid.clean. #}
+      <div class="d-none" aria-hidden="true">{% bootstrap_field form.website %}</div>
       <datalist id="ror-organization-suggestions"></datalist>
       <button type="submit" class="btn w-100 btn-primary">Sign Up</button>
     </form>

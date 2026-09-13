@@ -1,0 +1,30 @@
+{% extends "toxtempass/email/base.html" %}
+{% block title %}Background failures{% endblock %}
+{% block heading %}Background failures{% endblock %}
+{% block content %}
+<p style="margin:0 0 12px 0;">
+  Since {{ since }} (Amsterdam time): {{ email_count }} failed email{{ email_count|pluralize }},
+  {{ run_count }} failed LLM draft{{ run_count|pluralize }} and {{ task_count }} failed
+  background task{{ task_count|pluralize }}. The most recent ones are listed below; full
+  tracebacks are in logs/django-errors.log.
+</p>
+{% if emails %}
+<p style="margin:12px 0 4px 0;"><strong>Emails</strong></p>
+<ul style="margin:0;padding-left:20px;font-size:14px;">
+  {% for email in emails %}<li>{{ email.kind }} to {{ email.recipient }}: {{ email.error }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% if runs %}
+<p style="margin:12px 0 4px 0;"><strong>LLM drafts</strong></p>
+<ul style="margin:0;padding-left:20px;font-size:14px;">
+  {% for run in runs %}<li>Assay {{ run.assay_id|default:"(deleted)" }}{% if run.user %} by {{ run.user }}{% endif %}{% if run.model %}, {{ run.model }}{% endif %}: {{ run.error }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% if tasks %}
+<p style="margin:12px 0 4px 0;"><strong>Background tasks</strong></p>
+<ul style="margin:0;padding-left:20px;font-size:14px;">
+  {% for task in tasks %}<li>{{ task.func }} ({{ task.name }}): {{ task.error }}</li>{% endfor %}
+</ul>
+{% endif %}
+<p style="margin:12px 0 0 0;color:#475569;">You get at most one of these alerts per hour.</p>
+{% endblock %}

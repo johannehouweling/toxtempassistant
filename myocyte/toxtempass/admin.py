@@ -9,6 +9,7 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
+from toxtempass import notifications
 from toxtempass.azure_registry import (
     all_model_choices,
     badge_color,
@@ -23,9 +24,11 @@ from toxtempass.models import (
     Assay,
     AssayCost,
     DemoAssay,
+    EmailLog,
     Feedback,
     Investigation,
     LLMConfig,
+    LLMRun,
     Person,
     Question,
     QuestionSet,
@@ -50,7 +53,13 @@ logger = logging.getLogger(__name__)
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
     list_display = (
-        "first_name", "last_name", "email", "orcid_id", "organization", "ror_name"
+        "first_name",
+        "last_name",
+        "email",
+        "email_confirmed_at",
+        "orcid_id",
+        "organization",
+        "ror_name",
     )
     search_fields = ("first_name", "last_name", "email", "orcid_id")
     readonly_fields = ("ror_id", "ror_name", "ror_checked_organization")
@@ -829,6 +838,9 @@ class WorkspaceAdmin(admin.ModelAdmin):
                     f"another workspace kept theirs.",
                 )
             else:  # WorkspaceMember
+                notifications.notify_access_lost(
+                    obj, actor=request.user, reason=notifications.REASON_REMOVED
+                )
                 revoked = revoke_shared_investigations_from_member(workspace, obj.user)
                 obj.delete()
                 messages.info(
@@ -843,6 +855,8 @@ class WorkspaceAdmin(admin.ModelAdmin):
             is_new = obj.pk is None
             if isinstance(obj, WorkspaceInvestigation) and obj.added_by_id is None:
                 obj.added_by = request.user
+            if isinstance(obj, WorkspaceMember) and is_new and obj.added_by_id is None:
+                obj.added_by = request.user
             obj.save()
             if not is_new:
                 continue
@@ -855,6 +869,7 @@ class WorkspaceAdmin(admin.ModelAdmin):
                 )
             else:  # WorkspaceMember
                 granted = grant_shared_investigations_to_member(workspace, obj.user)
+                notifications.notify_member_added(obj, request.user)
                 messages.success(
                     request,
                     f"Added {obj.user} and granted {granted} investigation "
@@ -864,14 +879,23 @@ class WorkspaceAdmin(admin.ModelAdmin):
 
     def delete_model(self, request: HttpRequest, obj: Workspace) -> None:
         """Revoke every workspace-derived perm before the cascade removes the rows."""
+        self._notify_members(request, obj)
         self._revoke_all(obj)
         super().delete_model(request, obj)
 
     def delete_queryset(self, request: HttpRequest, queryset: QuerySet) -> None:
         """Bulk delete bypasses delete_model, so repeat the cleanup here."""
         for workspace in queryset:
+            self._notify_members(request, workspace)
             self._revoke_all(workspace)
         super().delete_queryset(request, queryset)
+
+    @staticmethod
+    def _notify_members(request: HttpRequest, workspace: Workspace) -> None:
+        for member in workspace.memberships.select_related("user", "workspace"):
+            notifications.notify_access_lost(
+                member, actor=request.user, reason=notifications.REASON_DELETED
+            )
 
     @staticmethod
     def _revoke_all(workspace: Workspace) -> None:
@@ -942,15 +966,21 @@ class WorkspaceMemberAdmin(admin.ModelAdmin):
     ) -> None:
         """Add the member, then grant everything already shared here."""
         is_new = obj.pk is None
+        if is_new and obj.added_by_id is None:
+            obj.added_by = request.user
         super().save_model(request, obj, form, change)
         if is_new:
             granted = grant_shared_investigations_to_member(obj.workspace, obj.user)
+            notifications.notify_member_added(obj, request.user)
             messages.success(
                 request, f"Granted {granted} investigation permission(s)."
             )
 
     def delete_model(self, request: HttpRequest, obj: WorkspaceMember) -> None:
         """Revoke the member's workspace-derived perms, then remove them."""
+        notifications.notify_access_lost(
+            obj, actor=request.user, reason=notifications.REASON_REMOVED
+        )
         revoked = revoke_shared_investigations_from_member(obj.workspace, obj.user)
         super().delete_model(request, obj)
         messages.info(request, f"Revoked {revoked} investigation permission(s).")
@@ -958,5 +988,45 @@ class WorkspaceMemberAdmin(admin.ModelAdmin):
     def delete_queryset(self, request: HttpRequest, queryset: QuerySet) -> None:
         """Bulk delete bypasses delete_model; repeat the cleanup here."""
         for member in queryset:
+            notifications.notify_access_lost(
+                member, actor=request.user, reason=notifications.REASON_REMOVED
+            )
             revoke_shared_investigations_from_member(member.workspace, member.user)
         super().delete_queryset(request, queryset)
+
+
+# ── Emails and LLM runs ───────────────────────────────────────────────────────
+# Written by toxtempass/notifications.py and process_llm_async; read-only here.
+
+
+@admin.register(EmailLog)
+class EmailLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "kind", "recipient", "status", "attempts", "sent_at")
+    list_filter = ("status", "kind")
+    search_fields = ("recipient", "subject", "dedup_key")
+    readonly_fields = [field.name for field in EmailLog._meta.fields]
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Refuse adding emails by hand; only the app creates them."""
+        return False
+
+
+@admin.register(LLMRun)
+class LLMRunAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "status",
+        "user",
+        "model_key",
+        "input_tokens",
+        "output_tokens",
+        "cost",
+        "cost_unit",
+    )
+    list_filter = ("status", "model_key")
+    search_fields = ("user__email", "model_key", "model_id")
+    readonly_fields = [field.name for field in LLMRun._meta.fields]
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Refuse adding runs by hand; only the app records them."""
+        return False
