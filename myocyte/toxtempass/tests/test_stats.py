@@ -148,22 +148,24 @@ class StatsAggregationTests(TestCase):
         self.assertNotIn(copy.pk, pks)
         self.assertIn(self.done.pk, pks)
 
-    def test_staff_created_toxtemp_is_excluded(self):
-        staff = AdminFactory.create(email="staff.creator@example.org")
-        by_staff = _assay_for(self.user, created_by=staff)
-        pks = set(real_assays().values_list("pk", flat=True))
-        self.assertNotIn(by_staff.pk, pks)
-        # No recorded creator is not a reason to drop a ToxTemp.
-        self.assertIsNone(self.done.created_by_id)
-        self.assertIn(self.done.pk, pks)
-
-    def test_toxtemp_in_staff_owned_investigation_is_excluded(self):
+    def test_staff_toxtemps_count_but_staff_are_not_users(self):
         staff = AdminFactory.create(email="staff.owner@example.org")
+        by_staff = _assay_for(self.user, created_by=staff)
         in_staff_investigation = _assay_for(staff, created_by=self.user)
-        self.assertNotIn(
-            in_staff_investigation.pk, set(real_assays().values_list("pk", flat=True))
-        )
+        staff_own = _assay_for(staff, created_by=staff)
+        legacy = _assay_for(staff)  # no recorded creator, as before created_by
+        pks = set(real_assays().values_list("pk", flat=True))
+        for assay in (by_staff, in_staff_investigation, staff_own, legacy):
+            self.assertIn(assay.pk, pks)
         self.assertNotIn(staff.pk, set(people().values_list("pk", flat=True)))
+
+    def test_staff_demo_toxtemps_are_still_excluded(self):
+        staff = AdminFactory.create(email="staff.demo@example.org")
+        template = _assay_for(staff, created_by=staff, demo_template=True)
+        copy = _assay_for(staff, demo_lock=True, demo_source=template)
+        pks = set(real_assays().values_list("pk", flat=True))
+        self.assertNotIn(template.pk, pks)
+        self.assertNotIn(copy.pk, pks)
 
     def test_synthetic_account_and_its_toxtemps_are_excluded(self):
         synthetic = PersonFactory.create(organization="Evaluation Harness")
@@ -638,10 +640,11 @@ class StatsAggregationTests(TestCase):
         FileAssetFactory.create(uploaded_by=self.user, size_bytes=1_048_576)
         FileAssetFactory.create(uploaded_by=staff, size_bytes=1_048_576)
         # Uploaded by a counted user, but into a ToxTemp that does not count.
-        in_staff_investigation = _assay_for(staff, created_by=self.user)
+        synthetic = PersonFactory.create()
+        in_synthetic_investigation = _assay_for(synthetic, created_by=self.user)
         linked = FileAssetFactory.create(uploaded_by=self.user, size_bytes=1_048_576)
         answer = AnswerFactory.create(
-            assay=in_staff_investigation, question=self.question
+            assay=in_synthetic_investigation, question=self.question
         )
         AnswerFile.objects.create(answer=answer, file=linked)
 
