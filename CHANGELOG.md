@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v3.40.0 (2026-09-13)
+
+### Features
+
+- **accounts**: Match organisations to the ROR registry
+  ([`e631a28`](https://github.com/johannehouweling/toxtempassistant/commit/e631a28c47e265bcccc791d8b8e1dd4a17f489db))
+
+- **stats**: Make every /stats figure match what it counts
+  ([`fe021ed`](https://github.com/johannehouweling/toxtempassistant/commit/fe021ed76b0eb8515dd2693abfc684e643a1bee3))
+
+
 ## v3.39.0 (2026-09-12)
 
 ### Bug Fixes
