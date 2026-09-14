@@ -1,10 +1,12 @@
 {# Account tab: deleting the account. Loaded when the section opens; see user_offcanvas.html. #}
 <div class="mb-3">
-    <a class="btn btn-sm btn-outline-secondary" href="{% url 'account_export' %}">
-        <i class="bi bi-download me-1"></i>Download all your ToxTemps
-    </a>
+    <div class="d-grid">
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'account_export' %}">
+            <i class="bi bi-download me-1"></i>Download all your ToxTemps
+        </a>
+    </div>
     <div class="form-text">
-        A ZIP file with the {{ assay_count }} ToxTemp{{ assay_count|pluralize }} you can open, as JSON and Markdown. Download it before you delete your account.
+        A ZIP file with the {{ assay_count }} ToxTemp{{ assay_count|pluralize }} you can open, as JSON and Markdown; the read-only demo is left out. Download it before you delete your account.
     </div>
 </div>
 
@@ -35,15 +37,19 @@
 </ul>
 <p class="small text-muted mb-2">Studies and ToxTemps you created in other people's investigations stay with those investigations.</p>
 <form class="js-delete-account-form" data-url="{% url 'account_delete' %}" novalidate>
-    <label class="form-label small mb-1" for="account-delete-password">Current password</label>
-    <input type="password" class="form-control form-control-sm mb-2" id="account-delete-password" name="password" autocomplete="current-password" required>
+    <div class="form-floating mb-2">
+        <input type="password" class="form-control" id="account-delete-password" name="password" placeholder="Current password" autocomplete="current-password" required>
+        <label for="account-delete-password">Current password</label>
+    </div>
     <div class="form-check small mb-2">
         <input class="form-check-input" type="checkbox" id="account-delete-confirm" name="confirm" value="1" required>
         <label class="form-check-label" for="account-delete-confirm">
             I understand that this deletes my account and my data for good. It cannot be undone, and copies in backups are gone within {{ backup_retention_days }} days.
         </label>
     </div>
-    <button type="submit" class="btn btn-sm btn-danger">Delete my account</button>
+    <div class="d-grid">
+        <button type="submit" class="btn btn-sm btn-danger">Delete my account</button>
+    </div>
     <div class="small mt-2 js-form-result" hidden></div>
 </form>
 {% endif %}

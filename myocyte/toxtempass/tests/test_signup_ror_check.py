@@ -1,4 +1,4 @@
-"""Signup pushes back when the organization matches no ROR record."""
+"""Signup and the Account tab push back when an organization matches no ROR record."""
 
 from unittest.mock import Mock, patch
 
@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from toxtempass import Config, ror
 from toxtempass.models import Person
+from toxtempass.tests.fixtures.factories import PersonFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -116,3 +117,70 @@ def test_not_in_ror_checkbox_starts_hidden(client):
     content = client.get(reverse("signup")).content.decode()
     assert '<div id="organization-not-in-ror" hidden>' in content
     assert 'name="organization_not_in_ror"' in content
+
+
+# ── Account tab ───────────────────────────────────────────────────────────────
+
+
+def _save_profile(client, **data):
+    return client.post(
+        reverse("account_update_profile"),
+        {"first_name": "Lazy", "last_name": "Person", "organization": "RIVM", **data},
+    )
+
+
+def test_account_tab_checks_a_changed_organization(client):
+    user = PersonFactory(email="lazy.person@rivm.nl", organization="RIVM")
+    client.force_login(user)
+
+    with patch(MATCH, return_value=None), _ror_search("Lab & Co"):
+        refused = _save_profile(client, organization="rivm lab")
+
+    assert refused.status_code == 400
+    # The menu shows messages as text, so nothing is escaped here.
+    assert refused.json()["errors"]["organization"] == [
+        Config.ror_unmatched_organization_message,
+        "Did you mean: Lab & Co (The Netherlands)?",
+    ]
+    user.refresh_from_db()
+    assert user.organization == "RIVM"
+
+    with patch(MATCH) as match:
+        saved = _save_profile(
+            client, organization="rivm lab", organization_not_in_ror="on"
+        )
+
+    assert saved.json()["success"] is True
+    match.assert_not_called()
+    user.refresh_from_db()
+    assert user.organization == "rivm lab"
+
+
+def test_account_tab_stores_a_match_and_reloads_the_menu(client):
+    user = PersonFactory(organization="Old place")
+    client.force_login(user)
+
+    with patch(MATCH, return_value=(RIVM_ID, RIVM_NAME)):
+        response = _save_profile(client, organization="RIVM")
+
+    assert response.json() == {
+        "success": True,
+        "message": "Your details are saved.",
+        "reload": True,
+    }
+    user.refresh_from_db()
+    assert (user.ror_id, user.ror_checked_organization) == (RIVM_ID, "RIVM")
+
+
+def test_account_tab_leaves_an_unchanged_organization_alone(client):
+    user = PersonFactory(organization="Somewhere not in ROR")
+    client.force_login(user)
+
+    with patch(MATCH) as match:
+        response = _save_profile(
+            client, organization="Somewhere not in ROR", first_name="Renamed"
+        )
+
+    assert response.json()["success"] is True
+    assert response.json()["reload"] is False
+    match.assert_not_called()

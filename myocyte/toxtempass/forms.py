@@ -69,7 +69,52 @@ class LoginForm(forms.Form):
         return cleaned_data
 
 
-class SignupFormOrcid(UserCreationForm):
+class OrganizationRorCheckMixin:
+    """Push back when an organization matches no ROR record (signup, Account tab).
+
+    A match is not required, since ROR does not list every institution, but a name
+    typed in a hurry should not slip through. An unmatched name fails validation,
+    listing the closest ROR records for the name and the email domain, until the
+    user corrects it or ticks ``organization_not_in_ror`` (declared by each form).
+    A match is stored on the instance, so saving queues no second lookup. When ROR
+    cannot be reached the form goes ahead unchecked (signals.resolve_ror queues one
+    background lookup on save; nothing retries after that).
+    """
+
+    # The signup page inserts error messages as HTML, so they are escaped.
+    escape_messages = True
+
+    def _check_organization_in_ror(self, cleaned_data: dict, email: str) -> None:
+        """Validate ``cleaned_data["organization"]`` against ROR; see the class doc."""
+        organization = cleaned_data.get("organization")
+        if (
+            not settings.ROR_LOOKUP_ENABLED
+            or not organization
+            or cleaned_data.get("organization_not_in_ror")
+        ):
+            return
+        try:
+            match = ror.match_organization(organization)
+        except ror.RorLookupError as exc:
+            logger.warning("ROR check of an organization failed: %s", exc)
+            return
+        if match is not None:
+            self.instance.ror_id, self.instance.ror_name = match
+            self.instance.ror_checked_organization = organization
+            return
+
+        messages = [config.ror_unmatched_organization_message]
+        suggestions = ror.suggest_organizations(organization, email)
+        if suggestions:
+            shown = suggestions[: config.ror_unmatched_organization_suggestions]
+            labels = [item["label"] for item in shown]
+            if self.escape_messages:
+                labels = [escape(label) for label in labels]
+            messages.append(f"Did you mean: {', '.join(labels)}?")
+        self.add_error("organization", messages)
+
+
+class SignupFormOrcid(OrganizationRorCheckMixin, UserCreationForm):
     # Honeypot: hidden in the signup template, so only bots fill it in.
     website = forms.CharField(
         required=False,
@@ -131,49 +176,8 @@ class SignupFormOrcid(UserCreationForm):
                 "has_accepted_tos",
                 "You must accept the terms of service to continue.",
             )
-        self._check_organization_in_ror(cleaned_data)
+        self._check_organization_in_ror(cleaned_data, cleaned_data.get("email") or "")
         return cleaned_data
-
-    def _check_organization_in_ror(self, cleaned_data: dict) -> None:
-        """Push back when the organization matches no ROR record.
-
-        A match is not required, since ROR does not list every institution, but a
-        name typed in a hurry should not slip through. An unmatched name fails
-        validation, listing the closest ROR records for the name and the email
-        domain, until the user corrects it or ticks ``organization_not_in_ror``.
-        A match is stored on the instance, so saving queues no second lookup. When
-        ROR cannot be reached the signup goes ahead unchecked (signals.resolve_ror
-        queues one background lookup on save; nothing retries after that).
-        """
-        organization = cleaned_data.get("organization")
-        if (
-            not settings.ROR_LOOKUP_ENABLED
-            or not organization
-            or cleaned_data.get("organization_not_in_ror")
-        ):
-            return
-        try:
-            match = ror.match_organization(organization)
-        except ror.RorLookupError as exc:
-            logger.warning("ROR check at signup failed: %s", exc)
-            return
-        if match is not None:
-            self.instance.ror_id, self.instance.ror_name = match
-            self.instance.ror_checked_organization = organization
-            return
-
-        messages = [config.ror_unmatched_organization_message]
-        suggestions = ror.suggest_organizations(
-            organization, cleaned_data.get("email") or ""
-        )
-        if suggestions:
-            # The signup page inserts error messages as HTML.
-            labels = ", ".join(
-                escape(item["label"])
-                for item in suggestions[: config.ror_signup_prompt_suggestions]
-            )
-            messages.append(f"Did you mean: {labels}?")
-        self.add_error("organization", messages)
 
 class SignupForm(SignupFormOrcid):
     class Meta(SignupFormOrcid.Meta):
@@ -182,8 +186,15 @@ class SignupForm(SignupFormOrcid):
         )
 
 
-class ProfileForm(forms.ModelForm):
+class ProfileForm(OrganizationRorCheckMixin, forms.ModelForm):
     """Name and organization, edited in the Account tab of the user menu."""
+
+    # Shown in the Account tab once a new organization matched no ROR record.
+    organization_not_in_ror = forms.BooleanField(
+        required=False, label="My organization is not in ROR"
+    )
+    # The user menu shows messages as text.
+    escape_messages = False
 
     class Meta:
         model = Person
@@ -195,6 +206,14 @@ class ProfileForm(forms.ModelForm):
         if not organization:
             raise forms.ValidationError("Please enter your organization.")
         return organization
+
+    def clean(self) -> dict:
+        """Check a changed organization against ROR; an unchanged one is left alone."""
+        cleaned_data = super().clean()
+        # The instance still holds the saved values until _post_clean.
+        if cleaned_data.get("organization") != self.instance.organization:
+            self._check_organization_in_ror(cleaned_data, self.instance.email)
+        return cleaned_data
 
 
 class EmailChangeForm(forms.Form):

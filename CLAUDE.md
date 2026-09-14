@@ -208,7 +208,7 @@ The user menu has four tabs: Workspaces, Account, Settings (only with a real mod
 
 * **Email changes** keep the current address until the link sent to `Person.pending_email` is followed; the current address gets a notice.
 * **Shared documents.** "Stop sharing" sets `FileAsset.status = withdrawn`. From then on nothing may read the file: every reader of stored files (admin ZIP download, benchmarking, stats) must filter on `status="available"`. After `Config._file_withdrawal_grace_hours` the periodic job deletes it (the `post_delete` signal removes the MinIO object) and writes a `FileWithdrawal` record. Answers are unaffected.
-* **Account deletion** is refused while the user owns a workspace (never delete workspaces on their behalf), is a superuser, or created a question set. `privacy.delete_account` removes owned investigations first (`Investigation.owner` is PROTECT); the unconfirmed-signup cleanup uses the same function. Users can download every ToxTemp they can open (`privacy.export_toxtemps_zip`, JSON and Markdown) before deleting.
+* **Account deletion** is refused while the user owns a workspace (never delete workspaces on their behalf), is a superuser, or created a question set. `privacy.delete_account` removes owned investigations first (`Investigation.owner` is PROTECT); the unconfirmed-signup cleanup uses the same function. Users can download every ToxTemp they can open, except the read-only demo (`privacy.export_toxtemps_zip`, JSON and Markdown), before deleting.
 
 ### File storage
 
