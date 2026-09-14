@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.43.2 (2026-09-14)
+
+### Bug Fixes
+
+- **about**: Move the VHP4Safety link to the footer
+  ([`349995a`](https://github.com/johannehouweling/toxtempassistant/commit/349995a42937dc9b0c158621c5d3a1ee33887124))
+
+
 ## v3.43.1 (2026-09-14)
 
 ### Bug Fixes
