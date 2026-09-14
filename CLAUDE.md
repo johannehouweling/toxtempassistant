@@ -228,6 +228,14 @@ Selectors and help text for the in-app tour live in `Config.user_onboarding_help
 
 `Assay.status_context` accumulates user-visible error/info messages; `utilities.add_status_context()` truncates to `Config.status_error_max_len` while preserving the most recent entry. Full tracebacks go to the rotating file handler at `myocyte/logs/django-errors.log` (volume-mounted; survives container rebuilds). Correlation IDs in `status_context` point back to entries in that log.
 
+### Server housekeeping (disk space)
+
+The legacy server once ran out of disk because nothing cleaned up. Three things keep it in check; keep them working when changing deploys or logging:
+
+* **Images:** after a healthy legacy deploy, `deploy.yml` runs `prune-old-images.sh`, which keeps the deployed tag plus the two newest older versions of each of our images (always at least one, however old) for rollback, then removes dangling images and the build cache.
+* **Container logs:** `docker-compose.yml` caps every service's Docker log (`x-logging`); `docker-stack.yml` resets that for Swarm.
+* **Log files in `myocyte/logs`:** the backup container runs logrotate hourly (`dockerfiles/backup-scheduler/logrotate.conf`) for the gunicorn logs and the backup cron log. `django-errors.log` rotates through Django's `RotatingFileHandler`.
+
 ## Environment variables
 
 Required for any run (see `.env.dummy` for the full list): `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `AWS_*` (MinIO), the `SMTP_*` settings used by Django email, `SITE_URL` (absolute links in emails) and `DJANGO_ADMINS` (maintainer emails). `USE_POSTGRES=true` switches from SQLite to Postgres; if `USE_POSTGRES=true` and `TESTING=true`, `POSTGRES_HOST` must equal `postgres_test_for_django` (settings.py raises otherwise). Azure AI Foundry credentials (`AZURE_E<n>_ENDPOINT`, `AZURE_E<n>_KEY`) are required for non-test runs.

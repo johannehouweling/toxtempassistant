@@ -9,6 +9,8 @@
 #      services don't write to hidrive directly.
 #   3. Traefik ingress + the cluster's `core` overlay network for djangoapp
 #   4. Restart policies for long-running services
+#   5. No log cap: the base compose caps Docker logs for the single legacy host;
+#      the cluster keeps its own logging setup (`logging: !reset null`).
 #
 # Deploy: render with `compose config` (resolves profiles + `!override` here),
 # then pipe to `docker stack deploy`. This base+overlay stack uses Compose-only
@@ -89,6 +91,7 @@ services:
     # entirely from the rendered output. Swarm starts services in parallel
     # anyway, and django_startup.sh waits for postgres on its own.
     depends_on: !reset null
+    logging: !reset null
     networks:
       - db_network
       - data_network
@@ -112,11 +115,13 @@ services:
         - "traefik.docker.network=core"
 
   postgres_for_django:
+    logging: !reset null
     deploy:
       restart_policy:
         condition: on-failure
 
   minio:
+    logging: !reset null
     deploy:
       restart_policy:
         condition: on-failure
@@ -126,10 +131,12 @@ services:
     # blocks on `mc alias set` until minio responds, so it's resilient to
     # being scheduled before minio comes up.
     depends_on: !reset null
+    logging: !reset null
 
   backup:
     # See djangoapp's note about !reset — same reason here.
     depends_on: !reset null
+    logging: !reset null
     # !override drops the host-relative `./backups` and `./myocyte/logs` binds
     # from the base compose; the swarm pins them to the gluster paths instead.
     # docker.sock is no longer needed — backup.sh now reaches postgres and

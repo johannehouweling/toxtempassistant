@@ -6,6 +6,10 @@ set -euo pipefail
 # backup.sh is baked into the image — no longer mounted from the host repo.
 : "${BACKUP_CMD:=/usr/local/bin/backup.sh}"
 : "${CRON_LOG:=/var/log/cron.log}"
+# Log rotation for the shared logs folder (see logrotate.conf); checks hourly and
+# rotates a log once it passes 50 MB.
+: "${LOGROTATE_SCHEDULE:="17 * * * *"}"
+LOGROTATE_CONF=/etc/toxtempassistant-logrotate.conf
 
 if [[ ! -x "$BACKUP_CMD" ]]; then
   echo "ERROR: backup script not executable at: $BACKUP_CMD" >&2
@@ -24,6 +28,8 @@ CRONTAB_FILE=/etc/crontab
 # including bash-generated errors from `${VAR:?msg}` and any external command's
 # stderr the script doesn't wrap itself.
 printf "%s\n" "${BACKUP_SCHEDULE} ${BACKUP_CMD} 2>&1 | ts '[%FT%T%z]' >> ${CRON_LOG}" > "$CRONTAB_FILE"
+# The state file lives next to the logs so it survives a new container.
+printf "%s\n" "${LOGROTATE_SCHEDULE} /usr/sbin/logrotate --state $(dirname "$CRON_LOG")/.logrotate.status ${LOGROTATE_CONF} 2>&1 | ts '[%FT%T%z]' >> ${CRON_LOG}" >> "$CRONTAB_FILE"
 
 echo "Installed cron job:"
 cat "$CRONTAB_FILE"
