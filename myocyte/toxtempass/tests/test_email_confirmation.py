@@ -56,6 +56,24 @@ def test_signup_emails_a_confirmation_link_and_not_the_maintainers(
     assert f"{SITE}/account/confirm-email/" in mail.outbox[0].body
 
 
+def test_confirmation_email_encourages_linking_orcid_only_without_one(
+    django_capture_on_commit_callbacks,
+):
+    without_orcid = _unconfirmed(email="no.orcid@example.org", orcid_id=None)
+    with_orcid = _unconfirmed(
+        email="has.orcid@example.org", orcid_id="0000-0002-1825-0097"
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        notifications.request_email_confirmation(without_orcid)
+        notifications.request_email_confirmation(with_orcid)
+
+    bodies = {message.to[0]: message.body for message in mail.outbox}
+    assert "Do you have an ORCID iD?" in bodies["no.orcid@example.org"]
+    assert f"Sign in at {SITE}/login/" in bodies["no.orcid@example.org"]
+    assert "Do you have an ORCID iD?" not in bodies["has.orcid@example.org"]
+
+
 def test_confirmation_link_confirms_the_address(client):
     user = _unconfirmed()
     token = utilities.generate_email_confirmation_token(user)

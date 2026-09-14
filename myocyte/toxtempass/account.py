@@ -41,22 +41,22 @@ def _form_errors(form: forms.BaseForm) -> JsonResponse:
 @login_required(login_url="/login/")
 @require_POST
 def update_profile(request: HttpRequest) -> JsonResponse:
-    """Save the signed-in user's name and organization.
+    """Save the name and organization the user edited inline in the Account tab.
 
     A changed organization is checked against ROR first, as at signup (see
-    forms.OrganizationRorCheckMixin). After such a change the menu reloads, so it
-    shows the new ROR match.
+    forms.OrganizationRorCheckMixin). The response carries the saved values, so the
+    menu can show them, including the ROR match, without reloading.
     """
     form = ProfileForm(request.POST, instance=request.user)
     if not form.is_valid():
         return _form_errors(form)
-    organization_changed = "organization" in form.changed_data
-    form.save()
+    user = form.save()
     return JsonResponse(
         {
             "success": True,
-            "message": "Your details are saved.",
-            "reload": organization_changed,
+            "name": user.get_full_name(),
+            "organization": user.organization,
+            "ror_name": user.ror_name,
         }
     )
 

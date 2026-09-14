@@ -109,7 +109,7 @@ def test_ror_lookup_returns_suggestions():
     assert payload["items"] == [
         {
             "name": "Leiden University",
-            "label": "Leiden University (Netherlands)",
+            "label": "Leiden University",
             "id": "https://ror.org/027bh9e22",
         }
     ]
@@ -148,7 +148,7 @@ def test_ror_lookup_returns_suggestions_for_v2_payload():
     assert payload["items"] == [
         {
             "name": "Leiden University",
-            "label": "Leiden University (Netherlands)",
+            "label": "Leiden University",
             "id": "https://ror.org/027bh9e22",
         }
     ]
@@ -177,7 +177,7 @@ def test_ror_lookup_returns_suggestions_for_nested_ror_payload():
     assert payload["items"] == [
         {
             "name": "Leiden University",
-            "label": "Leiden University (Netherlands)",
+            "label": "Leiden University",
             "id": "https://ror.org/027bh9e22",
         }
     ]
@@ -347,6 +347,33 @@ def test_ror_lookup_uses_domain_lookup_after_single_keystroke_when_email_given()
     }
 
 
+def test_ror_lookup_shows_company_names_without_their_country():
+    request = RequestFactory().get("/login/signup/ror-organizations/", {"q": "Avient"})
+    mocked_response = _mock_ror_response(
+        _ror_item(
+            ror_id="https://ror.org/05768zd89",
+            display_name="Avient Corporation (United States)",
+            country_name="United States",
+            labels=[("en", "Avient Corporation")],
+        ),
+        # No plain name in ROR: without the country it might not match any more.
+        _ror_item(
+            ror_id="https://ror.org/000000000",
+            display_name="Avient Lab (United States)",
+            country_name="United States",
+        ),
+    )
+
+    with patch("toxtempass.views.requests.get", return_value=mocked_response):
+        response = ror_organization_lookup(request)
+
+    payload = json.loads(response.content.decode("utf-8"))
+    assert [(item["name"], item["label"]) for item in payload["items"]] == [
+        ("Avient Corporation", "Avient Corporation"),
+        ("Avient Lab (United States)", "Avient Lab (United States)"),
+    ]
+
+
 def test_ror_lookup_deduplicates_same_name_without_id():
     request = RequestFactory().get("/login/signup/ror-organizations/", {"q": "Leiden"})
     mocked_response = Mock()
@@ -365,7 +392,7 @@ def test_ror_lookup_deduplicates_same_name_without_id():
     assert payload["items"] == [
         {
             "name": "Leiden University",
-            "label": "Leiden University (Netherlands)",
+            "label": "Leiden University",
             "id": None,
         }
     ]
