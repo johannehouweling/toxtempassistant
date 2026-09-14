@@ -74,3 +74,22 @@ def test_about_page_does_not_publish_the_maintainer_email():
     html = Client().get(reverse("about")).content.decode()
     assert config.maintainer_email not in html
 
+
+@pytest.mark.django_db
+def test_how_to_cite_also_credits_the_toxtemp_authors():
+    """Besides our paper, one short sentence asks to also consider citing ToxTemp."""
+    html = Client().get(reverse("about")).content.decode()
+    section = html.split('id="how-to-cite"', 1)[1].split("</section>", 1)[0]
+    assert f'href="{config.reference_toxtempassistant_paper}"' in section
+    assert f'href="{config.reference_toxtemp}"' in section
+    assert "Please also consider citing" in section
+    assert "ToxTemp (Krebs et al., 2019)</a>" in section
+
+
+@pytest.mark.django_db
+def test_landing_page_citation_request_links_to_how_to_cite():
+    """The request for a citation on the landing page points to the full guidance."""
+    landing = Client().get(reverse("overview")).content.decode()
+    paragraph = landing.split("we would appreciate a citation", 1)[1].split("</p>", 1)[0]
+    assert f'href="{reverse("about")}#how-to-cite">How to cite</a>' in paragraph
+
