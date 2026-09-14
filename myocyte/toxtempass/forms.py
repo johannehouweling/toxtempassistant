@@ -6,17 +6,19 @@ from decimal import Decimal
 from functools import partial
 
 from django import forms
+from django.conf import settings
 from django.contrib.auth.forms import UserCreationForm
 from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 from django.db.models import Sum
 from django.forms import widgets
+from django.utils.html import escape
 from django.utils.safestring import SafeText, mark_safe
 from django_q.tasks import async_task
 from guardian.shortcuts import get_objects_for_user
 
-from toxtempass import config
+from toxtempass import config, ror
 from toxtempass.filehandling import (
     get_text_or_imagebytes_from_django_uploaded_file,
 )
@@ -74,6 +76,10 @@ class SignupFormOrcid(UserCreationForm):
         label="Leave this field empty",
         widget=forms.TextInput(attrs={"autocomplete": "off", "tabindex": "-1"}),
     )
+    # Hidden on the signup page until the organization matched no ROR record.
+    organization_not_in_ror = forms.BooleanField(
+        required=False, label="My organization is not in ROR"
+    )
 
     def __init__(self, *args, **kwargs):
         """Initialize signup form fields."""
@@ -125,7 +131,49 @@ class SignupFormOrcid(UserCreationForm):
                 "has_accepted_tos",
                 "You must accept the terms of service to continue.",
             )
+        self._check_organization_in_ror(cleaned_data)
         return cleaned_data
+
+    def _check_organization_in_ror(self, cleaned_data: dict) -> None:
+        """Push back when the organization matches no ROR record.
+
+        A match is not required, since ROR does not list every institution, but a
+        name typed in a hurry should not slip through. An unmatched name fails
+        validation, listing the closest ROR records for the name and the email
+        domain, until the user corrects it or ticks ``organization_not_in_ror``.
+        A match is stored on the instance, so saving queues no second lookup. When
+        ROR cannot be reached the signup goes ahead unchecked (signals.resolve_ror
+        queues one background lookup on save; nothing retries after that).
+        """
+        organization = cleaned_data.get("organization")
+        if (
+            not settings.ROR_LOOKUP_ENABLED
+            or not organization
+            or cleaned_data.get("organization_not_in_ror")
+        ):
+            return
+        try:
+            match = ror.match_organization(organization)
+        except ror.RorLookupError as exc:
+            logger.warning("ROR check at signup failed: %s", exc)
+            return
+        if match is not None:
+            self.instance.ror_id, self.instance.ror_name = match
+            self.instance.ror_checked_organization = organization
+            return
+
+        messages = [config.ror_unmatched_organization_message]
+        suggestions = ror.suggest_organizations(
+            organization, cleaned_data.get("email") or ""
+        )
+        if suggestions:
+            # The signup page inserts error messages as HTML.
+            labels = ", ".join(
+                escape(item["label"])
+                for item in suggestions[: config.ror_signup_prompt_suggestions]
+            )
+            messages.append(f"Did you mean: {labels}?")
+        self.add_error("organization", messages)
 
 class SignupForm(SignupFormOrcid):
     class Meta(SignupFormOrcid.Meta):

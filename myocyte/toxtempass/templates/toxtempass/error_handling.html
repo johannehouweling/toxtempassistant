@@ -125,6 +125,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     window.location.href = response.redirect_url;
                 } else {
+                    // Let the page react to the errors, e.g. reveal an extra field.
+                    form.dispatchEvent(new CustomEvent('form-errors', { detail: response }));
                     // Handle form errors
                     for (const field in response.errors) {
                         const errors = response.errors[field];

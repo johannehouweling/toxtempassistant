@@ -365,6 +365,16 @@ class Config:
     )
     ror_max_query_length = 120
     ror_max_suggestions = 10
+    # Signup refuses an organization that matches no ROR record until it is corrected
+    # or the user ticks "not in ROR" (see forms.SignupFormOrcid). signup.html shows
+    # that checkbox when this exact message comes back.
+    ror_unmatched_organization_message = (
+        "We could not find this organization in the Research Organization Registry "
+        "(ROR). Please check it: suggestions appear while you type, starting with "
+        "organizations that match your email address. If your organization is not in "
+        "ROR, tick the box below and click Sign Up again."
+    )
+    ror_signup_prompt_suggestions = 3
     # ORCID settings
     _orcid_client_id = os.getenv("ORCID_CLIENT_ID")
     _orcid_client_secret = os.getenv("ORCID_CLIENT_SECRET")
