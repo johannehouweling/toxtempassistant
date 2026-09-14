@@ -46,13 +46,16 @@ def test_about_is_linked_from_landing_page_header_and_sitemap():
 
 
 @pytest.mark.django_db
-def test_about_demo_video_uses_privacy_enhanced_embed_and_video_data():
-    """The YouTube embed sets no tracking cookies and is described as a VideoObject."""
+def test_about_demo_video_is_embedded_from_peertube_with_video_data():
+    """The video comes from PeerTube, not YouTube, and is described as a VideoObject."""
+    embed_url = "https://video.edu.nl/videos/embed/mXiqzVCSYytLb4i2YgT7a6"
     html = Client().get(reverse("about")).content.decode()
-    assert 'src="https://www.youtube-nocookie.com/embed/L1vsox-emrY"' in html
-    assert "https://www.youtube.com/embed/" not in html
+    assert f'src="{embed_url}"' in html
+    assert "youtube.com/embed" not in html
+    assert "youtube-nocookie.com" not in html
     blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
     video = next(json.loads(block) for block in blocks if "VideoObject" in block)
+    assert video["embedUrl"] == embed_url
     assert video["uploadDate"] and video["thumbnailUrl"] and video["duration"]
 
 
@@ -70,3 +73,4 @@ def test_about_page_does_not_publish_the_maintainer_email():
     """The address stays off public pages; logged-in users find it in the user menu."""
     html = Client().get(reverse("about")).content.decode()
     assert config.maintainer_email not in html
+
