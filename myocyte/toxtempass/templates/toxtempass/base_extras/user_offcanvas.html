@@ -12,12 +12,6 @@
                     <i class="bi bi-people me-1"></i>Workspaces
                 </button>
             </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link px-2" id="userMenuAccountTab" data-bs-toggle="tab" data-bs-target="#userMenuAccount" type="button" role="tab" aria-controls="userMenuAccount" aria-selected="false">
-                    <i class="bi bi-person-vcard me-1"></i>Account
-                    {% if not user.has_confirmed_email %}<i class="bi bi-exclamation-circle-fill text-warning ms-1" role="img" aria-label="Email address not confirmed"></i>{% endif %}
-                </button>
-            </li>
             {# Settings only has content with a real model choice, or for staff. #}
             {% if llm_choices|length > 1 or user.is_staff %}
             <li class="nav-item" role="presentation">
@@ -26,6 +20,12 @@
                 </button>
             </li>
             {% endif %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link px-2" id="userMenuAccountTab" data-bs-toggle="tab" data-bs-target="#userMenuAccount" type="button" role="tab" aria-controls="userMenuAccount" aria-selected="false">
+                    <i class="bi bi-person-vcard me-1"></i>Account
+                    {% if not user.has_confirmed_email %}<i class="bi bi-exclamation-circle-fill text-warning ms-1" role="img" aria-label="Email address not confirmed"></i>{% endif %}
+                </button>
+            </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link px-2" id="userMenuPrivacyTab" data-bs-toggle="tab" data-bs-target="#userMenuPrivacy" type="button" role="tab" aria-controls="userMenuPrivacy" aria-selected="false">
                     <i class="bi bi-shield-lock me-1"></i>Privacy

@@ -61,6 +61,18 @@ def test_menu_opens_on_workspaces_and_puts_privacy_in_its_own_tab(client):
     assert "Email notifications" not in account
 
 
+def test_tabs_are_workspaces_settings_account_privacy(client):
+    menu = _menu(client, PersonFactory(is_staff=True))
+    tabs = [
+        "userMenuWorkspacesTab",
+        "userMenuSettingsTab",
+        "userMenuAccountTab",
+        "userMenuPrivacyTab",
+    ]
+    positions = [menu.index(f'id="{tab}"') for tab in tabs]
+    assert positions == sorted(positions)
+
+
 def test_settings_tab_only_appears_when_it_has_something_to_show(client):
     menu = _menu(client, PersonFactory(), models=1)
     assert 'id="userMenuSettingsTab"' not in menu
