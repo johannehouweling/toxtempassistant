@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 from django.urls import reverse
 
+from toxtempass.models import LLMConfig
 from toxtempass.tests.fixtures.factories import PersonFactory
 
 pytestmark = pytest.mark.django_db
@@ -13,8 +14,11 @@ pytestmark = pytest.mark.django_db
 PANES = ("userMenuWorkspaces", "userMenuAccount", "userMenuSettings", "userMenuPrivacy")
 
 
-def _menu(client, user, models=None):
-    """Return the page HTML from the user menu onwards, optionally with fake models."""
+def _menu(client, user, models=None, allowed=None):
+    """Return the page HTML from the user menu onwards, optionally with fake models.
+
+    ``allowed`` lists the fake model numbers the admin ticked; all of them by default.
+    """
     client.force_login(user)
     if models is None:
         html = client.get(reverse("beta_wait")).content.decode()
@@ -30,6 +34,11 @@ def _menu(client, user, models=None):
                 ],
             )
         ]
+        llm_config = LLMConfig.load()
+        llm_config.allowed_models = [
+            f"1:M{i}" for i in (range(models) if allowed is None else allowed)
+        ]
+        llm_config.save()
         with patch("toxtempass.azure_registry.get_registry", return_value=registry):
             html = client.get(reverse("beta_wait")).content.decode()
     return html[html.index('id="offcanvasUser"') :]
@@ -77,6 +86,16 @@ def test_model_choice_only_appears_with_a_real_choice(client, models, shown):
     assert ('id="llm-model-select"' in menu) is shown
     if shown:
         assert 'id="llm-model-select"' in _pane(menu, "userMenuSettings")
+
+
+def test_users_only_get_the_models_the_admin_ticked(client):
+    no_choice = _menu(client, PersonFactory(), models=3, allowed=[])
+    assert 'id="llm-model-select"' not in no_choice
+
+    two_ticked = _menu(client, PersonFactory(), models=3, allowed=[0, 2])
+    assert 'value="1:M0"' in two_ticked
+    assert 'value="1:M1"' not in two_ticked
+    assert 'value="1:M2"' in two_ticked
 
 
 def test_unconfirmed_address_is_flagged_on_the_account_tab(client):

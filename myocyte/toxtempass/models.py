@@ -1086,7 +1086,8 @@ class LLMConfig(models.Model):
         blank=True,
         help_text=(
             'List of "endpoint_index:tag" strings users may choose from. '
-            "Empty list = all discovered models are allowed."
+            "Empty list = users cannot choose and always get the default model "
+            "(superusers can pick any model)."
         ),
     )
     last_health_check = models.JSONField(

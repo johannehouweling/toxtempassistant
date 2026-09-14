@@ -87,7 +87,7 @@ docker compose exec djangoapp python manage.py run_evals --experiment X      # e
 
 `toxtempass.llm.get_llm()` and `resolve_user_llm(user)` resolve which model client to instantiate at request time. The order is:
 
-1. **User preference** — `user.preferences["llm_model"]` (a `"endpoint_index:tag"` string), if still in the admin allowlist and not retired.
+1. **User preference** — `user.preferences["llm_model"]` (a `"endpoint_index:tag"` string), if still in the admin allowlist and not retired. An empty allowlist means users have no choice and get the default; superusers may pick any model.
 2. **Admin default** — `LLMConfig.default_model` (singleton row, pk=1, managed at `/admin/toxtempass/llmconfig/`).
 3. **Env-tagged default** — the Azure deployment whose `.env` tag string contains `default:true`.
 4. **Legacy fallback** — `OPENAI_API_KEY` env var (`toxtempass/__init__.py` resolves it into `LLM_ENDPOINT` / `LLM_API_KEY` at import time). Deprecated; prefer Azure AI Foundry credentials.
