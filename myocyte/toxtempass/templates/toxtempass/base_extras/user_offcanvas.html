@@ -1,215 +1,245 @@
 {% load static%}
 <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasUser" aria-labelledby="offcanvasUserLabel">
-    <div class="offcanvas-header">
-      <h5 class="offcanvas-title" id="offcanvasUserLabel"><i class="bi bi-person-badge"></i> {{user.email}}</h5>
-      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-    </div>
-    <div class="offcanvas-body">
-        <div class="mb-3">
-            <h5 class="mb-1">Account Info</h5>
-            {% if user.orcid_id %}
-            <p class="mb-0 text-muted">Here you can manage your account.</p>
-            {% else %}
-            <p class="mb-0 text-muted">Here you can manage your account. You have not linked your ORCID yet.</p>
-            {% endif %}
+    <div class="offcanvas-header flex-column align-items-stretch pb-0">
+        <div class="d-flex align-items-center mb-3">
+            <h5 class="offcanvas-title text-truncate me-auto" id="offcanvasUserLabel"><i class="bi bi-person-badge"></i> {{user.email}}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
-        {% if user.orcid_id %}
-        {% else %}
-        <div class="d-grid gap-2 ">
-        <a class="btn d-flex align-items-center justify-content-center btn-outline-secondary" href="{% url 'orcid_login' %}">
-            <img class="h-75 pe-2" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="ORCID" >
-            Link ORCID
-        </a>
+        <ul class="nav nav-tabs" id="userMenuTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="userMenuWorkspacesTab" data-bs-toggle="tab" data-bs-target="#userMenuWorkspaces" type="button" role="tab" aria-controls="userMenuWorkspaces" aria-selected="true">
+                    <i class="bi bi-people me-1"></i>Workspaces
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="userMenuAccountTab" data-bs-toggle="tab" data-bs-target="#userMenuAccount" type="button" role="tab" aria-controls="userMenuAccount" aria-selected="false">
+                    <i class="bi bi-gear me-1"></i>Account settings
+                    {% if not user.has_confirmed_email %}<i class="bi bi-exclamation-circle-fill text-warning ms-1" role="img" aria-label="Email address not confirmed"></i>{% endif %}
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="offcanvas-body tab-content">
+        <div class="tab-pane fade show active" id="userMenuWorkspaces" role="tabpanel" aria-labelledby="userMenuWorkspacesTab" tabindex="0">
+            {% include "toxtempass/base_extras/workspaces/workspace_list_partial.html" %}
         </div>
-        {% endif %}
-    
-    {% if user.is_staff %}
-    <div class="d-grid gap-2 pt-3">
-        <a class="btn btn-outline-secondary d-flex align-items-center justify-content-center" href="{% url 'stats_dashboard' %}">
-            <i class="bi bi-graph-up-arrow me-2"></i> KPI dashboard
-        </a>
-    </div>
-    {% endif %}
 
-    <div class="btn-toolbar gap-2 justify-content-between pt-3" role="toolbar">
-        <button id="startOnboardingBtn" class="btn btn-outline-primary">
-            <i class="bi bi-question-circle me-1"></i> Guided Tour
-        </button>
-        <a class="btn btn-secondary w-25 me-2" role="button" href="{% url 'logout'%}">Logout</a>
-        <!-- Onboarding help trigger button -->
-
-    </div>
-
-    {% if llm_choices %}
-    <hr>
-    <div class="mb-3">
-        <h5 class="mb-1">Model Choice</h5>
-        <p class="mb-2 text-muted">Choose the large language model used to draft answers. Leave on system default if unsure.</p>
-        <select id="llm-model-select" class="form-select form-select-sm" aria-label="LLM model">
-            <option value="">— use system default —</option>
-            {% for value, label in llm_choices %}
-            <option value="{{ value }}" {% if value == llm_current %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-        </select>
-        <div id="llm-model-alert" class="alert mt-2 py-2 px-3 small d-none" role="alert"></div>
-    </div>
-    <script>
-    (function () {
-      const sel = document.getElementById('llm-model-select');
-      const alertBox = document.getElementById('llm-model-alert');
-      if (!sel) return;
-
-      function showAlert(variant, html) {
-        alertBox.className = 'alert alert-' + variant + ' mt-2 py-2 px-3 small d-flex align-items-center';
-        alertBox.innerHTML = html;
-      }
-
-      function htmlEscape(s) {
-        return String(s || '').replace(/[&<>"']/g, c => (
-          {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
-        ));
-      }
-
-      function updateBadge(sig) {
-        const badge = document.getElementById('llm-signature-badge');
-        if (!badge || !sig) return;
-        const label = badge.querySelector('[data-llm-badge-label]');
-        if (label) label.textContent = sig.model_id;
-        if (badge.tagName === 'A' && sig.model_id) {
-          badge.setAttribute(
-            'href',
-            'https://ai.azure.com/catalog/models/' + encodeURIComponent(sig.model_id)
-          );
-        }
-        const parts = [
-          'Model: ' + htmlEscape(sig.model_id),
-          'Model by: ' + htmlEscape(sig.model_by || '—'),
-          'Hosted on: ' + htmlEscape(sig.hosted_on || ''),
-        ];
-        if (sig.version) parts.push('Version: ' + htmlEscape(sig.version));
-        parts.push('Data handling: ' + htmlEscape(sig.privacy_short || ''));
-        if (sig.context_window) {
-          parts.push('Context window: ' + htmlEscape(sig.context_window) + ' tokens');
-        }
-        if (sig.retirement_date) parts.push('Retires: ' + htmlEscape(sig.retirement_date));
-        parts.push('<em>Click to open in Azure model catalog</em>');
-        const title = parts.join('<br>');
-        badge.setAttribute('data-bs-original-title', title);
-        badge.setAttribute('title', title);
-        // Re-instantiate the Bootstrap tooltip so the new content is picked up.
-        if (window.bootstrap && bootstrap.Tooltip) {
-          const existing = bootstrap.Tooltip.getInstance(badge);
-          if (existing) existing.dispose();
-          new bootstrap.Tooltip(badge);
-        }
-      }
-
-      function hideAlert() {
-        alertBox.className = 'alert mt-2 py-2 px-3 small d-none';
-        alertBox.innerHTML = '';
-      }
-
-      sel.addEventListener('change', async () => {
-        hideAlert();
-        const fd = new FormData();
-        fd.append('llm_model', sel.value);
-        fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-        try {
-          const r = await fetch('{% url "set_llm_preference" %}', { method: 'POST', body: fd });
-          const data = await r.json();
-          if (data.success) {
-            updateBadge(data.signature);
-          } else {
-            showAlert('danger',
-              '<i class="bi bi-exclamation-triangle me-2"></i>'
-              + '<div>' + htmlEscape(data.error || 'Unknown error') + '</div>');
-          }
-        } catch (e) {
-          showAlert('danger',
-            '<i class="bi bi-exclamation-triangle me-2"></i>'
-            + '<div>Network error.</div>');
-        }
-      });
-    })();
-    </script>
-    {% endif %}
-
-    {% if email_settings %}
-    <hr>
-    <div class="mb-3">
-        <h5 class="mb-1">Email notifications</h5>
-        <p class="mb-2 text-muted">Emails about your account, like confirmations and password changes, are always sent.</p>
-        {% for setting in email_settings %}
-        <div class="form-check form-switch">
-            <input class="form-check-input js-email-setting" type="checkbox" role="switch" id="email-setting-{{ setting.kind }}" data-kind="{{ setting.kind }}"{% if setting.enabled %} checked{% endif %}>
-            <label class="form-check-label" for="email-setting-{{ setting.kind }}">{{ setting.label }}</label>
-        </div>
-        {% endfor %}
-        <div id="email-setting-alert" class="alert alert-danger mt-2 py-2 px-3 small" role="alert" hidden></div>
-    </div>
-    <script>
-    (function () {
-      const alertBox = document.getElementById('email-setting-alert');
-      document.querySelectorAll('.js-email-setting').forEach(function (toggle) {
-        toggle.addEventListener('change', async function () {
-          alertBox.hidden = true;
-          const fd = new FormData();
-          fd.append('kind', toggle.dataset.kind);
-          fd.append('enabled', toggle.checked ? '1' : '0');
-          fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-          try {
-            const r = await fetch('{% url "set_email_preference" %}', { method: 'POST', body: fd });
-            const data = await r.json();
-            if (!data.success) throw new Error(data.error);
-          } catch (e) {
-            toggle.checked = !toggle.checked;
-            alertBox.textContent = 'Could not save the setting. Please try again.';
-            alertBox.hidden = false;
-          }
-        });
-      });
-    })();
-    </script>
-    {% endif %}
-
-    <hr>
-    {% include "toxtempass/base_extras/workspaces/workspace_list_partial.html" %}
-</div>
-    <div class="text-center mb-2 small">
-        <span class="text-body-secondary">If useful, please cite:</span>
-        <a href="{% url 'about' %}#how-to-cite">How to cite</a>
-    </div>
-    <div class="sticky-bottom d-flex justify-content-center pb-3">
-        <div class="btn-group" role="group">
-            <a class="btn btn-sm btn-outline-primary d-flex align-items-center" type="button" href="{{ config.github_repo_url }}">
-                <i class="bi bi-github"></i>
-                {% if config.git_hash %}
-                    <span class="ms-1 small text-muted">{{ config.git_hash|slice:":7" }}</span>
+        <div class="tab-pane fade" id="userMenuAccount" role="tabpanel" aria-labelledby="userMenuAccountTab" tabindex="0">
+            <div class="mb-4">
+                <h5 class="mb-2">Account</h5>
+                <p class="mb-2 text-break">
+                    {{ user.email }}
+                    {% if user.has_confirmed_email %}
+                    <span class="badge text-bg-success ms-1">Confirmed</span>
+                    {% else %}
+                    <span class="badge text-bg-warning ms-1">Not confirmed</span>
+                    {% endif %}
+                </p>
+                {% if not user.has_confirmed_email %}
+                <p class="mb-2 small text-muted">Confirm your address with the link we emailed you to generate drafts.</p>
+                <button type="button" class="btn btn-sm btn-outline-primary js-resend-confirmation" data-url="{% url 'resend_confirmation_email' %}">Send the link again</button>
+                <div class="small mt-1 js-resend-confirmation-result" hidden></div>
                 {% endif %}
-            </a>
-            <a class="btn btn-sm btn-outline-primary" type="button" href="mailto:{{config.maintainer_email}}?subject=%5BToxTempAssistant%5D%20%3CEnter%20Subject%20Here%3E"> <i class="bi bi-envelope-paper-heart"></i></a>
-            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-target="#copyrightModal" data-bs-toggle="modal"> <i class="bi bi-c-circle"></i></button>
-            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-target="#termsModal" data-bs-toggle="modal" href="#"> <i class="bi bi-book"></i> </button>
-            {% if llm_signature %}
-            <a id="llm-signature-badge"
-                  class="btn btn-sm btn-outline-primary d-flex align-items-center"
-                  href="https://ai.azure.com/catalog/models/{{ llm_signature.model_id }}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-bs-toggle="tooltip"
-                  data-bs-html="true"
-                  title="Model: {{ llm_signature.model_id }}<br>
-                         Model by: {{ llm_signature.model_by|default:'—' }}<br>
-                         Hosted on: {{ llm_signature.hosted_on }}<br>
-                         {% if llm_signature.version %}Version: {{ llm_signature.version }}<br>{% endif %}
-                         Data handling: {{ llm_signature.privacy_short }}
-                         {% if llm_signature.context_window %}<br>Context window: {{ llm_signature.context_window|stringformat:'d' }} tokens{% endif %}
-                         {% if llm_signature.retirement_date %}<br>Retires: {{ llm_signature.retirement_date }}{% endif %}<br>
-                         <em>Click to open in Azure model catalog</em>">
-                <i class="bi bi-robot"></i>
-                <span class="ms-1 small" data-llm-badge-label>{{ llm_signature.model_id }}</span>
-            </a>
+
+                <div class="mt-3">
+                    {% if user.orcid_id %}
+                    <p class="mb-0"><img class="pe-1" style="height:16px" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="ORCID"> {{ user.orcid_id }}</p>
+                    {% else %}
+                    <div class="d-grid">
+                        <a class="btn d-flex align-items-center justify-content-center btn-outline-secondary" href="{% url 'orcid_login' %}">
+                            <img class="h-75 pe-2" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="ORCID" >
+                            Link ORCID
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if user.is_staff %}
+                <div class="d-grid mt-2">
+                    <a class="btn btn-outline-secondary d-flex align-items-center justify-content-center" href="{% url 'stats_dashboard' %}">
+                        <i class="bi bi-graph-up-arrow me-2"></i> KPI dashboard
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+
+            {# A single model leaves nothing to choose: the system default is that model. #}
+            {% if llm_choices|length > 1 %}
+            <div class="mb-4">
+                <h5 class="mb-1">Model choice</h5>
+                <p class="mb-2 text-muted">Choose the large language model used to draft answers. Leave on system default if unsure.</p>
+                <select id="llm-model-select" class="form-select form-select-sm" aria-label="LLM model">
+                    <option value="">— use system default —</option>
+                    {% for value, label in llm_choices %}
+                    <option value="{{ value }}" {% if value == llm_current %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <div id="llm-model-alert" class="alert mt-2 py-2 px-3 small d-none" role="alert"></div>
+            </div>
+            <script>
+            (function () {
+              const sel = document.getElementById('llm-model-select');
+              const alertBox = document.getElementById('llm-model-alert');
+              if (!sel) return;
+
+              function showAlert(variant, html) {
+                alertBox.className = 'alert alert-' + variant + ' mt-2 py-2 px-3 small d-flex align-items-center';
+                alertBox.innerHTML = html;
+              }
+
+              function htmlEscape(s) {
+                return String(s || '').replace(/[&<>"']/g, c => (
+                  {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+                ));
+              }
+
+              function updateBadge(sig) {
+                const badge = document.getElementById('llm-signature-badge');
+                if (!badge || !sig) return;
+                const label = badge.querySelector('[data-llm-badge-label]');
+                if (label) label.textContent = sig.model_id;
+                if (badge.tagName === 'A' && sig.model_id) {
+                  badge.setAttribute(
+                    'href',
+                    'https://ai.azure.com/catalog/models/' + encodeURIComponent(sig.model_id)
+                  );
+                }
+                const parts = [
+                  'Model: ' + htmlEscape(sig.model_id),
+                  'Model by: ' + htmlEscape(sig.model_by || '—'),
+                  'Hosted on: ' + htmlEscape(sig.hosted_on || ''),
+                ];
+                if (sig.version) parts.push('Version: ' + htmlEscape(sig.version));
+                parts.push('Data handling: ' + htmlEscape(sig.privacy_short || ''));
+                if (sig.context_window) {
+                  parts.push('Context window: ' + htmlEscape(sig.context_window) + ' tokens');
+                }
+                if (sig.retirement_date) parts.push('Retires: ' + htmlEscape(sig.retirement_date));
+                parts.push('<em>Click to open in Azure model catalog</em>');
+                const title = parts.join('<br>');
+                badge.setAttribute('data-bs-original-title', title);
+                badge.setAttribute('title', title);
+                // Re-instantiate the Bootstrap tooltip so the new content is picked up.
+                if (window.bootstrap && bootstrap.Tooltip) {
+                  const existing = bootstrap.Tooltip.getInstance(badge);
+                  if (existing) existing.dispose();
+                  new bootstrap.Tooltip(badge);
+                }
+              }
+
+              function hideAlert() {
+                alertBox.className = 'alert mt-2 py-2 px-3 small d-none';
+                alertBox.innerHTML = '';
+              }
+
+              sel.addEventListener('change', async () => {
+                hideAlert();
+                const fd = new FormData();
+                fd.append('llm_model', sel.value);
+                fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+                try {
+                  const r = await fetch('{% url "set_llm_preference" %}', { method: 'POST', body: fd });
+                  const data = await r.json();
+                  if (data.success) {
+                    updateBadge(data.signature);
+                  } else {
+                    showAlert('danger',
+                      '<i class="bi bi-exclamation-triangle me-2"></i>'
+                      + '<div>' + htmlEscape(data.error || 'Unknown error') + '</div>');
+                  }
+                } catch (e) {
+                  showAlert('danger',
+                    '<i class="bi bi-exclamation-triangle me-2"></i>'
+                    + '<div>Network error.</div>');
+                }
+              });
+            })();
+            </script>
             {% endif %}
+
+            {% if email_settings %}
+            <div class="mb-4">
+                <h5 class="mb-1">Email notifications</h5>
+                <p class="mb-2 text-muted">Emails about your account, like confirmations and password changes, are always sent.</p>
+                {% for setting in email_settings %}
+                <div class="form-check form-switch">
+                    <input class="form-check-input js-email-setting" type="checkbox" role="switch" id="email-setting-{{ setting.kind }}" data-kind="{{ setting.kind }}"{% if setting.enabled %} checked{% endif %}>
+                    <label class="form-check-label" for="email-setting-{{ setting.kind }}">{{ setting.label }}</label>
+                </div>
+                {% endfor %}
+                <div id="email-setting-alert" class="alert alert-danger mt-2 py-2 px-3 small" role="alert" hidden></div>
+            </div>
+            <script>
+            (function () {
+              const alertBox = document.getElementById('email-setting-alert');
+              document.querySelectorAll('.js-email-setting').forEach(function (toggle) {
+                toggle.addEventListener('change', async function () {
+                  alertBox.hidden = true;
+                  const fd = new FormData();
+                  fd.append('kind', toggle.dataset.kind);
+                  fd.append('enabled', toggle.checked ? '1' : '0');
+                  fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+                  try {
+                    const r = await fetch('{% url "set_email_preference" %}', { method: 'POST', body: fd });
+                    const data = await r.json();
+                    if (!data.success) throw new Error(data.error);
+                  } catch (e) {
+                    toggle.checked = !toggle.checked;
+                    alertBox.textContent = 'Could not save the setting. Please try again.';
+                    alertBox.hidden = false;
+                  }
+                });
+              });
+            })();
+            </script>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="border-top px-3 pt-3">
+        <div class="d-flex justify-content-between mb-3">
+            <button id="startOnboardingBtn" class="btn btn-outline-primary">
+                <i class="bi bi-question-circle me-1"></i> Guided Tour
+            </button>
+            <a class="btn btn-secondary" role="button" href="{% url 'logout'%}">Logout</a>
+        </div>
+        <div class="text-center mb-2 small">
+            <span class="text-body-secondary">If useful, please cite:</span>
+            <a href="{% url 'about' %}#how-to-cite">How to cite</a>
+        </div>
+        <div class="d-flex justify-content-center pb-3">
+            <div class="btn-group" role="group">
+                <a class="btn btn-sm btn-outline-primary d-flex align-items-center" type="button" href="{{ config.github_repo_url }}">
+                    <i class="bi bi-github"></i>
+                    {% if config.git_hash %}
+                        <span class="ms-1 small text-muted">{{ config.git_hash|slice:":7" }}</span>
+                    {% endif %}
+                </a>
+                <a class="btn btn-sm btn-outline-primary" type="button" href="mailto:{{config.maintainer_email}}?subject=%5BToxTempAssistant%5D%20%3CEnter%20Subject%20Here%3E"> <i class="bi bi-envelope-paper-heart"></i></a>
+                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-target="#copyrightModal" data-bs-toggle="modal"> <i class="bi bi-c-circle"></i></button>
+                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-target="#termsModal" data-bs-toggle="modal" href="#"> <i class="bi bi-book"></i> </button>
+                {% if llm_signature %}
+                <a id="llm-signature-badge"
+                      class="btn btn-sm btn-outline-primary d-flex align-items-center"
+                      href="https://ai.azure.com/catalog/models/{{ llm_signature.model_id }}"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-bs-toggle="tooltip"
+                      data-bs-html="true"
+                      title="Model: {{ llm_signature.model_id }}<br>
+                             Model by: {{ llm_signature.model_by|default:'—' }}<br>
+                             Hosted on: {{ llm_signature.hosted_on }}<br>
+                             {% if llm_signature.version %}Version: {{ llm_signature.version }}<br>{% endif %}
+                             Data handling: {{ llm_signature.privacy_short }}
+                             {% if llm_signature.context_window %}<br>Context window: {{ llm_signature.context_window|stringformat:'d' }} tokens{% endif %}
+                             {% if llm_signature.retirement_date %}<br>Retires: {{ llm_signature.retirement_date }}{% endif %}<br>
+                             <em>Click to open in Azure model catalog</em>">
+                    <i class="bi bi-robot"></i>
+                    <span class="ms-1 small" data-llm-badge-label>{{ llm_signature.model_id }}</span>
+                </a>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
@@ -239,6 +269,18 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
+            // Opening the menu from a button (user menu, share icon in the overview
+            // table) starts on Workspaces. Re-opening it from code after a modal has
+            // no relatedTarget, so the tab the user was on stays.
+            const userMenu = document.getElementById("offcanvasUser");
+            userMenu.addEventListener("show.bs.offcanvas", function (event) {
+                if (event.relatedTarget) {
+                    bootstrap.Tab.getOrCreateInstance(
+                        document.getElementById("userMenuWorkspacesTab")
+                    ).show();
+                }
+            });
+
             // More robust: wait for the offcanvas "hidden" event before showing modal
             document.querySelectorAll("[data-bs-toggle='modal']").forEach((btn) => {
                 btn.addEventListener("click", function () {
