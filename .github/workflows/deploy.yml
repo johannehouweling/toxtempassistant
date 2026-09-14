@@ -102,6 +102,12 @@ jobs:
               exit 1
             fi
 
+            # The new release is healthy: remove old images so they don't fill the
+            # disk. Keeps this release and the 2 newest older versions (at least 1,
+            # however old) for an instant rollback; see prune-old-images.sh. A
+            # failure here doesn't fail the deploy.
+            sudo bash ./prune-old-images.sh "$GIT_TAG" 2 || echo "Pruning old images failed; the deploy itself succeeded."
+
   deploy-swarm:
     name: Deploy to Swarm cluster
     runs-on: ubuntu-latest
