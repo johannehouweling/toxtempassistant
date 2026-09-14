@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.44.1 (2026-09-14)
+
+### Bug Fixes
+
+- **about**: Say "Sign up / Log in" on the About page header button
+  ([`8c179c2`](https://github.com/johannehouweling/toxtempassistant/commit/8c179c2250faea2ee0e4c62b5599a7c717b1accd))
+
+
 ## v3.44.0 (2026-09-14)
 
 ### Bug Fixes
