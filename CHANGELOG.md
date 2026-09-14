@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v3.42.0 (2026-09-14)
+
+### Build System
+
+- **deps**: Require Django 6.1 for MAILERS
+  ([`cd0847d`](https://github.com/johannehouweling/toxtempassistant/commit/cd0847d0fed6d5e444f451bf570d5f7e3786513f))
+
+### Features
+
+- **email**: Add email confirmation and a notification system
+  ([`a987f26`](https://github.com/johannehouweling/toxtempassistant/commit/a987f261b93cdf22c3a256dc2fddac9f8a988e17))
+
+### Refactoring
+
+- **settings**: Migrate email settings to MAILERS
+  ([`19d4c8f`](https://github.com/johannehouweling/toxtempassistant/commit/19d4c8f88b60a92a0d1df5ae8e473abad6f798f1))
+
+
 ## v3.41.3 (2026-09-13)
 
 ### Bug Fixes
