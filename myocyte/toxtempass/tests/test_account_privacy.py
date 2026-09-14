@@ -348,6 +348,7 @@ def test_account_deletion_is_blocked_while_owning_a_workspace(client):
     assert "Liver models" in panel
     assert "Delete my account" not in panel
     assert "Download all your ToxTemps" in panel
+    assert "export each ToxTemp from its own page" in panel
 
     response = client.post(
         reverse("account_delete"), {"password": PASSWORD, "confirm": "1"}
