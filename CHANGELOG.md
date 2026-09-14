@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v3.45.0 (2026-09-14)
+
+### Documentation
+
+- **account**: Point to per-ToxTemp export for other formats before deleting
+  ([`5062c39`](https://github.com/johannehouweling/toxtempassistant/commit/5062c39e5fd9d79440e8e2baa52e24df49fd83ef))
+
+### Features
+
+- **account**: Only workspaces with other members block account deletion
+  ([`ce10336`](https://github.com/johannehouweling/toxtempassistant/commit/ce1033669c28a810bfaa3c5b2a1d43f8967faf9e))
+
+- **account**: ROR check for a changed organization and a cleaner Account tab
+  ([`c4bc855`](https://github.com/johannehouweling/toxtempassistant/commit/c4bc8556ca3760a09af66935c12db8162ae5bba2))
+
+- **signup**: Ask to check an organization that is not in ROR
+  ([`22b9544`](https://github.com/johannehouweling/toxtempassistant/commit/22b954435a8479d497d2e818fcd7bc78dd33a945))
+
+- **ui**: Order the user menu tabs Workspaces, Settings, Account, Privacy
+  ([`44a583f`](https://github.com/johannehouweling/toxtempassistant/commit/44a583fa2ce37f56c51ccc7666f6be8c2f57622e))
+
+
 ## v3.44.2 (2026-09-14)
 
 ### Bug Fixes
