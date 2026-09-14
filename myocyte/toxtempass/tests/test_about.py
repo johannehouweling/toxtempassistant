@@ -111,3 +111,13 @@ def test_about_names_the_projects_using_toxtemp_with_links():
         link = f'href="{url}" target="_blank" rel="noopener noreferrer">{name}</a>'
         assert link in sentence
 
+
+@pytest.mark.django_db
+def test_about_links_the_grant_number_to_its_nwo_project_page():
+    """The NWA grant number under Team and funding opens the project on nwo.nl."""
+    html = Client().get(reverse("about")).content.decode()
+    assert (
+        '<a href="https://www.nwo.nl/projecten/nwa129219272" target="_blank" '
+        'rel="noopener noreferrer">NWA-ORC 1292.19.272</a>'
+    ) in html
+
