@@ -124,7 +124,8 @@
                         </div>
                     </span>
                     {% elif current_url_name == 'about' %}
-                    <a class="btn btn-outline-light ms-auto me-3" href="{% url 'overview' %}">Sign up / Log in</a>
+                    {# Phones only get "Log in", so the button fits next to the logo. #}
+                    <a class="btn btn-outline-light ms-auto me-3" href="{% url 'overview' %}"><span class="d-none d-sm-inline">Sign up / </span>Log in</a>
                     {% else %}
                     <a class="btn btn-outline-light ms-auto me-3" href="{% url 'about' %}">About</a>
                     {%endif%}

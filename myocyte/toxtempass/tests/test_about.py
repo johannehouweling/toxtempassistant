@@ -64,7 +64,11 @@ def test_about_page_header_links_to_login_instead_of_itself():
     """On /about/ the header button leads to login and signup, not back to /about/."""
     html = Client().get(reverse("about")).content.decode()
     header = html.split("</header>")[0]
-    assert f'href="{reverse("overview")}">Sign up / Log in</a>' in header
+    # "Sign up / " is hidden on phones to keep the button narrow.
+    assert (
+        f'href="{reverse("overview")}">'
+        '<span class="d-none d-sm-inline">Sign up / </span>Log in</a>'
+    ) in header
     assert f'href="{reverse("about")}">About</a>' not in header
 
 
