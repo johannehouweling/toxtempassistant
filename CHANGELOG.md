@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v3.43.1 (2026-09-14)
+
+### Bug Fixes
+
+- **about**: List VHP4Safety among the projects using ToxTemp
+  ([`bccbc31`](https://github.com/johannehouweling/toxtempassistant/commit/bccbc314b7194f7d7cc1f459ed4b5f805b05e20b))
+
+- **ui**: Polish the user menu
+  ([`2f45471`](https://github.com/johannehouweling/toxtempassistant/commit/2f454710f6346a50f82bcd42f84303dd98a286b4))
+
+
 ## v3.43.0 (2026-09-14)
 
 ### Bug Fixes
