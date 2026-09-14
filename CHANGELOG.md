@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v3.44.0 (2026-09-14)
+
+### Bug Fixes
+
+- **email**: Leave the email kind out of the duplicate-send log line
+  ([`07c98f4`](https://github.com/johannehouweling/toxtempassistant/commit/07c98f4efda8eb384253511faaf0939f1587d50b))
+
+### Features
+
+- **account**: Account and privacy tabs in the user menu
+  ([`95ba496`](https://github.com/johannehouweling/toxtempassistant/commit/95ba496acd16b316e73c3a9372c9d2cbe0218a89))
+
+### Testing
+
+- **account**: Keep the question set label within 10 characters
+  ([`9bba38d`](https://github.com/johannehouweling/toxtempassistant/commit/9bba38dd37b63f932e3b1b248fb0e3c2b175acfa))
+
+
 ## v3.43.2 (2026-09-14)
 
 ### Bug Fixes
