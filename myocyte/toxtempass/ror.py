@@ -180,7 +180,9 @@ def suggest_organizations(raw_query: str, raw_email: str = "") -> list[dict]:
     if not can_run_general_lookup and email_domain is None:
         return []
     quoted_query = _escape_ror_query_value(query)
-    name_or_acronym_query = f'(names.value:"{quoted_query}" OR acronyms:"{quoted_query}")'
+    # ROR v2 lists acronyms among the names; it has no `acronyms` field any more and
+    # rejects a query that uses one.
+    name_or_acronym_query = f'names.value:"{quoted_query}"'
 
     domain_queries = []
     if email_domain:
@@ -206,6 +208,13 @@ def suggest_organizations(raw_query: str, raw_email: str = "") -> list[dict]:
                     "ROR lookup failed for query '%s' (advanced query: %s)",
                     query,
                     advanced_query,
+                )
+                continue
+
+            if payload.get("errors"):
+                # ROR answers a query it cannot parse with 200 and an error list.
+                _LOG.warning(
+                    "ROR rejected the query %s: %s", advanced_query, payload["errors"]
                 )
                 continue
 

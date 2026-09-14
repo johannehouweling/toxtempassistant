@@ -196,7 +196,7 @@ def test_ror_lookup_uses_advanced_query_param():
 
     mocked_get.assert_called_once()
     assert mocked_get.call_args.kwargs["params"] == {
-        "query.advanced": '(names.value:"Leiden" OR acronyms:"Leiden")'
+        "query.advanced": 'names.value:"Leiden"'
     }
 
 
@@ -232,7 +232,7 @@ def test_ror_lookup_tries_domain_queries_first_when_email_given():
     assert mocked_get.call_args_list[0].kwargs["params"] == {
         "query.advanced": (
             'links.value:"rivm.nl" AND '
-            '(names.value:"Nat" OR acronyms:"Nat")'
+            'names.value:"Nat"'
         )
     }
     assert mocked_get.call_args_list[1].kwargs["params"] == {
@@ -269,7 +269,7 @@ def test_ror_lookup_falls_back_to_wide_query_when_domain_queries_are_empty():
     assert payload["items"][0]["name"] == "Leiden University"
     assert mocked_get.call_count == 3
     assert mocked_get.call_args_list[2].kwargs["params"] == {
-        "query.advanced": '(names.value:"Leiden" OR acronyms:"Leiden")'
+        "query.advanced": 'names.value:"Leiden"'
     }
 
 
@@ -285,7 +285,7 @@ def test_ror_lookup_ignores_invalid_email_domain():
 
     mocked_get.assert_called_once()
     assert mocked_get.call_args.kwargs["params"] == {
-        "query.advanced": '(names.value:"Leiden" OR acronyms:"Leiden")'
+        "query.advanced": 'names.value:"Leiden"'
     }
 
 
@@ -307,7 +307,7 @@ def test_ror_lookup_keeps_email_domain_as_is():
     assert mocked_get.call_args_list[0].kwargs["params"] == {
         "query.advanced": (
             'links.value:"www.rivm.nl" AND '
-            '(names.value:"Leiden" OR acronyms:"Leiden")'
+            'names.value:"Leiden"'
         )
     }
     assert mocked_get.call_args_list[1].kwargs["params"] == {
