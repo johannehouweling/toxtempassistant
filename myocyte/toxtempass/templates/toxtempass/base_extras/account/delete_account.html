@@ -12,7 +12,7 @@
 
 {% if blockers.owned_workspaces %}
 <div class="alert alert-warning py-2 px-3 small mb-0">
-    You still own {{ blockers.owned_workspaces|length }} workspace{{ blockers.owned_workspaces|length|pluralize }}:
+    You still own {{ blockers.owned_workspaces|length }} workspace{{ blockers.owned_workspaces|length|pluralize }} with other members:
     {% for workspace in blockers.owned_workspaces %}<strong>{{ workspace.name }}</strong>{% if not forloop.last %}, {% endif %}{% endfor %}.
     Workspaces cannot be handed over, so delete them yourself first, after checking what the other members lose.
     <button type="button" class="btn btn-link btn-sm p-0 align-baseline js-show-workspaces">Go to Workspaces</button>
@@ -29,6 +29,9 @@
 <p class="small mb-1">Deleting your account removes:</p>
 <ul class="small mb-2">
     <li>the {{ summary.investigation_count }} investigation{{ summary.investigation_count|pluralize }} you own, with their studies, ToxTemps and answers</li>
+    {% if summary.own_workspaces %}
+    <li>your workspace{{ summary.own_workspaces|length|pluralize }} {{ summary.own_workspaces|join:", " }}, which nobody else is in</li>
+    {% endif %}
     {% if summary.shared_investigations %}
     <li>for the other members too, the shared investigations {{ summary.shared_investigations|join:", " }}</li>
     {% endif %}

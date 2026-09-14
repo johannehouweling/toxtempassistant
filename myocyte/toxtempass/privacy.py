@@ -23,7 +23,7 @@ import zipfile
 from datetime import datetime, timedelta
 
 from django.db import transaction
-from django.db.models import Q, QuerySet
+from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 from django.utils.text import slugify
 from guardian.shortcuts import get_objects_for_user
@@ -250,16 +250,29 @@ def export_toxtemps_zip(user: Person) -> bytes:
     return buffer.getvalue()
 
 
+def _owned_workspaces(user: Person) -> tuple[list[Workspace], list[Workspace]]:
+    """Split the workspaces ``user`` owns into those with other members and the rest."""
+    owned = (
+        Workspace.objects.filter(owner=user)
+        .annotate(others=Count("memberships", filter=~Q(memberships__user=user)))
+        .order_by("name")
+    )
+    with_others = [workspace for workspace in owned if workspace.others]
+    alone = [workspace for workspace in owned if not workspace.others]
+    return with_others, alone
+
+
 def deletion_blockers(user: Person) -> dict:
     """Return what stops ``user`` from deleting their account; empty when nothing.
 
-    Owned workspaces block it: they cannot be handed over, and deleting them on
-    the user's behalf would take investigations away from other members unseen.
+    Owned workspaces with other members block it: workspaces cannot be handed over,
+    and deleting them on the user's behalf would take investigations away from
+    those members unseen. Workspaces nobody else is in go with the account.
     """
     blockers: dict = {}
-    owned = list(Workspace.objects.filter(owner=user).order_by("name"))
-    if owned:
-        blockers["owned_workspaces"] = owned
+    with_others, _alone = _owned_workspaces(user)
+    if with_others:
+        blockers["owned_workspaces"] = with_others
     # QuestionSet.created_by is PROTECT: maintainers who created a template version.
     if QuestionSet.objects.filter(created_by=user).exists():
         blockers["question_sets"] = True
@@ -271,12 +284,16 @@ def deletion_blockers(user: Person) -> dict:
 def deletion_summary(user: Person) -> dict:
     """Describe what deleting ``user``'s account removes, for the confirmation."""
     investigations = Investigation.objects.filter(owner=user)
+    _with_others, alone = _owned_workspaces(user)
+    # Links into the user's own one-person workspaces affect nobody else.
     shared_elsewhere = (
         WorkspaceInvestigation.objects.filter(investigation__in=investigations)
+        .exclude(workspace__in=alone)
         .select_related("investigation", "workspace")
         .order_by("investigation__title", "workspace__name")
     )
     return {
+        "own_workspaces": [workspace.name for workspace in alone],
         "investigation_count": investigations.count(),
         "shared_investigations": [
             f"{link.investigation.title} ({link.workspace.name})"
@@ -293,7 +310,9 @@ def delete_account(person: Person) -> None:
     answers (``Investigation.owner`` is PROTECT). Documents they uploaded go with
     the account, which removes the stored objects. Their queued and sent emails
     are removed. Studies and ToxTemps they created in other people's
-    investigations stay there. Views check :func:`deletion_blockers` first.
+    investigations stay there. Workspaces the person owns go with the account
+    (``Workspace.owner`` cascades); :func:`deletion_blockers`, which views check
+    first, only allows that when nobody else is in them.
     """
     with transaction.atomic():
         for investigation in Investigation.objects.filter(owner=person):

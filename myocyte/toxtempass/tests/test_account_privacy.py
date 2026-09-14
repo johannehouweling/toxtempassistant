@@ -25,6 +25,7 @@ from toxtempass.models import (
     FileWithdrawal,
     Investigation,
     Person,
+    Workspace,
 )
 from toxtempass.tests.fixtures.factories import (
     AdminFactory,
@@ -36,6 +37,7 @@ from toxtempass.tests.fixtures.factories import (
     QuestionSetFactory,
     StudyFactory,
     WorkspaceFactory,
+    WorkspaceMemberFactory,
 )
 
 pytestmark = pytest.mark.django_db
@@ -339,9 +341,10 @@ def test_export_contains_every_toxtemp_the_user_can_open_and_nothing_else(client
     assert not any("demo-assay" in name for name in names)
 
 
-def test_account_deletion_is_blocked_while_owning_a_workspace(client):
+def test_account_deletion_is_blocked_by_a_workspace_with_other_members(client):
     user = _with_password()
-    WorkspaceFactory(owner=user, name="Liver models")
+    workspace = WorkspaceFactory(owner=user, name="Liver models")
+    WorkspaceMemberFactory(workspace=workspace)
     client.force_login(user)
 
     panel = client.get(reverse("account_delete_panel")).content.decode()
@@ -383,3 +386,20 @@ def test_deleting_an_account_removes_its_data_and_sends_a_receipt(
     assert mail.outbox[0].subject == "[ToxTempAssistant] Your account was deleted"
     assert client.get(reverse("account_shared_files")).status_code == 302
     assert client.get(reverse("account_deleted")).status_code == 200
+
+
+def test_workspaces_nobody_else_is_in_are_deleted_with_the_account(client):
+    user = _with_password()
+    workspace = WorkspaceFactory(owner=user, name="Just me")
+    client.force_login(user)
+
+    panel = client.get(reverse("account_delete_panel")).content.decode()
+    assert "Delete my account" in panel
+    assert "Just me" in panel
+
+    response = client.post(
+        reverse("account_delete"), {"password": PASSWORD, "confirm": "1"}
+    )
+
+    assert response.json()["success"] is True
+    assert not Workspace.objects.filter(pk=workspace.pk).exists()
