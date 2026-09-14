@@ -57,8 +57,8 @@ def _with_password(**kwargs):
 
 
 def _question():
-    # An explicit label: the factory's "v<n>" sequence can hit an existing "v1".
-    question_set = QuestionSetFactory(label="account-privacy-test")
+    # An explicit label (max 10 chars): the factory's "v<n>" can hit an existing "v1".
+    question_set = QuestionSetFactory(label="privacy")
     return QuestionFactory(subsection__section__question_set=question_set)
 
 
