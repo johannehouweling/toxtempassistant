@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.45.1 (2026-09-14)
+
+### Bug Fixes
+
+- **about**: Show only "Log in" on the header button on phones
+  ([`9409cf2`](https://github.com/johannehouweling/toxtempassistant/commit/9409cf2a899699f4fe7aaa00762da46bdf22846d))
+
+
 ## v3.45.0 (2026-09-14)
 
 ### Documentation
