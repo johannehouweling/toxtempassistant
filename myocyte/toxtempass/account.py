@@ -43,13 +43,22 @@ def _form_errors(form: forms.BaseForm) -> JsonResponse:
 def update_profile(request: HttpRequest) -> JsonResponse:
     """Save the signed-in user's name and organization.
 
-    A changed organization is matched against ROR again (see signals.resolve_ror).
+    A changed organization is checked against ROR first, as at signup (see
+    forms.OrganizationRorCheckMixin). After such a change the menu reloads, so it
+    shows the new ROR match.
     """
     form = ProfileForm(request.POST, instance=request.user)
     if not form.is_valid():
         return _form_errors(form)
+    organization_changed = "organization" in form.changed_data
     form.save()
-    return JsonResponse({"success": True, "message": "Your details are saved."})
+    return JsonResponse(
+        {
+            "success": True,
+            "message": "Your details are saved.",
+            "reload": organization_changed,
+        }
+    )
 
 
 @login_required(login_url="/login/")
@@ -194,7 +203,7 @@ def delete_account_panel(request: HttpRequest) -> HttpResponse:
     context = {
         "blockers": blockers,
         "summary": None if blockers else privacy.deletion_summary(user),
-        "assay_count": privacy.accessible_assays(user).count(),
+        "assay_count": privacy.exportable_assays(user).count(),
     }
     return HttpResponse(
         render_to_string(

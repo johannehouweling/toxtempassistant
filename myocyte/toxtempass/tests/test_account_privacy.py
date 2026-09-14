@@ -320,6 +320,12 @@ def test_export_contains_every_toxtemp_the_user_can_open_and_nothing_else(client
         question_set=question_set,
     )
     Answer.objects.create(assay=own, question=question, answer_text="An answer")
+    AssayFactory(
+        title="Demo assay",
+        study=own.study,
+        question_set=question_set,
+        demo_lock=True,
+    )
     AssayFactory(title="Someone else's assay", question_set=question_set)
     client.force_login(user)
 
@@ -329,6 +335,8 @@ def test_export_contains_every_toxtemp_the_user_can_open_and_nothing_else(client
     names = zipfile.ZipFile(io.BytesIO(response.content)).namelist()
     assert any(name.endswith("-own-assay/toxtemp.md") for name in names)
     assert not any("someone-elses-assay" in name for name in names)
+    # The read-only demo is seeded for everyone; it is not the user's own work.
+    assert not any("demo-assay" in name for name in names)
 
 
 def test_account_deletion_is_blocked_while_owning_a_workspace(client):

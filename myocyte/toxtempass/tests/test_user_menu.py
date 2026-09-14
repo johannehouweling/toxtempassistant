@@ -106,3 +106,30 @@ def test_linked_orcid_icon_opens_the_record_but_the_id_is_plain_text(client):
     assert f">{orcid_id}</a>" not in account
     assert f"<span>{orcid_id}</span>" in account
     assert "Link ORCID" not in account
+
+
+def test_account_tab_puts_identifiers_first_and_deletion_last(client):
+    account = _pane(_menu(client, PersonFactory()), "userMenuAccount")
+    headings = [
+        "Email address",
+        "ORCID",
+        "Your details",
+        "Password",
+        "Delete account",
+    ]
+    positions = [account.index(f'<h5 class="mb-2">{name}</h5>') for name in headings]
+    assert positions == sorted(positions)
+
+
+def test_link_orcid_spans_the_tab_like_the_other_buttons(client):
+    account = _pane(_menu(client, PersonFactory(orcid_id=None)), "userMenuAccount")
+    assert (
+        '<div class="d-grid">\n'
+        '                    <a class="btn btn-sm btn-outline-secondary d-flex '
+        f'align-items-center justify-content-center" href="{reverse("orcid_login")}">'
+    ) in account
+
+
+def test_not_in_ror_checkbox_is_hidden_in_the_account_tab(client):
+    account = _pane(_menu(client, PersonFactory()), "userMenuAccount")
+    assert '<div class="form-check mt-1 js-not-in-ror" hidden>' in account

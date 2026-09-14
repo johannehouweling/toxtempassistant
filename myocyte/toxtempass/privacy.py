@@ -23,7 +23,7 @@ import zipfile
 from datetime import datetime, timedelta
 
 from django.db import transaction
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.utils import timezone
 from django.utils.text import slugify
 from guardian.shortcuts import get_objects_for_user
@@ -212,6 +212,16 @@ def accessible_assays(user: Person) -> QuerySet[Assay]:
     )
 
 
+def exportable_assays(user: Person) -> QuerySet[Assay]:
+    """Return the ToxTemps ``user`` can take away: those they can open, minus demos.
+
+    The read-only demo is seeded for every account from a template; it is not the
+    user's own work.
+    """
+    demo = Q(demo_lock=True) | Q(demo_template=True) | Q(demo_source__isnull=False)
+    return accessible_assays(user).exclude(demo)
+
+
 def export_toxtemps_zip(user: Person) -> bytes:
     """Return a ZIP with every ToxTemp ``user`` can open, as JSON and Markdown.
 
@@ -223,7 +233,7 @@ def export_toxtemps_zip(user: Person) -> bytes:
 
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        for number, assay in enumerate(accessible_assays(user), start=1):
+        for number, assay in enumerate(exportable_assays(user), start=1):
             folder = f"{number:03d}-{slugify(assay.title)[:60] or 'toxtemp'}"
             try:
                 data = generate_json_from_assay(assay)
