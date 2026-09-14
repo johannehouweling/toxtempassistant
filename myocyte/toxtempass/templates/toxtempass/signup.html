@@ -25,9 +25,11 @@
     <form method="post" action="{{action}}" novalidate>
       <div id="non-field-errors"></div>
       {% csrf_token %}
-      {% bootstrap_form form exclude="website" %}
+      {% bootstrap_form form exclude="website,organization_not_in_ror" %}
       {# Honeypot: hidden from people, filled in by bots. See SignupFormOrcid.clean. #}
       <div class="d-none" aria-hidden="true">{% bootstrap_field form.website %}</div>
+      {# Shown below the organization once it matched no ROR record. #}
+      <div id="organization-not-in-ror" hidden>{% bootstrap_field form.organization_not_in_ror %}</div>
       <datalist id="ror-organization-suggestions"></datalist>
       <button type="submit" class="btn w-100 btn-primary">Sign Up</button>
     </form>
@@ -41,6 +43,17 @@ document.addEventListener("DOMContentLoaded", function() {
   const emailInput = document.getElementById("id_email");
   const suggestions = document.getElementById("ror-organization-suggestions");
   if (!orgInput || !suggestions) return;
+
+  // Offer "not in ROR" once the organization matched no ROR record.
+  const notInRor = document.getElementById("organization-not-in-ror");
+  const orgField = orgInput.closest(".mb-3");
+  if (notInRor && orgField) orgField.after(notInRor);
+  orgInput.form.addEventListener("form-errors", function(event) {
+    const messages = (event.detail.errors || {}).organization || [];
+    if (notInRor && messages.includes("{{ config.ror_unmatched_organization_message|escapejs }}")) {
+      notInRor.hidden = false;
+    }
+  });
 
   let timeoutId = null;
   const DEBOUNCE_DELAY_MS = 300;
