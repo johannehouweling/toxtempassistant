@@ -164,3 +164,25 @@ def test_link_orcid_spans_the_tab_like_the_other_buttons(client):
 def test_not_in_ror_checkbox_is_hidden_in_the_account_tab(client):
     account = _pane(_menu(client, PersonFactory()), "userMenuAccount")
     assert '<div class="form-check mt-1 js-not-in-ror" hidden>' in account
+    assert 'My organization is not in <a href="https://ror.org"' in account
+
+
+def test_organization_errors_show_between_the_field_and_the_not_in_ror_box(client):
+    account = _pane(_menu(client, PersonFactory()), "userMenuAccount")
+    organization = account.index('id="account-organization"')
+    error = account.index("js-organization-error")
+    checkbox = account.index("js-not-in-ror")
+    assert organization < error < checkbox
+
+
+def test_your_details_are_text_to_click_and_edit_without_a_save_button(client):
+    user = PersonFactory(first_name="Ada", last_name="Lovelace", organization="RIVM")
+    account = _pane(_menu(client, user), "userMenuAccount")
+    details = account[account.index("Your details") : account.index(">Password</h5>")]
+
+    assert '<span class="js-name-value">Ada Lovelace</span>' in details
+    assert '<span class="js-organization-value">RIVM</span>' in details
+    assert 'aria-label="Edit name"' in details
+    assert 'aria-label="Edit organization"' in details
+    assert '<div class="row g-2 js-profile-inputs" hidden>' in details
+    assert "Save</button>" not in details

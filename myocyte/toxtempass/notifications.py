@@ -443,6 +443,9 @@ def _build_email_confirmation(logs: list[EmailLog]) -> _Built | str:
             "confirm_url": utilities.absolute_url(reverse("confirm_email", args=[token])),
             "valid_days": config._email_confirmation_valid_days,
             "existing_account": bool(logs[0].payload.get("existing_account")),
+            # Nudge accounts without an ORCID iD to link one.
+            "link_orcid": not user.orcid_id,
+            "signin_url": utilities.absolute_url(reverse("login")),
             "delete_days": (
                 config._unconfirmed_account_delete_days
                 if user.delete_if_unconfirmed

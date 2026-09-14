@@ -13,7 +13,7 @@ from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 from django.db.models import Sum
 from django.forms import widgets
-from django.utils.html import escape
+from django.utils.html import escape, format_html
 from django.utils.safestring import SafeText, mark_safe
 from django_q.tasks import async_task
 from guardian.shortcuts import get_objects_for_user
@@ -69,6 +69,14 @@ class LoginForm(forms.Form):
         return cleaned_data
 
 
+# Links ROR, since not everyone knows the registry; clicking it does not tick the box.
+NOT_IN_ROR_LABEL = format_html(
+    'My organization is not in <a href="{}" target="_blank" rel="noopener noreferrer">'
+    "ROR</a>",
+    config.ror_website_url,
+)
+
+
 class OrganizationRorCheckMixin:
     """Push back when an organization matches no ROR record (signup, Account tab).
 
@@ -86,6 +94,8 @@ class OrganizationRorCheckMixin:
 
     def _check_organization_in_ror(self, cleaned_data: dict, email: str) -> None:
         """Validate ``cleaned_data["organization"]`` against ROR; see the class doc."""
+        # A new organization: a match stored for the previous one no longer applies.
+        self.instance.ror_id = self.instance.ror_name = ""
         organization = cleaned_data.get("organization")
         if (
             not settings.ROR_LOOKUP_ENABLED
@@ -123,7 +133,7 @@ class SignupFormOrcid(OrganizationRorCheckMixin, UserCreationForm):
     )
     # Hidden on the signup page until the organization matched no ROR record.
     organization_not_in_ror = forms.BooleanField(
-        required=False, label="My organization is not in ROR"
+        required=False, label=NOT_IN_ROR_LABEL
     )
 
     def __init__(self, *args, **kwargs):
@@ -191,7 +201,7 @@ class ProfileForm(OrganizationRorCheckMixin, forms.ModelForm):
 
     # Shown in the Account tab once a new organization matched no ROR record.
     organization_not_in_ror = forms.BooleanField(
-        required=False, label="My organization is not in ROR"
+        required=False, label=NOT_IN_ROR_LABEL
     )
     # The user menu shows messages as text.
     escape_messages = False

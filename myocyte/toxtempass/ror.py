@@ -180,7 +180,9 @@ def suggest_organizations(raw_query: str, raw_email: str = "") -> list[dict]:
     if not can_run_general_lookup and email_domain is None:
         return []
     quoted_query = _escape_ror_query_value(query)
-    name_or_acronym_query = f'(names.value:"{quoted_query}" OR acronyms:"{quoted_query}")'
+    # ROR v2 lists acronyms among the names; it has no `acronyms` field any more and
+    # rejects a query that uses one.
+    name_or_acronym_query = f'names.value:"{quoted_query}"'
 
     domain_queries = []
     if email_domain:
@@ -206,6 +208,13 @@ def suggest_organizations(raw_query: str, raw_email: str = "") -> list[dict]:
                     "ROR lookup failed for query '%s' (advanced query: %s)",
                     query,
                     advanced_query,
+                )
+                continue
+
+            if payload.get("errors"):
+                # ROR answers a query it cannot parse with 200 and an error list.
+                _LOG.warning(
+                    "ROR rejected the query %s: %s", advanced_query, payload["errors"]
                 )
                 continue
 
@@ -246,15 +255,22 @@ def suggest_organizations(raw_query: str, raw_email: str = "") -> list[dict]:
                     continue
                 seen_organizations.add(dedupe_key)
 
-                display_label = (
-                    f"{organization_name} ({country_name})"
-                    if country_name
-                    else organization_name
-                )
+                # Show the name only. ROR names of companies end in their country, as
+                # in "Avient Corporation (United States)"; drop it when the record also
+                # has the plain name, so the shorter name still matches. A place that
+                # is part of the name itself stays.
+                country_suffix = f" ({country_name})" if country_name else ""
+                if country_suffix and organization_name.endswith(country_suffix):
+                    plain_name = organization_name.removesuffix(country_suffix)
+                    known_names = {
+                        entry.get("value") for entry in organization.get("names") or []
+                    }
+                    if plain_name in known_names:
+                        organization_name = plain_name
                 suggestions.append(
                     {
                         "name": organization_name,
-                        "label": display_label,
+                        "label": organization_name,
                         "id": organization.get("id"),
                     }
                 )

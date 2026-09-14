@@ -109,36 +109,39 @@
 
             <div class="mb-4">
                 <h5 class="mb-2">Your details</h5>
-                <form class="js-account-form" data-url="{% url 'account_update_profile' %}" novalidate>
-                    <div class="row g-2 mb-2">
-                        <div class="col-6">
-                            <div class="form-floating">
-                                <input class="form-control" id="account-first-name" name="first_name" value="{{ user.first_name }}" placeholder="First name" autocomplete="given-name">
-                                <label for="account-first-name">First name</label>
+                {# Shown as text, like workspace names: click a value to edit it; it saves when you click away. #}
+                <form class="js-profile" data-url="{% url 'account_update_profile' %}" novalidate>
+                    <div class="mb-2 js-profile-field">
+                        <div class="text-uppercase fw-semibold small text-muted">Name</div>
+                        <button type="button" class="btn btn-link p-0 text-body text-decoration-none text-start js-profile-view" aria-label="Edit name" title="Click to edit">
+                            <span class="js-name-value">{{ user.get_full_name|default:"Add your name" }}</span>                        </button>
+                        <div class="row g-2 js-profile-inputs" hidden>
+                            <div class="col-6">
+                                <input class="form-control form-control-sm" id="account-first-name" name="first_name" value="{{ user.first_name }}" placeholder="First name" aria-label="First name" autocomplete="given-name">
+                            </div>
+                            <div class="col-6">
+                                <input class="form-control form-control-sm" id="account-last-name" name="last_name" value="{{ user.last_name }}" placeholder="Last name" aria-label="Last name" autocomplete="family-name">
                             </div>
                         </div>
-                        <div class="col-6">
-                            <div class="form-floating">
-                                <input class="form-control" id="account-last-name" name="last_name" value="{{ user.last_name }}" placeholder="Last name" autocomplete="family-name">
-                                <label for="account-last-name">Last name</label>
+                    </div>
+                    <div class="js-profile-field">
+                        <div class="text-uppercase fw-semibold small text-muted">Organization</div>
+                        <button type="button" class="btn btn-link p-0 text-body text-decoration-none text-start js-profile-view" aria-label="Edit organization" title="Click to edit">
+                            <span class="js-organization-value">{{ user.organization }}</span>                        </button>
+                        <div class="js-profile-inputs" hidden>
+                            <input class="form-control form-control-sm" id="account-organization" name="organization" value="{{ user.organization }}" placeholder="Organization" aria-label="Organization" list="account-ror-suggestions" autocomplete="organization" required>
+                            <datalist id="account-ror-suggestions"></datalist>
+                            {# Organization errors show here, above the "not in ROR" box they refer to. #}
+                            <div class="small text-danger mt-1 js-organization-error" hidden></div>
+                            {# Shown once a new organization matched no ROR record. #}
+                            <div class="form-check mt-1 js-not-in-ror" hidden>
+                                <input class="form-check-input" type="checkbox" id="account-organization-not-in-ror" name="organization_not_in_ror">
+                                <label class="form-check-label small" for="account-organization-not-in-ror">My organization is not in <a href="{{ config.ror_website_url }}" target="_blank" rel="noopener noreferrer">ROR</a></label>
                             </div>
                         </div>
+                        <div class="form-text mt-0 js-ror-match"{% if not user.ror_name %} hidden{% endif %}>Matched to <span class="js-ror-name">{{ user.ror_name }}</span> in ROR</div>
                     </div>
-                    <div class="form-floating">
-                        <input class="form-control" id="account-organization" name="organization" value="{{ user.organization }}" placeholder="Organization" list="account-ror-suggestions" autocomplete="organization" required>
-                        <label for="account-organization">Organization</label>
-                    </div>
-                    <datalist id="account-ror-suggestions"></datalist>
-                    {% if user.ror_name %}<div class="form-text">Matched to {{ user.ror_name }} in ROR</div>{% endif %}
-                    {# Shown once a new organization matched no ROR record. #}
-                    <div class="form-check mt-1 js-not-in-ror" hidden>
-                        <input class="form-check-input" type="checkbox" id="account-organization-not-in-ror" name="organization_not_in_ror">
-                        <label class="form-check-label small" for="account-organization-not-in-ror">My organization is not in ROR</label>
-                    </div>
-                    <div class="d-grid mt-2">
-                        <button type="submit" class="btn btn-sm btn-primary">Save</button>
-                    </div>
-                    <div class="small mt-2 js-form-result" hidden></div>
+                    <div class="small mt-1 js-profile-status" hidden></div>
                 </form>
             </div>
 
@@ -437,12 +440,6 @@
                   headers: { 'X-CSRFToken': csrftoken },
                 });
                 const data = await response.json();
-                // A new organization that matched no ROR record: offer "not in ROR".
-                const notInRor = form.querySelector('.js-not-in-ror');
-                const organizationErrors = (data.errors || {}).organization || [];
-                if (notInRor && organizationErrors.includes('{{ config.ror_unmatched_organization_message|escapejs }}')) {
-                  notInRor.hidden = false;
-                }
                 showResult(result, data.success, data.success ? data.message : errorText(data));
                 if (data.success && form.dataset.reset) form.reset();
                 if (data.success && data.reload) setTimeout(function () { window.location.reload(); }, 1200);
@@ -471,6 +468,128 @@
               }
             });
           });
+
+          // Your details: shown as text. Clicking a value turns it into inputs, which save
+          // when focus leaves them (or on Enter); Escape cancels. A new organization is
+          // checked against ROR, and while it is refused the inputs stay open.
+          const profile = document.querySelector('.js-profile');
+          if (profile) {
+            const status = profile.querySelector('.js-profile-status');
+            const organizationInput = profile.querySelector('[name="organization"]');
+            const organizationError = profile.querySelector('.js-organization-error');
+            const notInRor = profile.querySelector('.js-not-in-ror');
+            const notInRorBox = notInRor.querySelector('input');
+            const unmatched = '{{ config.ror_unmatched_organization_message|escapejs }}';
+            let latestRequest = 0;
+            let statusTimer = null;
+
+            const inputsOf = function (field) {
+              return Array.from(field.querySelectorAll('.js-profile-inputs input:not([type="checkbox"])'));
+            };
+            const setOpen = function (field, open) {
+              field.querySelector('.js-profile-view').hidden = open;
+              field.querySelector('.js-profile-inputs').hidden = !open;
+            };
+            const clearOrganizationCheck = function () {
+              organizationError.hidden = true;
+              organizationInput.classList.remove('is-invalid');
+              notInRor.hidden = true;
+              notInRorBox.checked = false;
+            };
+            const showStatus = function (ok, text) {
+              status.className = 'small mt-1 js-profile-status ' + (ok ? 'text-success' : 'text-danger');
+              status.textContent = text;
+              status.hidden = false;
+              clearTimeout(statusTimer);
+              if (ok) statusTimer = setTimeout(function () { status.hidden = true; }, 2000);
+            };
+            const remember = function () {
+              profile.querySelectorAll('.js-profile-inputs input').forEach(function (input) {
+                input.dataset.saved = input.value;
+              });
+            };
+
+            const save = async function (field) {
+              const request = ++latestRequest;
+              let data;
+              try {
+                const response = await fetch(profile.dataset.url, {
+                  method: 'POST',
+                  body: new FormData(profile),
+                  headers: { 'X-CSRFToken': csrftoken },
+                });
+                data = await response.json();
+              } catch (error) {
+                data = { success: false, error: 'Network error. Please try again.' };
+              }
+              if (request !== latestRequest) return;  // a newer save is under way
+              if (data.success) {
+                remember();
+                profile.querySelector('.js-name-value').textContent = data.name || 'Add your name';
+                profile.querySelector('.js-organization-value').textContent = data.organization;
+                const match = profile.querySelector('.js-ror-match');
+                match.querySelector('.js-ror-name').textContent = data.ror_name;
+                match.hidden = !data.ror_name;
+                clearOrganizationCheck();
+                setOpen(field, false);
+                showStatus(true, 'Saved.');
+                return;
+              }
+              const organizationErrors = (data.errors || {}).organization || [];
+              organizationError.textContent = organizationErrors.join(' ');
+              organizationError.hidden = organizationErrors.length === 0;
+              organizationInput.classList.toggle('is-invalid', organizationErrors.length > 0);
+              if (organizationErrors.includes(unmatched)) notInRor.hidden = false;
+              const otherErrors = Object.entries(data.errors || {})
+                .filter(function (entry) { return entry[0] !== 'organization'; })
+                .map(function (entry) { return entry[1]; })
+                .flat();
+              if (data.error || otherErrors.length) showStatus(false, data.error || otherErrors.join(' '));
+            };
+
+            const finish = function (field) {
+              const changed = inputsOf(field).some(function (input) {
+                return input.value !== input.dataset.saved;
+              });
+              if (changed) {
+                save(field);
+                return;
+              }
+              if (field.contains(organizationInput)) clearOrganizationCheck();
+              setOpen(field, false);
+            };
+
+            remember();
+            profile.addEventListener('submit', function (event) { event.preventDefault(); });
+            profile.querySelectorAll('.js-profile-field').forEach(function (field) {
+              const inputs = inputsOf(field);
+              field.querySelector('.js-profile-view').addEventListener('click', function () {
+                setOpen(field, true);
+                inputs[0].focus();
+              });
+              // Leaving the field saves; moving between its own inputs does not.
+              field.addEventListener('focusout', function () {
+                setTimeout(function () {
+                  const open = !field.querySelector('.js-profile-inputs').hidden;
+                  if (open && !field.contains(document.activeElement)) finish(field);
+                }, 150);
+              });
+              field.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  finish(field);
+                } else if (event.key === 'Escape') {
+                  event.stopPropagation();  // keep the menu open
+                  inputs.forEach(function (input) { input.value = input.dataset.saved; });
+                  if (field.contains(organizationInput)) clearOrganizationCheck();
+                  setOpen(field, false);
+                }
+              });
+            });
+            notInRorBox.addEventListener('change', function () {
+              if (notInRorBox.checked) save(organizationInput.closest('.js-profile-field'));
+            });
+          }
 
           // Organization suggestions from ROR, as on the signup page.
           const organization = document.getElementById('account-organization');

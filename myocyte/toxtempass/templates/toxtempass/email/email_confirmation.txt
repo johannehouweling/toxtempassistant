@@ -6,6 +6,8 @@ Confirm your email address:
 {{ confirm_url }}
 
 The link works for {{ valid_days }} days. If it has expired, sign in and request a new one.{% if delete_days %} Accounts that are not confirmed within {{ delete_days }} days are deleted.{% endif %}
-
+{% if link_orcid %}
+Do you have an ORCID iD? We highly recommend linking it to your account: it identifies you unambiguously and lets you sign in with ORCID. Sign in at {{ signin_url }} and open Account in the user menu to link it.
+{% endif %}
 If you did not sign up, you can ignore this email.
 {% endblock %}

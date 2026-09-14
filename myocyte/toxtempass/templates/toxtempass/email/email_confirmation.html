@@ -23,5 +23,13 @@
   one.{% if delete_days %} Accounts that are not confirmed within {{ delete_days }} days
   are deleted.{% endif %}
 </p>
+{% if link_orcid %}
+<p style="margin:0 0 12px 0;color:#475569;">
+  Do you have an ORCID iD? We highly recommend linking it to your account: it identifies
+  you unambiguously and lets you sign in with ORCID.
+  <a href="{{ signin_url }}" style="color:#0d6efd;">Sign in</a> and open Account in the
+  user menu to link it.
+</p>
+{% endif %}
 <p style="margin:0;color:#475569;">If you did not sign up, you can ignore this email.</p>
 {% endblock %}

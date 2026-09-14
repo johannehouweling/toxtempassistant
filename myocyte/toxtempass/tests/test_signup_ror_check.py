@@ -56,7 +56,7 @@ def test_unmatched_organization_is_refused_with_suggestions(client):
     assert response.json()["success"] is False
     assert response.json()["errors"]["organization"] == [
         Config.ror_unmatched_organization_message,
-        f"Did you mean: {RIVM_NAME} (The Netherlands)?",
+        f"Did you mean: {RIVM_NAME}?",
     ]
     assert not Person.objects.filter(email=SIGNUP["email"]).exists()
 
@@ -109,7 +109,7 @@ def test_suggested_names_are_escaped(client):
         response = client.post(reverse("signup"), SIGNUP)
 
     assert response.json()["errors"]["organization"][1] == (
-        "Did you mean: Lab &lt;b&gt;&amp;&lt;/b&gt; Co (The Netherlands)?"
+        "Did you mean: Lab &lt;b&gt;&amp;&lt;/b&gt; Co?"
     )
 
 
@@ -117,6 +117,7 @@ def test_not_in_ror_checkbox_starts_hidden(client):
     content = client.get(reverse("signup")).content.decode()
     assert '<div id="organization-not-in-ror" hidden>' in content
     assert 'name="organization_not_in_ror"' in content
+    assert 'My organization is not in <a href="https://ror.org"' in content
 
 
 # ── Account tab ───────────────────────────────────────────────────────────────
@@ -140,7 +141,7 @@ def test_account_tab_checks_a_changed_organization(client):
     # The menu shows messages as text, so nothing is escaped here.
     assert refused.json()["errors"]["organization"] == [
         Config.ror_unmatched_organization_message,
-        "Did you mean: Lab & Co (The Netherlands)?",
+        "Did you mean: Lab & Co?",
     ]
     user.refresh_from_db()
     assert user.organization == "RIVM"
@@ -156,7 +157,7 @@ def test_account_tab_checks_a_changed_organization(client):
     assert user.organization == "rivm lab"
 
 
-def test_account_tab_stores_a_match_and_reloads_the_menu(client):
+def test_account_tab_stores_a_match_and_returns_it_for_the_menu(client):
     user = PersonFactory(organization="Old place")
     client.force_login(user)
 
@@ -165,8 +166,9 @@ def test_account_tab_stores_a_match_and_reloads_the_menu(client):
 
     assert response.json() == {
         "success": True,
-        "message": "Your details are saved.",
-        "reload": True,
+        "name": "Lazy Person",
+        "organization": "RIVM",
+        "ror_name": RIVM_NAME,
     }
     user.refresh_from_db()
     assert (user.ror_id, user.ror_checked_organization) == (RIVM_ID, "RIVM")
@@ -182,5 +184,24 @@ def test_account_tab_leaves_an_unchanged_organization_alone(client):
         )
 
     assert response.json()["success"] is True
-    assert response.json()["reload"] is False
     match.assert_not_called()
+
+
+def test_a_new_organization_outside_ror_drops_the_old_match(client):
+    user = PersonFactory(
+        organization="RIVM",
+        ror_id=RIVM_ID,
+        ror_name=RIVM_NAME,
+        ror_checked_organization="RIVM",
+    )
+    client.force_login(user)
+
+    with patch(MATCH) as match:
+        response = _save_profile(
+            client, organization="rivm lab", organization_not_in_ror="on"
+        )
+
+    match.assert_not_called()
+    assert response.json()["ror_name"] == ""
+    user.refresh_from_db()
+    assert (user.organization, user.ror_id, user.ror_name) == ("rivm lab", "", "")

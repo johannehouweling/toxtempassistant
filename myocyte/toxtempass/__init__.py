@@ -353,6 +353,7 @@ class Config:
     reload_busy_max_retries = 30  # e.g., 30 × 10s = 5 minutes
     # ROR organization lookup settings
     ror_organization_api_url = "https://api.ror.org/v2/organizations"
+    ror_website_url = "https://ror.org"
     ror_lookup_timeout_seconds = 3
     ror_domain_lookup_min_query_length = 1
     ror_general_lookup_min_query_length = 3
@@ -373,7 +374,7 @@ class Config:
         "We could not find this organization in the Research Organization Registry "
         "(ROR). Please check it: suggestions appear while you type, starting with "
         "organizations that match your email address. If your organization is not in "
-        "ROR, tick the box below and submit again."
+        'ROR, tick "My organization is not in ROR" and submit again.'
     )
     ror_unmatched_organization_suggestions = 3
     # ORCID settings
