@@ -93,3 +93,17 @@ def test_landing_page_citation_request_links_to_how_to_cite():
     paragraph = landing.split("we would appreciate a citation", 1)[1].split("</p>", 1)[0]
     assert f'href="{reverse("about")}#how-to-cite">How to cite</a>' in paragraph
 
+
+@pytest.mark.django_db
+def test_about_names_the_projects_using_toxtemp_with_links():
+    """VHP4Safety, RISK-HUNT3R and ONTOX are all listed as ToxTemp users, linked."""
+    html = Client().get(reverse("about")).content.decode()
+    sentence = html.split("used by projects such as", 1)[1].split("Filling it in", 1)[0]
+    for url, name in (
+        ("https://vhp4safety.nl/", "VHP4Safety"),
+        ("https://www.risk-hunt3r.eu/", "RISK-HUNT3R"),
+        ("https://ontox-project.eu/", "ONTOX"),
+    ):
+        link = f'href="{url}" target="_blank" rel="noopener noreferrer">{name}</a>'
+        assert link in sentence
+
