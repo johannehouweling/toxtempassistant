@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v3.42.2 (2026-09-14)
+
+### Bug Fixes
+
+- **about**: Peertube instead of youtube, closes #299
+  ([`333150f`](https://github.com/johannehouweling/toxtempassistant/commit/333150f01eb97709a67c4ca255e3c67ee106eb6a))
+
+### Testing
+
+- **about**: Expect the PeerTube video embed instead of YouTube
+  ([`f183749`](https://github.com/johannehouweling/toxtempassistant/commit/f183749a70ee825e17c67854003df05ad916e503))
+
+
 ## v3.42.1 (2026-09-14)
 
 ### Bug Fixes
