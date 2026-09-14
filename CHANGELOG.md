@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v3.43.0 (2026-09-14)
+
+### Bug Fixes
+
+- **about**: Mention ToxTemp in How to cite and link it from the landing page
+  ([`2c872b6`](https://github.com/johannehouweling/toxtempassistant/commit/2c872b6289c8a48ee6bf071e30703c23ff20f9a7))
+
+### Features
+
+- **ui**: Split the user menu into Workspaces and Account settings tabs
+  ([`5b7aa01`](https://github.com/johannehouweling/toxtempassistant/commit/5b7aa010ac347807499dee7353f1be97fb84cdea))
+
+
 ## v3.42.2 (2026-09-14)
 
 ### Bug Fixes
