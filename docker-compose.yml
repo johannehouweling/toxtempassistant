@@ -1,14 +1,4 @@
 name: toxtempass
-
-# Caps each container's Docker log at 5 files of 10 MB. Without a cap these logs
-# grow until the disk is full. docker-stack.yml drops this for the Swarm cluster,
-# which keeps its own logging setup.
-x-logging: &default-logging
-  driver: json-file
-  options:
-    max-size: "10m"
-    max-file: "5"
-
 services:
   # Database
   postgres_for_django:
@@ -16,7 +6,6 @@ services:
     image: postgres:17-alpine
     container_name: postgres_for_django
     restart: unless-stopped
-    logging: *default-logging
     env_file:
       - ${ENV_FILE:-./.env}
     expose:
@@ -31,7 +20,6 @@ services:
     image: postgres:17-alpine
     container_name: postgres_test_for_django
     restart: unless-stopped
-    logging: *default-logging
     env_file:
       - ${ENV_FILE:-./.env} # Use ENV ENV_FILE to .env.dummy for testing to run properly
     expose:
@@ -47,7 +35,6 @@ services:
     image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: minio
     restart: unless-stopped
-    logging: *default-logging
     command: server /data --console-address ":9001"
     env_file:
       - ${ENV_FILE:-./.env}
@@ -79,7 +66,6 @@ services:
     networks:
       - data_network
     restart: "no"
-    logging: *default-logging
 
   backup:
     profiles: ["prod"]
@@ -105,7 +91,6 @@ services:
       - db_network
       - data_network
     restart: unless-stopped
-    logging: *default-logging
 
   # Django app
   djangoapp:
@@ -136,7 +121,6 @@ services:
     user: root
     container_name: djangoapp
     restart: unless-stopped
-    logging: *default-logging
     # Container-side readiness check. Swarm holds a task in "starting" until
     # the first successful healthcheck, so the deploy workflow can simply wait
     # for `docker service ps` to show "Running" instead of doing a docker exec

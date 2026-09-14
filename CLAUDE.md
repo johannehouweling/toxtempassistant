@@ -230,11 +230,7 @@ Selectors and help text for the in-app tour live in `Config.user_onboarding_help
 
 ### Server housekeeping (disk space)
 
-The legacy server once ran out of disk because nothing cleaned up. Three things keep it in check; keep them working when changing deploys or logging:
-
-* **Images:** after a healthy legacy deploy, `deploy.yml` runs `prune-old-images.sh`, which keeps the deployed tag plus the two newest older versions of each of our images (always at least one, however old) for rollback, then removes dangling images and the build cache.
-* **Container logs:** `docker-compose.yml` caps every service's Docker log (`x-logging`); `docker-stack.yml` resets that for Swarm.
-* **Log files in `myocyte/logs`:** the backup container runs logrotate hourly (`dockerfiles/backup-scheduler/logrotate.conf`) for the gunicorn logs and the backup cron log. `django-errors.log` rotates through Django's `RotatingFileHandler`.
+The legacy server once ran out of disk because old images were never removed. After a healthy legacy deploy, `deploy.yml` runs `prune-old-images.sh`, which keeps the deployed tag plus the two newest older versions of each of our images (always at least one, however old) for rollback, then removes dangling images and the build cache.
 
 ## Environment variables
 

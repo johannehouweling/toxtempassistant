@@ -17,8 +17,7 @@ RUN apk add --no-cache \
     postgresql17-client \
     ca-certificates \
     curl \
-    moreutils \
-    logrotate
+    moreutils
 
 COPY --from=quay.io/minio/mc:latest /usr/bin/mc /usr/local/bin/mc
 
@@ -40,7 +39,6 @@ WORKDIR /work
 # Docker Swarm, where each node has no notion of "the repo on this server".
 COPY backup.sh /usr/local/bin/backup.sh
 COPY myocyte/dockerfiles/backup-scheduler/entrypoint.sh /entrypoint.sh
-COPY myocyte/dockerfiles/backup-scheduler/logrotate.conf /etc/toxtempassistant-logrotate.conf
 RUN chmod +x /usr/local/bin/backup.sh /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
