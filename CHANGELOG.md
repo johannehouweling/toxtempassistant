@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v3.44.2 (2026-09-14)
+
+### Bug Fixes
+
+- **deploy**: Keep the server disk from filling up
+  ([`09ebade`](https://github.com/johannehouweling/toxtempassistant/commit/09ebadebe20ec31050cc52d5f5da3f289bdffd61))
+
+- **deploy**: Leave logging as it was
+  ([`5357c34`](https://github.com/johannehouweling/toxtempassistant/commit/5357c349338ce2b5eb47d568a26cb389f704870c))
+
+- **llm**: With no models ticked, users get no model choice
+  ([`952fcce`](https://github.com/johannehouweling/toxtempassistant/commit/952fcceb5d4279babc268565371a02be52042f29))
+
+
 ## v3.44.1 (2026-09-14)
 
 ### Bug Fixes
