@@ -24,7 +24,7 @@ from django.contrib.auth.views import (
 )
 from django.contrib.sitemaps.views import sitemap
 from django.urls import path
-from toxtempass import seo, views
+from toxtempass import account, seo, views
 
 from myocyte import settings
 
@@ -117,6 +117,42 @@ urlpatterns += [
         name="set_llm_preference",
     ),
     path("settings/email/", views.set_email_preference, name="set_email_preference"),
+    # Account and privacy tabs of the user menu (see toxtempass/account.py)
+    path("account/profile/", account.update_profile, name="account_update_profile"),
+    path(
+        "account/email/",
+        account.request_email_change,
+        name="account_request_email_change",
+    ),
+    path(
+        "account/email/cancel/",
+        account.cancel_email_change,
+        name="account_cancel_email_change",
+    ),
+    path(
+        "account/confirm-email-change/<str:token>/",
+        account.confirm_email_change,
+        name="account_confirm_email_change",
+    ),
+    path("account/password/", account.change_password, name="account_change_password"),
+    path("account/orcid/unlink/", account.unlink_orcid, name="account_unlink_orcid"),
+    path("account/shared-files/", account.shared_files, name="account_shared_files"),
+    path(
+        "account/shared-files/stop/", account.stop_sharing, name="account_stop_sharing"
+    ),
+    path(
+        "account/shared-files/undo/",
+        account.undo_stop_sharing,
+        name="account_undo_stop_sharing",
+    ),
+    path("account/export/", account.export_toxtemps, name="account_export"),
+    path(
+        "account/delete/panel/",
+        account.delete_account_panel,
+        name="account_delete_panel",
+    ),
+    path("account/delete/", account.delete_account, name="account_delete"),
+    path("account/deleted/", account.account_deleted, name="account_deleted"),
     # Investigation URLs
     path(
         "investigation/create/",

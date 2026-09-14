@@ -134,6 +134,72 @@ class SignupForm(SignupFormOrcid):
         )
 
 
+class ProfileForm(forms.ModelForm):
+    """Name and organization, edited in the Account tab of the user menu."""
+
+    class Meta:
+        model = Person
+        fields = ("first_name", "last_name", "organization")
+
+    def clean_organization(self) -> str:
+        """Require an organization, as signup does."""
+        organization = (self.cleaned_data.get("organization") or "").strip()
+        if not organization:
+            raise forms.ValidationError("Please enter your organization.")
+        return organization
+
+
+class EmailChangeForm(forms.Form):
+    """A new email address, confirmed with the current password."""
+
+    new_email = forms.EmailField(label="New email address")
+    password = forms.CharField(label="Current password", widget=forms.PasswordInput)
+
+    def __init__(self, user: Person, *args, **kwargs):
+        """Bind the form to the account whose address changes."""
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_new_email(self) -> str:
+        """Refuse the current address and addresses of other accounts."""
+        email = self.cleaned_data["new_email"].strip().lower()
+        if email == self.user.email.lower():
+            raise forms.ValidationError("This is already your email address.")
+        if Person.objects.filter(email__iexact=email).exclude(pk=self.user.pk).exists():
+            raise forms.ValidationError("This email address is already in use.")
+        return email
+
+    def clean_password(self) -> str:
+        """Check the current password, so a left-open session cannot take over."""
+        password = self.cleaned_data["password"]
+        if not self.user.check_password(password):
+            raise forms.ValidationError("The password is not correct.")
+        return password
+
+
+class AccountDeletionForm(forms.Form):
+    """The current password and an explicit confirmation, to delete an account."""
+
+    password = forms.CharField(label="Current password", widget=forms.PasswordInput)
+    confirm = forms.BooleanField(
+        error_messages={
+            "required": "Please confirm that you understand this cannot be undone."
+        }
+    )
+
+    def __init__(self, user: Person, *args, **kwargs):
+        """Bind the form to the account that is deleted."""
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_password(self) -> str:
+        """Check the current password."""
+        password = self.cleaned_data["password"]
+        if not self.user.check_password(password):
+            raise forms.ValidationError("The password is not correct.")
+        return password
+
+
 class MultipleFileInput(forms.ClearableFileInput):
     """FileInput for multiple files with upload progress bar and modal."""
 

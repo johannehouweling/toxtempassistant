@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Account deleted | ToxTempAssistant{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <h1 class="card-title fs-3">Your account is deleted</h1>
+        <p class="card-text">
+          Your account and your data are removed from ToxTempAssistant. Copies in our backups are
+          gone within {{ backup_retention_days }} days. Thank you for using ToxTempAssistant.
+        </p>
+        <a class="btn btn-outline-primary" href="{% url 'about' %}">About ToxTempAssistant</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "toxtempass/email/base.html" %}
+{% block title %}Your account was deleted{% endblock %}
+{% block heading %}Your account was deleted{% endblock %}
+{% block content %}
+<p style="margin:0 0 12px 0;">Hi {{ name|default:email }},</p>
+<p style="margin:0 0 12px 0;">
+  The ToxTempAssistant account for {{ email }} was deleted, together with its data.
+  Copies in our backups are removed within {{ backup_retention_days }} days.
+</p>
+<p style="margin:0;color:#475569;">
+  If you did not delete your account yourself, contact the maintainers right away at
+  <a href="mailto:{{ maintainer_email }}" style="color:#0d6efd;">{{ maintainer_email }}</a>.
+</p>
+{% endblock %}

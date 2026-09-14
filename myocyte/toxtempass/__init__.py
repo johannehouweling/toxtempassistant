@@ -239,7 +239,7 @@ class Config:
         ),
         (
             "What happens to the documents I upload?",
-            "They are used to generate your draft. Keeping the uploaded files so the development team can benchmark and improve the tool is optional: you choose when you create an assay, and you can withdraw consent at any time by contacting the maintainers.",
+            "They are used to generate your draft. Keeping the uploaded files so the development team can benchmark and improve the tool is optional: you choose when you create an assay, and you can stop sharing them at any time under Privacy in the user menu.",
         ),
         (
             "Can I work on a ToxTemp with colleagues?",
@@ -380,8 +380,8 @@ class Config:
     # ── Email notifications (see toxtempass/notifications.py) ─────────────────
     # Days are counted in this timezone for the beta digest and the cost alert.
     _email_timezone: Final[str] = "Europe/Amsterdam"
-    # How often the scheduled job sends due emails and runs the daily checks.
-    _email_jobs_interval_minutes: Final[int] = 2
+    # How often the periodic job runs: due emails, daily checks, withdrawn file deletion.
+    _periodic_jobs_interval_minutes: Final[int] = 2
     # Workspace emails wait this long, so an add that is quickly undone sends
     # nothing and several changes arrive as one email.
     _email_cooloff_minutes: Final[int] = 10
@@ -409,12 +409,24 @@ class Config:
         "login": (20, 600),
         "password_reset": (10, 3600),
         "confirmation_resend": (10, 3600),
+        "email_change": (10, 3600),
+        "password_change": (10, 3600),
+        "account_export": (10, 3600),
+        "account_delete": (10, 3600),
     })
     _email_confirmation_required_message: Final[str] = (
         "Please confirm your email address before generating drafts. Use the link "
         "in the email we sent you, or request a new one."
     )
     _rate_limited_message: Final[str] = "Too many attempts. Please try again later."
+
+    # ── Shared documents (see toxtempass/privacy.py) ──────────────────────────
+    # "Stop sharing" waits this long before deleting the stored copy, so a misclick
+    # can be undone. The file is not used from the moment it is withdrawn.
+    _file_withdrawal_grace_hours: Final[int] = 24
+    # How long backups keep copies. Only shown to users; the backup container
+    # prunes with the same BACKUP_RETENTION_DAYS setting.
+    _backup_retention_days: Final[int] = int(os.getenv("BACKUP_RETENTION_DAYS", "31"))
 
     # Validation settings
     # These are used in the validation pipeline to estimate performance of the LLM

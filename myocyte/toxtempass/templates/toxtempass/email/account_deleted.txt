@@ -1,0 +1,6 @@
+{% extends "toxtempass/email/base.txt" %}{% block content %}Hi {{ name|default:email }},
+
+The ToxTempAssistant account for {{ email }} was deleted, together with its data. Copies in our backups are removed within {{ backup_retention_days }} days.
+
+If you did not delete your account yourself, contact the maintainers right away at {{ maintainer_email }}.
+{% endblock %}

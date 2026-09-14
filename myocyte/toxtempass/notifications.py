@@ -5,8 +5,8 @@ audit trail. Emails a user is waiting for (email confirmation, password changed,
 beta approved) are sent as soon as the triggering transaction commits, from the
 same process: the task queue has a single worker, and an LLM draft can occupy it
 for a long time. Delayed emails wait for :func:`run_email_jobs`, which the task
-queue runs every couple of minutes (``manage.py setup_email_schedule``) and which
-also queues the maintainer digest and alerts and deletes stale signups.
+queue runs every couple of minutes (via ``toxtempass.jobs``) and which also
+queues the maintainer digest and alerts and deletes stale signups.
 
 Spam controls, in the order they apply:
 
@@ -37,10 +37,9 @@ from django.urls import reverse
 from django.utils import timezone
 from django_q.models import Failure
 
-from toxtempass import config, utilities
+from toxtempass import config, privacy, utilities
 from toxtempass.models import (
     EmailLog,
-    Investigation,
     LLMRun,
     Person,
     WorkspaceMember,
@@ -56,6 +55,9 @@ WORKSPACE_ACCESS_LOST = "workspace_access_lost"
 MAINTAINER_BETA_DIGEST = "maintainer_beta_digest"
 MAINTAINER_COST_ALERT = "maintainer_cost_alert"
 MAINTAINER_FAILURE_ALERT = "maintainer_failure_alert"
+EMAIL_CHANGE_CONFIRMATION = "email_change_confirmation"
+EMAIL_CHANGE_REQUESTED = "email_change_requested"
+ACCOUNT_DELETED = "account_deleted"
 
 # Why a member lost access to a workspace, for WORKSPACE_ACCESS_LOST.
 REASON_REMOVED = "removed"
@@ -80,6 +82,9 @@ class EmailKind:
     grouped: bool = False
     # Label of the switch in the user menu (optional kinds only).
     label: str = ""
+    # Payload key holding the address to send to, for emails that must not go to
+    # the account's current address (a new address, or a deleted account).
+    to_payload: str = ""
 
 
 KINDS: dict[str, EmailKind] = {
@@ -88,6 +93,13 @@ KINDS: dict[str, EmailKind] = {
         EmailKind(EMAIL_CONFIRMATION, "toxtempass/email/email_confirmation"),
         EmailKind(BETA_APPROVED, "toxtempass/email/beta_approved_email"),
         EmailKind(PASSWORD_CHANGED, "toxtempass/email/password_changed"),
+        EmailKind(
+            EMAIL_CHANGE_CONFIRMATION,
+            "toxtempass/email/email_change_confirmation",
+            to_payload="new_email",
+        ),
+        EmailKind(EMAIL_CHANGE_REQUESTED, "toxtempass/email/email_change_requested"),
+        EmailKind(ACCOUNT_DELETED, "toxtempass/email/account_deleted", to_payload="to"),
         EmailKind(
             WORKSPACE_ADDED,
             "toxtempass/email/workspace_added",
@@ -194,13 +206,20 @@ def queue_email(
     this kind off or reached the daily cap.
     """
     spec = KINDS[kind]
-    if not spec.maintainer and user is None:
+    payload = payload or {}
+    if spec.maintainer:
+        recipient = ", ".join(settings.ADMINS)
+    elif spec.to_payload:
+        recipient = payload[spec.to_payload]
+    elif user is None:
         raise ValueError(f"{kind} emails need a user")
+    else:
+        recipient = user.email
     log = EmailLog(
         kind=kind,
         user=user,
-        recipient=", ".join(settings.ADMINS) if spec.maintainer else user.email,
-        payload=payload or {},
+        recipient=recipient,
+        payload=payload,
         dedup_key=dedup_key,
         send_after=send_after,
     )
@@ -226,6 +245,8 @@ def _skip_reason(spec: EmailKind, user: Person | None) -> str:
     """Return why an email should not be sent at all, or an empty string."""
     if spec.maintainer:
         return "" if settings.ADMINS else "DJANGO_ADMINS is not set"
+    if user is None:  # only for kinds addressed through the payload
+        return ""
     if not user.email:
         return "The account has no email address"
     if not is_email_enabled(user, spec.key):
@@ -319,6 +340,9 @@ def _recipients(spec: EmailKind, log: EmailLog) -> list[str]:
     """Return the addresses to send to, as they are now."""
     if spec.maintainer:
         return list(settings.ADMINS)
+    if spec.to_payload:
+        address = log.payload.get(spec.to_payload, "")
+        return [address] if address else []
     if log.user is None or not log.user.email:
         return []
     return [log.user.email]
@@ -451,6 +475,55 @@ def _build_password_changed(logs: list[EmailLog]) -> _Built | str:
         context={
             "changed_at": logs[0].created_at,
             "reset_url": utilities.absolute_url(reverse("password_reset")),
+        },
+    )
+
+
+def _build_email_change_confirmation(logs: list[EmailLog]) -> _Built | str:
+    """Build the link that confirms a new address, sent to that new address."""
+    user = logs[0].user
+    new_email = logs[0].payload.get("new_email", "")
+    if user is None:
+        return "The account no longer exists"
+    if user.pending_email != new_email:
+        return "The change was cancelled or replaced by a newer request"
+    token = utilities.generate_email_change_token(user)
+    return _Built(
+        subject="Confirm your new email address",
+        context={
+            "new_email": new_email,
+            "old_email": user.email,
+            "confirm_url": utilities.absolute_url(
+                reverse("account_confirm_email_change", args=[token])
+            ),
+            "valid_days": config._email_confirmation_valid_days,
+        },
+    )
+
+
+def _build_email_change_requested(logs: list[EmailLog]) -> _Built | str:
+    """Build the notice to the current address that a change was requested."""
+    if logs[0].user is None:
+        return "The account no longer exists"
+    return _Built(
+        subject="Your email address is about to change",
+        context={
+            "new_email": logs[0].payload.get("new_email", ""),
+            "reset_url": utilities.absolute_url(reverse("password_reset")),
+        },
+    )
+
+
+def _build_account_deleted(logs: list[EmailLog]) -> _Built:
+    """Build the receipt for a deleted account, sent to its former address."""
+    payload = logs[0].payload
+    return _Built(
+        subject="Your account was deleted",
+        context={
+            "name": payload.get("name", ""),
+            "email": payload.get("to", ""),
+            "backup_retention_days": config._backup_retention_days,
+            "maintainer_email": config.maintainer_email,
         },
     )
 
@@ -614,6 +687,9 @@ _BUILDERS: dict[str, Callable[[list[EmailLog]], _Built | str]] = {
     EMAIL_CONFIRMATION: _build_email_confirmation,
     BETA_APPROVED: _build_beta_approved,
     PASSWORD_CHANGED: _build_password_changed,
+    EMAIL_CHANGE_CONFIRMATION: _build_email_change_confirmation,
+    EMAIL_CHANGE_REQUESTED: _build_email_change_requested,
+    ACCOUNT_DELETED: _build_account_deleted,
     WORKSPACE_ADDED: _build_workspace_added,
     WORKSPACE_ACCESS_LOST: _build_workspace_access_lost,
     MAINTAINER_BETA_DIGEST: _build_beta_digest,
@@ -651,6 +727,21 @@ def request_email_confirmation(user: Person) -> EmailLog | None:
         payload={"existing_account": True},
         dedup_key=f"{EMAIL_CONFIRMATION}:request:{user.pk}",
     )
+
+
+def request_email_change(user: Person) -> None:
+    """Send the confirmation link to ``user.pending_email``; warn the current address."""
+    payload = {"new_email": user.pending_email}
+    queue_email(EMAIL_CHANGE_CONFIRMATION, user=user, payload=payload)
+    queue_email(EMAIL_CHANGE_REQUESTED, user=user, payload=payload)
+
+
+def send_account_deleted_receipt(email: str, name: str) -> None:
+    """Confirm to a deleted account's former address that the deletion happened.
+
+    Queued without a user, because the account is gone by the time it is sent.
+    """
+    queue_email(ACCOUNT_DELETED, payload={"to": email, "name": name})
 
 
 def notify_member_added(member: WorkspaceMember, added_by: Person | None) -> None:
@@ -734,9 +825,8 @@ def _mark_notified(member: WorkspaceMember, now: datetime) -> None:
 def run_email_jobs(now: datetime | None = None) -> None:
     """Send due emails and run the periodic checks. The task queue calls this.
 
-    Scheduled every ``_email_jobs_interval_minutes`` by ``manage.py
-    setup_email_schedule``. Every step is safe to repeat, and a failing step does
-    not stop the others.
+    Called every ``_periodic_jobs_interval_minutes`` by ``jobs.run_periodic_jobs``.
+    Every step is safe to repeat, and a failing step does not stop the others.
     """
     now = now or timezone.now()
     steps = (
@@ -975,13 +1065,7 @@ def _delete_stale_unconfirmed_accounts(now: datetime) -> None:
     for person in stale:
         person_id = person.pk
         try:
-            with transaction.atomic():
-                # Investigation.owner is PROTECT, and every signup gets a demo
-                # investigation, so those have to go first.
-                for investigation in Investigation.objects.filter(owner=person):
-                    investigation.delete()
-                EmailLog.objects.filter(user=person).delete()
-                person.delete()
+            privacy.delete_account(person)
         except Exception:
             logger.exception("Could not delete unconfirmed account %s", person_id)
             continue

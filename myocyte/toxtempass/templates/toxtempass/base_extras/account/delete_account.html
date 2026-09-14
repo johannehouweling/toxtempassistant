@@ -1,0 +1,49 @@
+{# Account tab: deleting the account. Loaded when the section opens; see user_offcanvas.html. #}
+<div class="mb-3">
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'account_export' %}">
+        <i class="bi bi-download me-1"></i>Download all your ToxTemps
+    </a>
+    <div class="form-text">
+        A ZIP file with the {{ assay_count }} ToxTemp{{ assay_count|pluralize }} you can open, as JSON and Markdown. Download it before you delete your account.
+    </div>
+</div>
+
+{% if blockers.owned_workspaces %}
+<div class="alert alert-warning py-2 px-3 small mb-0">
+    You still own {{ blockers.owned_workspaces|length }} workspace{{ blockers.owned_workspaces|length|pluralize }}:
+    {% for workspace in blockers.owned_workspaces %}<strong>{{ workspace.name }}</strong>{% if not forloop.last %}, {% endif %}{% endfor %}.
+    Workspaces cannot be handed over, so delete them yourself first, after checking what the other members lose.
+    <button type="button" class="btn btn-link btn-sm p-0 align-baseline js-show-workspaces">Go to Workspaces</button>
+</div>
+{% elif blockers.superuser %}
+<div class="alert alert-warning py-2 px-3 small mb-0">
+    Maintainer accounts cannot delete themselves. Ask another maintainer to remove your account in the admin.
+</div>
+{% elif blockers.question_sets %}
+<div class="alert alert-warning py-2 px-3 small mb-0">
+    You created versions of the ToxTemp question set, which have to stay. Ask a maintainer to delete your account.
+</div>
+{% else %}
+<p class="small mb-1">Deleting your account removes:</p>
+<ul class="small mb-2">
+    <li>the {{ summary.investigation_count }} investigation{{ summary.investigation_count|pluralize }} you own, with their studies, ToxTemps and answers</li>
+    {% if summary.shared_investigations %}
+    <li>for the other members too, the shared investigations {{ summary.shared_investigations|join:", " }}</li>
+    {% endif %}
+    <li>the {{ summary.document_count }} document{{ summary.document_count|pluralize }} you shared with us</li>
+    <li>your workspace memberships and settings</li>
+</ul>
+<p class="small text-muted mb-2">Studies and ToxTemps you created in other people's investigations stay with those investigations.</p>
+<form class="js-delete-account-form" data-url="{% url 'account_delete' %}" novalidate>
+    <label class="form-label small mb-1" for="account-delete-password">Current password</label>
+    <input type="password" class="form-control form-control-sm mb-2" id="account-delete-password" name="password" autocomplete="current-password" required>
+    <div class="form-check small mb-2">
+        <input class="form-check-input" type="checkbox" id="account-delete-confirm" name="confirm" value="1" required>
+        <label class="form-check-label" for="account-delete-confirm">
+            I understand that this deletes my account and my data for good. It cannot be undone, and copies in backups are gone within {{ backup_retention_days }} days.
+        </label>
+    </div>
+    <button type="submit" class="btn btn-sm btn-danger">Delete my account</button>
+    <div class="small mt-2 js-form-result" hidden></div>
+</form>
+{% endif %}

@@ -1,0 +1,16 @@
+{% extends "toxtempass/email/base.html" %}
+{% block title %}Confirm your new email address{% endblock %}
+{% block heading %}Confirm your new email address{% endblock %}
+{% block content %}
+<p style="margin:0 0 12px 0;">Hi {{ user.get_full_name|default:old_email }},</p>
+<p style="margin:0 0 12px 0;">
+  You asked to change the email address of your ToxTempAssistant account to
+  <strong>{{ new_email }}</strong>. Please confirm it. Until you do, your account keeps
+  using {{ old_email }}.
+</p>
+<p style="margin:18px 0;">
+  <a href="{{ confirm_url }}" style="display:inline-block;padding:12px 18px;background:#0d6efd;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">Confirm my new email address</a>
+</p>
+<p style="margin:0 0 12px 0;color:#475569;">The link works for {{ valid_days }} days.</p>
+<p style="margin:0;color:#475569;">If you did not ask for this, ignore this email; nothing changes.</p>
+{% endblock %}

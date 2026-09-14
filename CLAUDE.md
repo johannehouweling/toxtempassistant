@@ -187,7 +187,7 @@ Key rules to observe when working in this area:
 Every email goes through `toxtempass/notifications.py` and starts as an `EmailLog` row, which is both the outbox and the audit trail (visible in the admin).
 
 * **Don't call `send_mail`/`EmailMessage` directly.** Add a kind to `notifications.KINDS`, templates `email/<kind>.txt` and `.html` extending `email/base.*`, and a builder in `_BUILDERS`; then call `notifications.queue_email(kind, user=..., ...)`.
-* **Immediate vs delayed.** Without `send_after`, the email is sent in-process right after the transaction commits, because the single qcluster worker can be busy with an LLM draft for a long time. With `send_after`, `run_email_jobs` sends it. That job runs every `Config._email_jobs_interval_minutes`, scheduled by `manage.py setup_email_schedule` (called from `django_startup.sh`). In tests, call `notifications.run_email_jobs(now=...)` directly, and wrap immediate emails in `django_capture_on_commit_callbacks(execute=True)`.
+* **Immediate vs delayed.** Without `send_after`, the email is sent in-process right after the transaction commits, because the single qcluster worker can be busy with an LLM draft for a long time. With `send_after`, `run_email_jobs` sends it. That job is part of `jobs.run_periodic_jobs`, which runs every `Config._periodic_jobs_interval_minutes`, scheduled by `manage.py setup_schedules` (called from `django_startup.sh`). In tests, call `notifications.run_email_jobs(now=...)` directly, and wrap immediate emails in `django_capture_on_commit_callbacks(execute=True)`.
 * **Spam controls:**
   * `dedup_key` (unique per logical email).
   * Per-user opt-out for kinds marked `optional`. Only emails caused by someone else's action are optional, and they carry a one-click unsubscribe link.
@@ -201,6 +201,14 @@ Every email goes through `toxtempass/notifications.py` and starts as an `EmailLo
 * **Email confirmation.** `Person.has_confirmed_email` (staff count as confirmed) gates starting LLM drafts, not browsing. New signups still unconfirmed after `Config._unconfirmed_account_delete_days` are deleted. `delete_if_unconfirmed` is off for accounts that predate confirmation; ask those accounts to confirm with `manage.py send_confirmation_requests`.
 * **Abuse limits.** Per-IP rate limits (`utilities.is_rate_limited`, `Config._ip_rate_limits`) cover signup, login, password reset and confirmation resends. Signup also has a honeypot field.
 * **Development.** With `DEBUG`, emails are printed to the console unless `EMAIL_SEND_IN_DEBUG=true`. Links in emails are built from `SITE_URL`.
+
+### Account and privacy (user menu)
+
+The user menu has four tabs: Workspaces, Account, Settings (only with a real model choice, or for staff) and Privacy. Their endpoints live in `toxtempass/account.py`, the rules in `toxtempass/privacy.py`.
+
+* **Email changes** keep the current address until the link sent to `Person.pending_email` is followed; the current address gets a notice.
+* **Shared documents.** "Stop sharing" sets `FileAsset.status = withdrawn`. From then on nothing may read the file: every reader of stored files (admin ZIP download, benchmarking, stats) must filter on `status="available"`. After `Config._file_withdrawal_grace_hours` the periodic job deletes it (the `post_delete` signal removes the MinIO object) and writes a `FileWithdrawal` record. Answers are unaffected.
+* **Account deletion** is refused while the user owns a workspace (never delete workspaces on their behalf), is a superuser, or created a question set. `privacy.delete_account` removes owned investigations first (`Investigation.owner` is PROTECT); the unconfirmed-signup cleanup uses the same function. Users can download every ToxTemp they can open (`privacy.export_toxtemps_zip`, JSON and Markdown) before deleting.
 
 ### File storage
 

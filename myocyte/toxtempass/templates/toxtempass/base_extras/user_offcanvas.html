@@ -8,14 +8,27 @@
         </div>
         <ul class="nav nav-tabs px-3" id="userMenuTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="userMenuWorkspacesTab" data-bs-toggle="tab" data-bs-target="#userMenuWorkspaces" type="button" role="tab" aria-controls="userMenuWorkspaces" aria-selected="true">
+                <button class="nav-link active px-2" id="userMenuWorkspacesTab" data-bs-toggle="tab" data-bs-target="#userMenuWorkspaces" type="button" role="tab" aria-controls="userMenuWorkspaces" aria-selected="true">
                     <i class="bi bi-people me-1"></i>Workspaces
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="userMenuAccountTab" data-bs-toggle="tab" data-bs-target="#userMenuAccount" type="button" role="tab" aria-controls="userMenuAccount" aria-selected="false">
-                    <i class="bi bi-gear me-1"></i>Account settings
+                <button class="nav-link px-2" id="userMenuAccountTab" data-bs-toggle="tab" data-bs-target="#userMenuAccount" type="button" role="tab" aria-controls="userMenuAccount" aria-selected="false">
+                    <i class="bi bi-person-vcard me-1"></i>Account
                     {% if not user.has_confirmed_email %}<i class="bi bi-exclamation-circle-fill text-warning ms-1" role="img" aria-label="Email address not confirmed"></i>{% endif %}
+                </button>
+            </li>
+            {# Settings only has content with a real model choice, or for staff. #}
+            {% if llm_choices|length > 1 or user.is_staff %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link px-2" id="userMenuSettingsTab" data-bs-toggle="tab" data-bs-target="#userMenuSettings" type="button" role="tab" aria-controls="userMenuSettings" aria-selected="false">
+                    <i class="bi bi-sliders me-1"></i>Settings
+                </button>
+            </li>
+            {% endif %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link px-2" id="userMenuPrivacyTab" data-bs-toggle="tab" data-bs-target="#userMenuPrivacy" type="button" role="tab" aria-controls="userMenuPrivacy" aria-selected="false">
+                    <i class="bi bi-shield-lock me-1"></i>Privacy
                 </button>
             </li>
         </ul>
@@ -28,7 +41,29 @@
 
         <div class="tab-pane fade" id="userMenuAccount" role="tabpanel" aria-labelledby="userMenuAccountTab" tabindex="0">
             <div class="mb-4">
-                <h5 class="mb-2">Account</h5>
+                <h5 class="mb-2">Your details</h5>
+                <form class="js-account-form" data-url="{% url 'account_update_profile' %}" novalidate>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small mb-1" for="account-first-name">First name</label>
+                            <input class="form-control form-control-sm" id="account-first-name" name="first_name" value="{{ user.first_name }}" autocomplete="given-name">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small mb-1" for="account-last-name">Last name</label>
+                            <input class="form-control form-control-sm" id="account-last-name" name="last_name" value="{{ user.last_name }}" autocomplete="family-name">
+                        </div>
+                    </div>
+                    <label class="form-label small mb-1" for="account-organization">Organization</label>
+                    <input class="form-control form-control-sm" id="account-organization" name="organization" value="{{ user.organization }}" list="account-ror-suggestions" autocomplete="organization" required>
+                    <datalist id="account-ror-suggestions"></datalist>
+                    {% if user.ror_name %}<div class="form-text">Matched to {{ user.ror_name }}</div>{% endif %}
+                    <button type="submit" class="btn btn-sm btn-primary mt-2">Save</button>
+                    <div class="small mt-2 js-form-result" hidden></div>
+                </form>
+            </div>
+
+            <div class="mb-4">
+                <h5 class="mb-2">Email address</h5>
                 <p class="mb-2 text-break">
                     {{ user.email }}
                     {% if user.has_confirmed_email %}
@@ -38,28 +73,80 @@
                     {% endif %}
                 </p>
                 {% if not user.has_confirmed_email %}
-                <p class="mb-2 small text-muted">Confirm your address with the link we emailed you to generate drafts.</p>
-                <button type="button" class="btn btn-sm btn-outline-primary js-resend-confirmation" data-url="{% url 'resend_confirmation_email' %}">Send the link again</button>
-                <div class="small mt-1 js-resend-confirmation-result" hidden></div>
+                <div class="mb-2">
+                    <p class="mb-2 small text-muted">Confirm your address with the link we emailed you to generate drafts.</p>
+                    <button type="button" class="btn btn-sm btn-outline-primary js-resend-confirmation" data-url="{% url 'resend_confirmation_email' %}">Send the link again</button>
+                    <div class="small mt-1 js-resend-confirmation-result" hidden></div>
+                </div>
                 {% endif %}
-
-                <div class="mt-3">
-                    {% if user.orcid_id %}
-                    <p class="mb-0">
-                        <a href="https://orcid.org/{{ user.orcid_id }}" target="_blank" rel="noopener noreferrer" title="Open your ORCID record"><img class="pe-1" style="height:16px" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="Open your ORCID record"></a>
-                        {{ user.orcid_id }}
-                    </p>
-                    {% else %}
-                    <div class="d-grid">
-                        <a class="btn d-flex align-items-center justify-content-center btn-outline-secondary" href="{% url 'orcid_login' %}">
-                            <img class="h-75 pe-2" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="ORCID" >
-                            Link ORCID
-                        </a>
-                    </div>
-                    {% endif %}
+                {% if user.pending_email %}
+                <div class="alert alert-info py-2 px-3 small">
+                    We sent a confirmation link to <strong>{{ user.pending_email }}</strong>. Your account keeps using {{ user.email }} until you follow it.
+                    <button type="button" class="btn btn-link btn-sm p-0 align-baseline js-account-action" data-url="{% url 'account_cancel_email_change' %}">Cancel this change</button>
+                </div>
+                {% endif %}
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#accountEmailChange" aria-expanded="false" aria-controls="accountEmailChange">Change email address</button>
+                <div class="collapse" id="accountEmailChange">
+                    <form class="js-account-form mt-2" data-url="{% url 'account_request_email_change' %}" novalidate>
+                        <label class="form-label small mb-1" for="account-new-email">New email address</label>
+                        <input type="email" class="form-control form-control-sm mb-2" id="account-new-email" name="new_email" autocomplete="email" required>
+                        <label class="form-label small mb-1" for="account-email-password">Current password</label>
+                        <input type="password" class="form-control form-control-sm" id="account-email-password" name="password" autocomplete="current-password" required>
+                        <div class="form-text">We send a confirmation link to the new address. You keep using your current address until you follow it.</div>
+                        <button type="submit" class="btn btn-sm btn-primary mt-2">Send confirmation link</button>
+                        <div class="small mt-2 js-form-result" hidden></div>
+                    </form>
                 </div>
             </div>
 
+            <div class="mb-4">
+                <h5 class="mb-2">Password</h5>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#accountPasswordChange" aria-expanded="false" aria-controls="accountPasswordChange">Change password</button>
+                <div class="collapse" id="accountPasswordChange">
+                    <form class="js-account-form mt-2" data-url="{% url 'account_change_password' %}" data-reset="true" novalidate>
+                        <label class="form-label small mb-1" for="account-old-password">Current password</label>
+                        <input type="password" class="form-control form-control-sm mb-2" id="account-old-password" name="old_password" autocomplete="current-password" required>
+                        <label class="form-label small mb-1" for="account-new-password1">New password</label>
+                        <input type="password" class="form-control form-control-sm mb-2" id="account-new-password1" name="new_password1" autocomplete="new-password" required>
+                        <label class="form-label small mb-1" for="account-new-password2">New password again</label>
+                        <input type="password" class="form-control form-control-sm" id="account-new-password2" name="new_password2" autocomplete="new-password" required>
+                        <button type="submit" class="btn btn-sm btn-primary mt-2">Change password</button>
+                        <div class="small mt-2 js-form-result" hidden></div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <h5 class="mb-2">ORCID</h5>
+                {% if user.orcid_id %}
+                <p class="mb-0 d-flex align-items-center gap-1">
+                    <a href="https://orcid.org/{{ user.orcid_id }}" target="_blank" rel="noopener noreferrer" title="Open your ORCID record"><img class="pe-1" style="height:16px" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="Open your ORCID record"></a>
+                    <span>{{ user.orcid_id }}</span>
+                    <button type="button" class="btn btn-link btn-sm ms-auto p-0 js-account-action" data-url="{% url 'account_unlink_orcid' %}" data-confirm="Unlink your ORCID iD from this account?">Unlink</button>
+                </p>
+                {% else %}
+                <div class="d-grid">
+                    <a class="btn d-flex align-items-center justify-content-center btn-outline-secondary" href="{% url 'orcid_login' %}">
+                        <img class="h-75 pe-2" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="ORCID" >
+                        Link ORCID
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="mb-2">
+                <h5 class="mb-2">Delete account</h5>
+                <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#accountDeletion" aria-expanded="false" aria-controls="accountDeletion">Delete account…</button>
+                <div class="collapse" id="accountDeletion">
+                    <div class="mt-2" id="accountDeletionContainer" data-url="{% url 'account_delete_panel' %}">
+                        <div class="text-muted small">Loading…</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if llm_choices|length > 1 or user.is_staff %}
+        <div class="tab-pane fade" id="userMenuSettings" role="tabpanel" aria-labelledby="userMenuSettingsTab" tabindex="0">
             {# A single model leaves nothing to choose: the system default is that model. #}
             {% if llm_choices|length > 1 %}
             <div class="mb-4">
@@ -154,6 +241,17 @@
             </script>
             {% endif %}
 
+            {% if user.is_staff %}
+            <div class="d-grid mb-4">
+                <a class="btn btn-outline-secondary d-flex align-items-center justify-content-center" href="{% url 'stats_dashboard' %}">
+                    <i class="bi bi-graph-up-arrow me-2"></i> KPI dashboard
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="tab-pane fade" id="userMenuPrivacy" role="tabpanel" aria-labelledby="userMenuPrivacyTab" tabindex="0">
             {% if email_settings %}
             <div class="mb-4">
                 <h5 class="mb-1">Email notifications</h5>
@@ -191,13 +289,16 @@
             </script>
             {% endif %}
 
-            {% if user.is_staff %}
-            <div class="d-grid mb-4">
-                <a class="btn btn-outline-secondary d-flex align-items-center justify-content-center" href="{% url 'stats_dashboard' %}">
-                    <i class="bi bi-graph-up-arrow me-2"></i> KPI dashboard
-                </a>
+            <div class="mb-4">
+                <h5 class="mb-1">
+                    Shared documents
+                    <i class="bi bi-info-circle text-muted fs-6 ms-1" tabindex="0" role="img" aria-label="What Stop sharing does" data-bs-toggle="tooltip" data-bs-placement="bottom" title="From the moment you click Stop sharing, the file is no longer used to improve ToxTempAssistant. The stored copy is deleted after {{ file_withdrawal_grace_hours }} hours; until then you can undo. Your ToxTemp answers are not changed. Copies in our backups expire within {{ backup_retention_days }} days and are not used either."></i>
+                </h5>
+                <p class="mb-2 text-muted">Documents you allowed the development team to keep to improve ToxTempAssistant.</p>
+                <div id="sharedFilesContainer" data-url="{% url 'account_shared_files' %}" data-stop-url="{% url 'account_stop_sharing' %}" data-undo-url="{% url 'account_undo_stop_sharing' %}">
+                    <div class="text-muted small">Loading…</div>
+                </div>
             </div>
-            {% endif %}
         </div>
     </div>
 
@@ -272,6 +373,206 @@
 {% include "terms_of_service_modal.html" %}
 
     <script>
+        // Account tab: forms and one-click actions post with fetch and show the result inline.
+        (function () {
+          function errorText(data) {
+            if (data.error) return data.error;
+            const messages = Object.values(data.errors || {}).flat();
+            return messages.join(' ') || 'Something went wrong. Please try again.';
+          }
+
+          function showResult(element, ok, text) {
+            element.className = 'small mt-2 js-form-result ' + (ok ? 'text-success' : 'text-danger');
+            element.textContent = text;
+            element.hidden = false;
+          }
+
+          document.querySelectorAll('.js-account-form').forEach(function (form) {
+            form.addEventListener('submit', async function (event) {
+              event.preventDefault();
+              const result = form.querySelector('.js-form-result');
+              const button = form.querySelector('button[type="submit"]');
+              button.disabled = true;
+              try {
+                const response = await fetch(form.dataset.url, {
+                  method: 'POST',
+                  body: new FormData(form),
+                  headers: { 'X-CSRFToken': csrftoken },
+                });
+                const data = await response.json();
+                showResult(result, data.success, data.success ? data.message : errorText(data));
+                if (data.success && form.dataset.reset) form.reset();
+                if (data.success && data.reload) setTimeout(function () { window.location.reload(); }, 1200);
+              } catch (error) {
+                showResult(result, false, 'Network error. Please try again.');
+              }
+              button.disabled = false;
+            });
+          });
+
+          document.querySelectorAll('.js-account-action').forEach(function (button) {
+            button.addEventListener('click', async function () {
+              if (button.dataset.confirm && !window.confirm(button.dataset.confirm)) return;
+              button.disabled = true;
+              try {
+                const response = await fetch(button.dataset.url, {
+                  method: 'POST',
+                  headers: { 'X-CSRFToken': csrftoken },
+                });
+                const data = await response.json();
+                if (!data.success) throw new Error(errorText(data));
+                window.location.reload();
+              } catch (error) {
+                window.alert(error.message || 'Something went wrong. Please try again.');
+                button.disabled = false;
+              }
+            });
+          });
+
+          // Organization suggestions from ROR, as on the signup page.
+          const organization = document.getElementById('account-organization');
+          const suggestions = document.getElementById('account-ror-suggestions');
+          if (organization && suggestions) {
+            let timer = null;
+            organization.addEventListener('input', function () {
+              const query = organization.value.trim();
+              clearTimeout(timer);
+              if (query.length < {{ config.ror_domain_lookup_min_query_length }}) {
+                suggestions.innerHTML = '';
+                return;
+              }
+              timer = setTimeout(async function () {
+                const params = new URLSearchParams({ q: query, email: '{{ user.email|escapejs }}' });
+                try {
+                  const response = await fetch('{% url "ror_organization_lookup" %}?' + params.toString());
+                  const data = await response.json();
+                  suggestions.innerHTML = '';
+                  (data.items || []).forEach(function (item) {
+                    const option = document.createElement('option');
+                    option.value = item.name;
+                    option.label = item.label || item.name;
+                    suggestions.appendChild(option);
+                  });
+                } catch (error) {
+                  suggestions.innerHTML = '';
+                }
+              }, 300);
+            });
+          }
+        })();
+
+        // Privacy tab: the shared documents load when the tab first opens, and
+        // every Stop sharing / Undo swaps in the updated list.
+        (function () {
+          const container = document.getElementById('sharedFilesContainer');
+          const privacyTab = document.getElementById('userMenuPrivacyTab');
+          if (!container || !privacyTab) return;
+          let loaded = false;
+
+          function render(html) {
+            const openPanels = Array.from(container.querySelectorAll('.accordion-collapse.show')).map(function (panel) { return panel.id; });
+            container.innerHTML = html;
+            openPanels.forEach(function (id) {
+              const panel = document.getElementById(id);
+              const toggle = container.querySelector('[data-bs-target="#' + id + '"]');
+              if (!panel || !toggle) return;
+              panel.classList.add('show');
+              toggle.classList.remove('collapsed');
+              toggle.setAttribute('aria-expanded', 'true');
+            });
+          }
+
+          async function load() {
+            try {
+              const response = await fetch(container.dataset.url);
+              if (!response.ok) throw new Error(response.statusText);
+              render(await response.text());
+              loaded = true;
+            } catch (error) {
+              container.innerHTML = '<p class="text-danger small mb-0">Could not load your shared documents.</p>';
+            }
+          }
+
+          privacyTab.addEventListener('shown.bs.tab', function () {
+            if (!loaded) load();
+          });
+
+          container.addEventListener('click', async function (event) {
+            const button = event.target.closest('.js-stop-sharing, .js-undo-sharing');
+            if (!button) return;
+            const stopping = button.classList.contains('js-stop-sharing');
+            const body = new FormData();
+            body.append('file_ids', button.dataset.fileIds);
+            button.disabled = true;
+            try {
+              const response = await fetch(stopping ? container.dataset.stopUrl : container.dataset.undoUrl, {
+                method: 'POST',
+                body: body,
+                headers: { 'X-CSRFToken': csrftoken },
+              });
+              const data = await response.json();
+              if (!data.success) throw new Error(data.error);
+              render(data.html);
+            } catch (error) {
+              button.disabled = false;
+              window.alert('Could not update this document. Please try again.');
+            }
+          });
+        })();
+
+        // Account tab: the deletion section loads when it opens, and posts its own form.
+        (function () {
+          const section = document.getElementById('accountDeletion');
+          const container = document.getElementById('accountDeletionContainer');
+          if (!section || !container) return;
+          let loaded = false;
+
+          section.addEventListener('show.bs.collapse', async function () {
+            if (loaded) return;
+            try {
+              const response = await fetch(container.dataset.url);
+              if (!response.ok) throw new Error(response.statusText);
+              container.innerHTML = await response.text();
+              loaded = true;
+            } catch (error) {
+              container.innerHTML = '<p class="text-danger small mb-0">Could not load this section.</p>';
+            }
+          });
+
+          container.addEventListener('click', function (event) {
+            if (!event.target.closest('.js-show-workspaces')) return;
+            bootstrap.Tab.getOrCreateInstance(document.getElementById('userMenuWorkspacesTab')).show();
+          });
+
+          container.addEventListener('submit', async function (event) {
+            const form = event.target.closest('.js-delete-account-form');
+            if (!form) return;
+            event.preventDefault();
+            const result = form.querySelector('.js-form-result');
+            const button = form.querySelector('button[type="submit"]');
+            button.disabled = true;
+            try {
+              const response = await fetch(form.dataset.url, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: { 'X-CSRFToken': csrftoken },
+              });
+              const data = await response.json();
+              if (data.success) {
+                window.location.href = data.redirect_url;
+                return;
+              }
+              const messages = data.error ? [data.error] : Object.values(data.errors || {}).flat();
+              result.textContent = messages.join(' ') || 'Something went wrong. Please try again.';
+            } catch (error) {
+              result.textContent = 'Network error. Please try again.';
+            }
+            result.className = 'small mt-2 js-form-result text-danger';
+            result.hidden = false;
+            button.disabled = false;
+          });
+        })();
+
         document.addEventListener("DOMContentLoaded", function () {
             // Opening the menu from a button (user menu, share icon in the overview
             // table) starts on Workspaces. Re-opening it from code after a modal has

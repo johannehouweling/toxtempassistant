@@ -1,0 +1,9 @@
+{% extends "toxtempass/email/base.txt" %}{% block content %}Hi {{ user.get_full_name|default:user.email }},
+
+Someone signed in to your ToxTempAssistant account asked to change its email address to {{ new_email }}. The change only happens once the link sent to that address is followed.
+
+If this was you, there is nothing else to do.
+
+If it was not, reset your password right away and let the maintainers know:
+{{ reset_url }}
+{% endblock %}

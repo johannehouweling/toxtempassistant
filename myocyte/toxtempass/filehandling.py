@@ -997,9 +997,10 @@ def download_assay_files_as_zip(
     Raises:
         Exception: If file retrieval or ZIP creation fails
     """
-    # Get all files associated with all answers in this assay
+    # Get all files associated with all answers in this assay. Only files that are
+    # still shared: withdrawn ones must not be used (see toxtempass/privacy.py).
     answer_files = AnswerFile.objects.filter(
-        answer__assay=assay
+        answer__assay=assay, file__status="available"
     ).select_related("file").distinct("file")
 
     if not answer_files.exists():
