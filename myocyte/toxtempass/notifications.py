@@ -232,7 +232,9 @@ def queue_email(
             log.save()
     except IntegrityError:
         if dedup_key and EmailLog.objects.filter(dedup_key=dedup_key).exists():
-            logger.info("Not sending %s email again (key %s)", kind, dedup_key)
+            # No kind or key in the message: CodeQL reads the "password_changed"
+            # kind as a password. The earlier EmailLog row shows what was sent.
+            logger.info("Not sending an email again: its dedup key was used before")
             return None
         raise
     if log.status == EmailLog.Status.PENDING and send_after is None:
