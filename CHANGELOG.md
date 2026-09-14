@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v3.46.0 (2026-09-14)
+
+### Bug Fixes
+
+- **about**: Link the NWA grant number to its NWO project page
+  ([`b6e5038`](https://github.com/johannehouweling/toxtempassistant/commit/b6e50385d812a5d82f0e3115078c335ac8842601))
+
+- **ror**: Make organization suggestions work with ROR API v2
+  ([`d96f59a`](https://github.com/johannehouweling/toxtempassistant/commit/d96f59a1f759a2b624dc3fd81f01a13d47384fa0))
+
+### Features
+
+- **account**: Edit your details inline, clearer ROR prompt, ORCID nudge
+  ([`b3a5fea`](https://github.com/johannehouweling/toxtempassistant/commit/b3a5feacb5f823ae07e6c76d936564ffc8092b91))
+
+
 ## v3.45.1 (2026-09-14)
 
 ### Bug Fixes
