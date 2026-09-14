@@ -164,7 +164,8 @@ def current_llm_key(user) -> str | None:
                 cfg = LLMConfig.load()
                 allowed = cfg.allowed_models or []
                 is_superuser = bool(getattr(user, "is_superuser", False))
-                if not allowed or raw in allowed or is_superuser:
+                # An empty allowlist allows no user choice, only the default.
+                if raw in allowed or is_superuser:
                     return f"{ep.index}:{m.tag}"
 
     # Fall back to the admin-selected default.
@@ -222,7 +223,8 @@ def resolve_user_llm(user, temperature: float | int = 0):
             key = f"{ep.index}:{m.tag}"
             not_retired = m.retirement_status != "retired"
             is_superuser = bool(getattr(user, "is_superuser", False))
-            in_allowlist = not allowed or key in allowed or is_superuser
+            # An empty allowlist allows no user choice, only the default.
+            in_allowlist = key in allowed or is_superuser
             if not_retired and in_allowlist:
                 user_pref = (ep.index, m.tag)
         if user_pref is None:

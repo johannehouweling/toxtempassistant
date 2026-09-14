@@ -568,7 +568,8 @@ class LLMConfigAdmin(admin.ModelAdmin):
                 '<div style="margin:6px 0 22px 0;max-width:900px;line-height:1.5">'
                 "Each row is one Azure deployment. "
                 "Pick one <b>Default</b> (sent for every request unless users have choice), "
-                "tick the ones regular users may <b>Choose</b>. "
+                "tick the ones regular users may <b>Choose</b> "
+                "(none ticked: users get no choice and always use the default). "
                 "Click <b>Run health check</b> to refresh the Status column."
                 "</div>"
             ),

@@ -99,17 +99,18 @@ def llm_info(request) -> dict:
     except Exception:
         cfg = None
 
-    allowed = set(cfg.allowed_models) if cfg and cfg.allowed_models else None
+    # Users may only pick models the admin ticked; with none ticked there is no choice
+    # and everyone gets the default. Superusers also see the other models, marked
+    # "(admin-only)". Labels are just the model_id (no privacy/version cruft).
+    allowed = set(cfg.allowed_models or []) if cfg else set()
     is_superuser = bool(getattr(user, "is_superuser", False))
-    # Build user-facing choices: just model_id as the label (no privacy/version cruft).
-    # Superusers also see admin-only models (not in allowed list), marked "(admin-only)".
     choices = []
     for ep in get_registry():
         for m in ep.models:
             if m.retirement_status == "retired":
                 continue
             key = f"{ep.index}:{m.tag}"
-            in_allowed = not allowed or key in allowed
+            in_allowed = key in allowed
             if not in_allowed and not is_superuser:
                 continue
             label = m.model_id if in_allowed else f"{m.model_id} (admin-only)"

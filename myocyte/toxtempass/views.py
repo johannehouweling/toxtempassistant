@@ -3095,11 +3095,8 @@ def set_llm_preference(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"success": False, "error": "Deployment retired"}, status=400)
 
     cfg = LLMConfig.load()
-    if (
-        cfg.allowed_models
-        and raw not in cfg.allowed_models
-        and not request.user.is_superuser
-    ):
+    # Only models the admin ticked may be chosen; none ticked means no choice.
+    if raw not in (cfg.allowed_models or []) and not request.user.is_superuser:
         return JsonResponse(
             {"success": False, "error": "Not in allowed list"}, status=403
         )
