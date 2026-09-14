@@ -1,11 +1,12 @@
 {% load static%}
 <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasUser" aria-labelledby="offcanvasUserLabel">
-    <div class="offcanvas-header flex-column align-items-stretch pb-0">
-        <div class="d-flex align-items-center mb-3">
+    {# No side padding on the header: the tab bar's bottom line then spans the full width, like the footer's top line. #}
+    <div class="offcanvas-header flex-column align-items-stretch p-0">
+        <div class="d-flex align-items-center px-3 pt-3 mb-3">
             <h5 class="offcanvas-title text-truncate me-auto" id="offcanvasUserLabel"><i class="bi bi-person-badge"></i> {{user.email}}</h5>
             <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
-        <ul class="nav nav-tabs" id="userMenuTabs" role="tablist">
+        <ul class="nav nav-tabs px-3" id="userMenuTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="userMenuWorkspacesTab" data-bs-toggle="tab" data-bs-target="#userMenuWorkspaces" type="button" role="tab" aria-controls="userMenuWorkspaces" aria-selected="true">
                     <i class="bi bi-people me-1"></i>Workspaces
@@ -44,7 +45,10 @@
 
                 <div class="mt-3">
                     {% if user.orcid_id %}
-                    <p class="mb-0"><img class="pe-1" style="height:16px" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="ORCID"> {{ user.orcid_id }}</p>
+                    <p class="mb-0">
+                        <a href="https://orcid.org/{{ user.orcid_id }}" target="_blank" rel="noopener noreferrer" title="Open your ORCID record"><img class="pe-1" style="height:16px" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="Open your ORCID record"></a>
+                        {{ user.orcid_id }}
+                    </p>
                     {% else %}
                     <div class="d-grid">
                         <a class="btn d-flex align-items-center justify-content-center btn-outline-secondary" href="{% url 'orcid_login' %}">
@@ -54,14 +58,6 @@
                     </div>
                     {% endif %}
                 </div>
-
-                {% if user.is_staff %}
-                <div class="d-grid mt-2">
-                    <a class="btn btn-outline-secondary d-flex align-items-center justify-content-center" href="{% url 'stats_dashboard' %}">
-                        <i class="bi bi-graph-up-arrow me-2"></i> KPI dashboard
-                    </a>
-                </div>
-                {% endif %}
             </div>
 
             {# A single model leaves nothing to choose: the system default is that model. #}
@@ -193,6 +189,14 @@
               });
             })();
             </script>
+            {% endif %}
+
+            {% if user.is_staff %}
+            <div class="d-grid mb-4">
+                <a class="btn btn-outline-secondary d-flex align-items-center justify-content-center" href="{% url 'stats_dashboard' %}">
+                    <i class="bi bi-graph-up-arrow me-2"></i> KPI dashboard
+                </a>
+            </div>
             {% endif %}
         </div>
     </div>
