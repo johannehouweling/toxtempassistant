@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v3.42.1 (2026-09-14)
+
+### Bug Fixes
+
+- **about**: Add VHP4Safety to orgs using toxtemp, also add links to vhp4, ontox and riskhuntr,
+  closes #300
+  ([`ab8e37c`](https://github.com/johannehouweling/toxtempassistant/commit/ab8e37c46253bbd7e3fb501843e8076dc7f7e83b))
+
+
 ## v3.42.0 (2026-09-14)
 
 ### Build System
