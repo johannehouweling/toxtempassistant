@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Email address change | ToxTempAssistant{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-body">
+        {% if status == "confirmed" %}
+        <h1 class="card-title fs-3">Email address changed</h1>
+        <p class="card-text">Your account now uses {{ email }}. Sign in with this address from now on.</p>
+        <a class="btn btn-primary" href="{% url 'overview' %}">Continue to ToxTempAssistant</a>
+        {% elif status == "taken" %}
+        <h1 class="card-title fs-3">This address is already in use</h1>
+        <p class="card-text">
+          Another account uses {{ email }} by now, so your address did not change. You can
+          request a change to a different address in the Account tab of the user menu.
+        </p>
+        {% else %}
+        <h1 class="card-title fs-3">This link does not work</h1>
+        <p class="card-text">
+          The link is invalid or has expired, or the change was cancelled or replaced by a
+          newer request. Your email address did not change.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

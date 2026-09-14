@@ -36,6 +36,7 @@ from toxtempass.models import (
     Study,
     Subsection,
     FileAsset,
+    FileWithdrawal,
     Workspace,
     WorkspaceInvestigation,
     WorkspaceMember,
@@ -189,7 +190,20 @@ class AnswerAdmin(admin.ModelAdmin):
 
 @admin.register(FileAsset)
 class FileAssetAdmin(admin.ModelAdmin):
-    list_display = ("id", "original_filename", "uploaded_by")
+    list_display = ("id", "original_filename", "uploaded_by", "status", "delete_after")
+    list_filter = ("status",)
+
+
+@admin.register(FileWithdrawal)
+class FileWithdrawalAdmin(admin.ModelAdmin):
+    """Evidence that shared documents were deleted after their uploader withdrew."""
+
+    list_display = ("deleted_at", "user", "assay", "file_count", "withdrawn_at")
+    readonly_fields = [field.name for field in FileWithdrawal._meta.fields]
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """Refuse adding records by hand; only the deletion job writes them."""
+        return False
 
 @admin.register(Feedback)
 class FeedbackAdmin(admin.ModelAdmin):

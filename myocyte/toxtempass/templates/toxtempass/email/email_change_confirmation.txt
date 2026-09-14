@@ -1,0 +1,11 @@
+{% extends "toxtempass/email/base.txt" %}{% block content %}Hi {{ user.get_full_name|default:old_email }},
+
+You asked to change the email address of your ToxTempAssistant account to {{ new_email }}. Please confirm it. Until you do, your account keeps using {{ old_email }}.
+
+Confirm your new email address:
+{{ confirm_url }}
+
+The link works for {{ valid_days }} days.
+
+If you did not ask for this, ignore this email; nothing changes.
+{% endblock %}

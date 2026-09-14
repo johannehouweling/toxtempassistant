@@ -154,6 +154,15 @@ class Person(AbstractUser):
         ),
     )
 
+    pending_email = models.EmailField(
+        blank=True,
+        default="",
+        help_text=(
+            "New address waiting for confirmation. The account keeps its current "
+            "address until the link sent to this one is followed."
+        ),
+    )
+
     @property
     def has_confirmed_email(self) -> bool:
         """Return whether the user may use features that need a confirmed address.
@@ -786,6 +795,8 @@ class Question(AccessibleModel):
 class FileAsset(models.Model):
     class Status(models.TextChoices):
         AVAILABLE = "available", "Available"
+        # The uploader stopped sharing it: unused, deleted after the waiting period.
+        WITHDRAWN = "withdrawn", "No longer shared"
         DELETED = "deleted", "Deleted"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -810,6 +821,16 @@ class FileAsset(models.Model):
         related_name="uploaded_files",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    withdrawn_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the uploader stopped sharing the file; unused from then on.",
+    )
+    delete_after = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When a withdrawn file is deleted; until then the uploader can undo.",
+    )
 
     def __str__(self) -> str:
         return self.original_filename
@@ -900,6 +921,43 @@ class FileDownloadLog(models.Model):
 
     def __str__(self):
         return f"{self.user.email} downloaded {self.file.original_filename} on {self.downloaded_at.strftime('%Y-%m-%d %H:%M:%S')}"
+
+
+class FileWithdrawal(models.Model):
+    """Shared documents deleted because their uploader stopped sharing them.
+
+    Written when the files are deleted, after the waiting period, as evidence
+    that the withdrawal was carried out. It keeps no file names or content: only
+    who, for which assay and how many.
+    """
+
+    user = models.ForeignKey(
+        Person,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="file_withdrawals",
+    )
+    assay = models.ForeignKey(
+        "Assay",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Empty for files never linked to an assay, or once it is deleted.",
+    )
+    file_count = models.PositiveIntegerField()
+    withdrawn_at = models.DateTimeField(help_text="When the uploader stopped sharing.")
+    deleted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "File withdrawal"
+        verbose_name_plural = "File withdrawals"
+        ordering = ["-deleted_at"]
+
+    def __str__(self) -> str:
+        """Represent as string."""
+        return f"{self.file_count} file(s) of user {self.user_id}, {self.deleted_at}"
 
 
 # Feedback Model

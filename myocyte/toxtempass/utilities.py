@@ -234,6 +234,44 @@ def verify_unsubscribe_token(token: str) -> tuple[Person, str] | None:
     return person, data["kind"]
 
 
+def generate_email_change_token(person: Person) -> str:
+    """Return a signed token that moves ``person`` to ``person.pending_email``.
+
+    It is bound to both the current and the pending address, so it stops working
+    once either changes: another request, a cancel, or a completed change.
+    """
+    from django.core.signing import dumps
+
+    return dumps(
+        {
+            "person_id": person.pk,
+            "old_email": person.email,
+            "new_email": person.pending_email,
+        },
+        salt="toxtempass-email-change",
+    )
+
+
+def verify_email_change_token(token: str) -> tuple[Person, str] | None:
+    """Return ``(person, new_email)`` for a valid email change token, otherwise None."""
+    from django.core.signing import BadSignature, loads
+
+    max_age = config._email_confirmation_valid_days * 24 * 60 * 60
+    try:
+        data = loads(token, salt="toxtempass-email-change", max_age=max_age)
+    except BadSignature:  # SignatureExpired is a subclass
+        return None
+    person = Person.objects.filter(pk=data.get("person_id")).first()
+    if (
+        person is None
+        or not person.pending_email
+        or person.email != data.get("old_email")
+        or person.pending_email != data.get("new_email")
+    ):
+        return None
+    return person, person.pending_email
+
+
 def set_beta_requested(person, comment: str | None = None) -> None:
     """Mark a Person as having requested access to the beta program.
 

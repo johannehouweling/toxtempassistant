@@ -186,4 +186,7 @@ def email_preferences(request: HttpRequest) -> dict:
         "email_settings": email_settings_for(user),
         # Shown in the banner asking unconfirmed users to confirm their address.
         "unconfirmed_account_delete_days": config._unconfirmed_account_delete_days,
+        # Shown in the Privacy tab's explanation of "Stop sharing".
+        "file_withdrawal_grace_hours": config._file_withdrawal_grace_hours,
+        "backup_retention_days": config._backup_retention_days,
     }

@@ -1,0 +1,38 @@
+{# Privacy tab: documents the user shared. Swapped in by fetch; see user_offcanvas.html. #}
+{% if not groups %}
+<p class="text-muted small mb-0">You have not shared any documents.</p>
+{% else %}
+<div class="accordion">
+    {% for group in groups %}
+    <div class="accordion-item">
+        <h6 class="accordion-header">
+            <button class="accordion-button collapsed py-2 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#{{ group.panel_id }}" aria-expanded="false" aria-controls="{{ group.panel_id }}">
+                <span class="text-truncate me-2">{% if group.assay %}{{ group.assay.title }}{% else %}Not linked to an assay{% endif %}</span>
+                <span class="badge text-bg-secondary ms-auto me-2">{{ group.files|length }}</span>
+            </button>
+        </h6>
+        <div id="{{ group.panel_id }}" class="accordion-collapse collapse">
+            <div class="accordion-body px-3 py-2">
+                <ul class="list-unstyled mb-2">
+                    {% for file in group.files %}
+                    <li class="d-flex align-items-center gap-2 py-1 small">
+                        <i class="bi bi-file-earmark{% if file.status == 'withdrawn' %} text-muted{% endif %}"></i>
+                        <span class="text-truncate me-auto{% if file.status == 'withdrawn' %} text-muted text-decoration-line-through{% endif %}" title="{{ file.original_filename }}">{{ file.original_filename }}</span>
+                        {% if file.status == "withdrawn" %}
+                        <span class="text-muted text-nowrap">Removed in {{ file.delete_after|timeuntil }}</span>
+                        <button type="button" class="btn btn-link btn-sm p-0 js-undo-sharing" data-file-ids="{{ file.pk }}">Undo</button>
+                        {% else %}
+                        <button type="button" class="btn btn-outline-danger btn-sm py-0 text-nowrap js-stop-sharing" data-file-ids="{{ file.pk }}">Stop sharing</button>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% if group.available_ids|length > 1 %}
+                <button type="button" class="btn btn-outline-danger btn-sm js-stop-sharing" data-file-ids="{{ group.available_ids|join:',' }}">Stop sharing all {{ group.available_ids|length }} files</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
