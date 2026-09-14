@@ -62,3 +62,23 @@ def test_unconfirmed_address_is_flagged_on_the_account_tab(client):
     confirmed_menu = _menu(client, PersonFactory())
     assert 'aria-label="Email address not confirmed"' not in confirmed_menu
     assert "js-resend-confirmation" not in confirmed_menu
+
+
+def test_kpi_dashboard_is_the_last_account_setting_and_staff_only(client):
+    # Staff but not superuser: the beta wait page redirects superusers away.
+    staff = PersonFactory(is_staff=True)
+    account = _menu(client, staff).split('id="userMenuAccount"', 1)[1]
+    assert account.index("Email notifications") < account.index("KPI dashboard")
+
+    assert "KPI dashboard" not in _menu(client, PersonFactory())
+
+
+def test_linked_orcid_icon_opens_the_record_but_the_id_is_plain_text(client):
+    orcid_id = "0000-0002-1825-0097"
+    menu = _menu(client, PersonFactory(orcid_id=orcid_id))
+    account = menu.split('id="userMenuAccount"', 1)[1]
+
+    assert f'href="https://orcid.org/{orcid_id}"' in account
+    assert f">{orcid_id}</a>" not in account
+    assert orcid_id in account
+    assert "Link ORCID" not in account
