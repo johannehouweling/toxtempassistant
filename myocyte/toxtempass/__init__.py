@@ -436,6 +436,9 @@ class Config:
     # "Stop sharing" waits this long before deleting the stored copy, so a misclick
     # can be undone. The file is not used from the moment it is withdrawn.
     _file_withdrawal_grace_hours: Final[int] = 24
+    # Uploads are read from a private folder of their own under <tmp>/<this name>,
+    # deleted once their text is extracted.
+    upload_temp_dirname: Final[str] = "toxtempass"
     # How long backups keep copies. Only shown to users; the backup container
     # prunes with the same BACKUP_RETENTION_DAYS setting.
     _backup_retention_days: Final[int] = int(os.getenv("BACKUP_RETENTION_DAYS", "31"))

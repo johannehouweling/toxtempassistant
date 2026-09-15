@@ -738,10 +738,10 @@ def get_text_or_bytes_perfile_dict(
             logger.error(f"Error reading '{context_filename}': {e}")
         finally:
             if unlink:
-                try:
-                    context_filename.unlink()
-                except FileNotFoundError:
-                    pass
+                context_filename.unlink(missing_ok=True)
+                # Uploads get a folder of their own (_new_upload_folder); remove it too.
+                if context_filename.parent.parent == _upload_temp_root():
+                    shutil.rmtree(context_filename.parent, ignore_errors=True)
 
     if extract_images:
         summarize_image_entries(document_contents)
@@ -749,29 +749,30 @@ def get_text_or_bytes_perfile_dict(
     return document_contents
 
 
-def convert_to_temporary(file: InMemoryUploadedFile) -> tuple[str, Path]:
-    """Convert an InMemoryUploadedFile to a TemporaryUploadedFile.
+def _upload_temp_root() -> Path:
+    return Path(tempfile.gettempdir()) / config.upload_temp_dirname
 
-    by creating a temporary file on disk with the correct file extension.
 
-    Args:
-    file (InMemoryUploadedFile): The file in memory to convert.
+def _new_upload_folder() -> Path:
+    """Create a private folder for one upload, so it can keep the user's file name.
 
-    Returns:
-    str: Path to the new temporary file
-
+    mkdtemp creates the folder with a random name in one step, readable only by us;
+    two uploads with the same name never share a path.
     """
-    # Create a temporary file with the same extension
-    tmp_dir = Path(tempfile.mktemp(dir=Path(tempfile.gettempdir()) / "toxtempass"))  # noqa: S306
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    temp_file = tmp_dir / file.name
+    root = _upload_temp_root()
+    root.mkdir(exist_ok=True)
+    return Path(tempfile.mkdtemp(dir=root))
 
-    # Write the contents of the InMemoryUploadedFile to the temporary file
+
+def convert_to_temporary(file: InMemoryUploadedFile) -> str:
+    """Write an in-memory upload to disk under its own name and return the path.
+
+    The file extension decides how it is read, so the name is kept.
+    """
+    temp_file = _new_upload_folder() / file.name
     with temp_file.open("wb") as f:
         for chunk in file.chunks():
             f.write(chunk)
-            f.flush()
-
     return str(temp_file)
 
 
@@ -796,7 +797,7 @@ def get_text_or_imagebytes_from_django_uploaded_file(
     for file in files:
         if isinstance(file, TemporaryUploadedFile):
             src_path = Path(file.temporary_file_path())
-            dest_path = src_path.parent / file.name
+            dest_path = _new_upload_folder() / file.name
             # Copy the temporary file to destination retaining the user-provided filename
             shutil.copy(src_path, dest_path)
             temp_files.append(str(dest_path))
