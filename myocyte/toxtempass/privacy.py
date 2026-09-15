@@ -29,6 +29,7 @@ from django.utils.text import slugify
 from guardian.shortcuts import get_objects_for_user
 
 from toxtempass import config
+from toxtempass.demo import DEMO_ASSAY
 from toxtempass.models import (
     AnswerFile,
     Assay,
@@ -218,8 +219,7 @@ def exportable_assays(user: Person) -> QuerySet[Assay]:
     The read-only demo is seeded for every account from a template; it is not the
     user's own work.
     """
-    demo = Q(demo_lock=True) | Q(demo_template=True) | Q(demo_source__isnull=False)
-    return accessible_assays(user).exclude(demo)
+    return accessible_assays(user).exclude(DEMO_ASSAY)
 
 
 def export_toxtemps_zip(user: Person) -> bytes:
