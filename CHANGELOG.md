@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.49.0 (2026-09-15)
+
+### Features
+
+- **ui**: Move How to cite into the user menu's icon buttons and add an About button
+  ([`e361610`](https://github.com/johannehouweling/toxtempassistant/commit/e3616103cfe755633e5c4c01defea6427a43c520))
+
+
 ## v3.48.4 (2026-09-15)
 
 ### Bug Fixes
