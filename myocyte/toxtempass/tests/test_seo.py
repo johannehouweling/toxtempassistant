@@ -85,6 +85,17 @@ def test_signup_page_has_heading_and_description():
     assert "Create a free ToxTempAssistant beta account" in html
 
 
+def test_google_search_console_verification_file():
+    """Search Console expects exactly this line at /<file name>, at the site root."""
+    from toxtempass import config
+
+    response = Client().get(f"/{config.google_verification_file}")
+    assert response.status_code == 200
+    assert response.content.decode() == (
+        f"google-site-verification: {config.google_verification_file}"
+    )
+
+
 def test_favicon_redirects_to_static_file():
     """/favicon.ico is requested by convention and must not 404."""
     response = Client().get("/favicon.ico")

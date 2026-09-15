@@ -314,6 +314,9 @@ class Config:
     )
     reference_toxtempassistant_zenodo_publication = ""
     github_repo_url = "https://github.com/johannehouweling/ToxTempAssistant"
+    # Google Search Console checks this file at the site root to confirm we own the
+    # site, now and from time to time later. It is public by design, not a secret.
+    google_verification_file = "google072b90907d9da524.html"  # pragma: allowlist secret
     # Source JSON of a questionnaire version, as loaded by `init_db --label <label>`.
     questionnaire_json_url_template = (
         "https://github.com/johannehouweling/ToxTempAssistant/blob/main/myocyte/"
