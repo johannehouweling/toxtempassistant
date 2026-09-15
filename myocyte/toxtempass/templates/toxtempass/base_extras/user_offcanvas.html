@@ -40,36 +40,96 @@
         </div>
 
         <div class="tab-pane fade" id="userMenuAccount" role="tabpanel" aria-labelledby="userMenuAccountTab" tabindex="0">
-            {# Identifiers first: the email address in the app, the ORCID iD in the world. #}
-            <div class="mb-4">
-                <h5 class="mb-2">Email address</h5>
-                <p class="mb-2 text-break">
+            {# Who you are first, one row each with a small icon instead of a heading; the buttons below change it. #}
+            {# Name and organization are text, like workspace names: click one to edit it; it saves when you click away. #}
+            <form class="js-profile" data-url="{% url 'account_update_profile' %}" novalidate>
+                <div class="d-flex gap-2 mb-2 js-profile-field">
+                    <i class="bi bi-person text-body-secondary" aria-hidden="true"></i>
+                    <div class="flex-grow-1">
+                        <button type="button" class="btn btn-link p-0 text-body text-decoration-none text-start js-profile-view" aria-label="Edit name" title="Click to edit">
+                            <span class="js-name-value">{{ user.get_full_name|default:"Add your name" }}</span>
+                        </button>
+                        <div class="row g-2 js-profile-inputs" hidden>
+                            <div class="col-6">
+                                <input class="form-control form-control-sm" id="account-first-name" name="first_name" value="{{ user.first_name }}" placeholder="First name" aria-label="First name" autocomplete="given-name">
+                            </div>
+                            <div class="col-6">
+                                <input class="form-control form-control-sm" id="account-last-name" name="last_name" value="{{ user.last_name }}" placeholder="Last name" aria-label="Last name" autocomplete="family-name">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 mb-2 js-profile-field">
+                    <i class="bi bi-building text-body-secondary" aria-hidden="true"></i>
+                    <div class="flex-grow-1">
+                        <button type="button" class="btn btn-link p-0 text-body text-decoration-none text-start js-profile-view" aria-label="Edit organization" title="Click to edit">
+                            <span class="js-organization-value">{{ user.organization }}</span>
+                        </button>
+                        <div class="js-profile-inputs" hidden>
+                            <input class="form-control form-control-sm" id="account-organization" name="organization" value="{{ user.organization }}" placeholder="Organization" aria-label="Organization" list="account-ror-suggestions" autocomplete="organization" required>
+                            <datalist id="account-ror-suggestions"></datalist>
+                            {# Organization errors show here, above the "not in ROR" box they refer to. #}
+                            <div class="small text-danger mt-1 js-organization-error" hidden></div>
+                            {# Shown once a new organization matched no ROR record. #}
+                            <div class="form-check mt-1 js-not-in-ror" hidden>
+                                <input class="form-check-input" type="checkbox" id="account-organization-not-in-ror" name="organization_not_in_ror">
+                                <label class="form-check-label small" for="account-organization-not-in-ror">My organization is not in <a href="{{ config.ror_website_url }}" target="_blank" rel="noopener noreferrer">ROR</a></label>
+                            </div>
+                        </div>
+                        <div class="form-text mt-0 js-ror-match"{% if not user.ror_name %} hidden{% endif %}>Matched to <span class="js-ror-name">{{ user.ror_name }}</span> in ROR</div>
+                    </div>
+                </div>
+                <div class="small mb-2 js-profile-status" hidden></div>
+            </form>
+
+            <div class="d-flex gap-2 mb-2">
+                <i class="bi bi-envelope text-body-secondary" aria-hidden="true"></i>
+                <div class="flex-grow-1 text-break">
                     {{ user.email }}
                     {% if user.has_confirmed_email %}
                     <span class="badge text-bg-success ms-1">Confirmed</span>
                     {% else %}
                     <span class="badge text-bg-warning ms-1">Not confirmed</span>
+                    {# base.html's script looks for the result next to the button. #}
+                    <div class="small text-body-secondary">
+                        Confirm it with the link we emailed you to generate drafts.
+                        <button type="button" class="btn btn-link btn-sm p-0 align-baseline js-resend-confirmation" data-url="{% url 'resend_confirmation_email' %}">Send the link again</button>
+                        <div class="js-resend-confirmation-result" hidden></div>
+                    </div>
                     {% endif %}
-                </p>
-                {% if not user.has_confirmed_email %}
-                <p class="mb-2 small text-muted">Confirm your address with the link we emailed you to generate drafts.</p>
-                {# base.html's script looks for the result next to the button. #}
+                    {% if user.pending_email %}
+                    <div class="small text-body-secondary">
+                        Changes to <strong>{{ user.pending_email }}</strong> once you follow the link we sent there.
+                        <button type="button" class="btn btn-link btn-sm p-0 align-baseline js-account-action" data-url="{% url 'account_cancel_email_change' %}">Cancel this change</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if user.orcid_id %}
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <a class="d-flex" href="https://orcid.org/{{ user.orcid_id }}" target="_blank" rel="noopener noreferrer" title="Open your ORCID record"><img style="height:16px" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="Open your ORCID record"></a>
+                <span>{{ user.orcid_id }}</span>
+                <button type="button" class="btn btn-link btn-sm p-0 ms-auto text-body-secondary js-account-action" data-url="{% url 'account_unlink_orcid' %}" data-confirm="Unlink your ORCID iD from this account?">Unlink</button>
+            </div>
+            {% endif %}
+
+            {# Then what you can do, as buttons as wide as the tab. #}
+            <div class="mt-3">
+                {% if not user.orcid_id %}
                 <div class="d-grid mb-2">
-                    <button type="button" class="btn btn-sm btn-outline-primary js-resend-confirmation" data-url="{% url 'resend_confirmation_email' %}">Send the link again</button>
-                    <div class="small mt-1 js-resend-confirmation-result" hidden></div>
+                    <a class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center" href="{% url 'orcid_login' %}">
+                        <img class="me-1" style="height:16px" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="">
+                        Link ORCID
+                    </a>
                 </div>
                 {% endif %}
-                {% if user.pending_email %}
-                <div class="alert alert-info py-2 px-3 small">
-                    We sent a confirmation link to <strong>{{ user.pending_email }}</strong>. Your account keeps using {{ user.email }} until you follow it.
-                    <button type="button" class="btn btn-link btn-sm p-0 align-baseline js-account-action" data-url="{% url 'account_cancel_email_change' %}">Cancel this change</button>
-                </div>
-                {% endif %}
-                <div class="d-grid">
+
+                <div class="d-grid mb-2">
                     <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#accountEmailChange" aria-expanded="false" aria-controls="accountEmailChange">Change email address</button>
                 </div>
                 <div class="collapse" id="accountEmailChange">
-                    <form class="js-account-form mt-2" data-url="{% url 'account_request_email_change' %}" novalidate>
+                    <form class="js-account-form mb-3" data-url="{% url 'account_request_email_change' %}" novalidate>
                         <div class="form-floating mb-2">
                             <input type="email" class="form-control" id="account-new-email" name="new_email" placeholder="New email address" autocomplete="email" required>
                             <label for="account-new-email">New email address</label>
@@ -85,73 +145,12 @@
                         <div class="small mt-2 js-form-result" hidden></div>
                     </form>
                 </div>
-            </div>
 
-            <div class="mb-4">
-                <h5 class="mb-2">ORCID</h5>
-                {% if user.orcid_id %}
-                <p class="mb-2 d-flex align-items-center gap-1">
-                    <a href="https://orcid.org/{{ user.orcid_id }}" target="_blank" rel="noopener noreferrer" title="Open your ORCID record"><img class="pe-1" style="height:16px" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="Open your ORCID record"></a>
-                    <span>{{ user.orcid_id }}</span>
-                </p>
-                <div class="d-grid">
-                    <button type="button" class="btn btn-sm btn-outline-secondary js-account-action" data-url="{% url 'account_unlink_orcid' %}" data-confirm="Unlink your ORCID iD from this account?">Unlink ORCID</button>
-                </div>
-                {% else %}
-                <div class="d-grid">
-                    <a class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center" href="{% url 'orcid_login' %}">
-                        <img class="me-1" style="height:16px" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="">
-                        Link ORCID
-                    </a>
-                </div>
-                {% endif %}
-            </div>
-
-            <div class="mb-4">
-                <h5 class="mb-2">Your details</h5>
-                {# Shown as text, like workspace names: click a value to edit it; it saves when you click away. #}
-                <form class="js-profile" data-url="{% url 'account_update_profile' %}" novalidate>
-                    <div class="mb-2 js-profile-field">
-                        <div class="text-uppercase fw-semibold small text-muted">Name</div>
-                        <button type="button" class="btn btn-link p-0 text-body text-decoration-none text-start js-profile-view" aria-label="Edit name" title="Click to edit">
-                            <span class="js-name-value">{{ user.get_full_name|default:"Add your name" }}</span>                        </button>
-                        <div class="row g-2 js-profile-inputs" hidden>
-                            <div class="col-6">
-                                <input class="form-control form-control-sm" id="account-first-name" name="first_name" value="{{ user.first_name }}" placeholder="First name" aria-label="First name" autocomplete="given-name">
-                            </div>
-                            <div class="col-6">
-                                <input class="form-control form-control-sm" id="account-last-name" name="last_name" value="{{ user.last_name }}" placeholder="Last name" aria-label="Last name" autocomplete="family-name">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="js-profile-field">
-                        <div class="text-uppercase fw-semibold small text-muted">Organization</div>
-                        <button type="button" class="btn btn-link p-0 text-body text-decoration-none text-start js-profile-view" aria-label="Edit organization" title="Click to edit">
-                            <span class="js-organization-value">{{ user.organization }}</span>                        </button>
-                        <div class="js-profile-inputs" hidden>
-                            <input class="form-control form-control-sm" id="account-organization" name="organization" value="{{ user.organization }}" placeholder="Organization" aria-label="Organization" list="account-ror-suggestions" autocomplete="organization" required>
-                            <datalist id="account-ror-suggestions"></datalist>
-                            {# Organization errors show here, above the "not in ROR" box they refer to. #}
-                            <div class="small text-danger mt-1 js-organization-error" hidden></div>
-                            {# Shown once a new organization matched no ROR record. #}
-                            <div class="form-check mt-1 js-not-in-ror" hidden>
-                                <input class="form-check-input" type="checkbox" id="account-organization-not-in-ror" name="organization_not_in_ror">
-                                <label class="form-check-label small" for="account-organization-not-in-ror">My organization is not in <a href="{{ config.ror_website_url }}" target="_blank" rel="noopener noreferrer">ROR</a></label>
-                            </div>
-                        </div>
-                        <div class="form-text mt-0 js-ror-match"{% if not user.ror_name %} hidden{% endif %}>Matched to <span class="js-ror-name">{{ user.ror_name }}</span> in ROR</div>
-                    </div>
-                    <div class="small mt-1 js-profile-status" hidden></div>
-                </form>
-            </div>
-
-            <div class="mb-4">
-                <h5 class="mb-2">Password</h5>
-                <div class="d-grid">
+                <div class="d-grid mb-2">
                     <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#accountPasswordChange" aria-expanded="false" aria-controls="accountPasswordChange">Change password</button>
                 </div>
                 <div class="collapse" id="accountPasswordChange">
-                    <form class="js-account-form mt-2" data-url="{% url 'account_change_password' %}" data-reset="true" novalidate>
+                    <form class="js-account-form mb-3" data-url="{% url 'account_change_password' %}" data-reset="true" novalidate>
                         <div class="form-floating mb-2">
                             <input type="password" class="form-control" id="account-old-password" name="old_password" placeholder="Current password" autocomplete="current-password" required>
                             <label for="account-old-password">Current password</label>
@@ -170,15 +169,12 @@
                         <div class="small mt-2 js-form-result" hidden></div>
                     </form>
                 </div>
-            </div>
 
-            <div class="mb-2">
-                <h5 class="mb-2">Delete account</h5>
-                <div class="d-grid">
-                    <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#accountDeletion" aria-expanded="false" aria-controls="accountDeletion">Delete account…</button>
+                <div class="d-grid mb-2">
+                    <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#accountDeletion" aria-expanded="false" aria-controls="accountDeletion">Delete account</button>
                 </div>
                 <div class="collapse" id="accountDeletion">
-                    <div class="mt-2" id="accountDeletionContainer" data-url="{% url 'account_delete_panel' %}">
+                    <div class="mb-2" id="accountDeletionContainer" data-url="{% url 'account_delete_panel' %}">
                         <div class="text-muted small">Loading…</div>
                     </div>
                 </div>
