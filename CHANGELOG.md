@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v3.48.0 (2026-09-15)
+
+### Bug Fixes
+
+- **uploads**: Read each upload from its own temporary folder
+  ([`e977329`](https://github.com/johannehouweling/toxtempassistant/commit/e977329592a0f85caac3096a03a55b7177ab9887))
+
+### Features
+
+- **account**: Show the ROR match as a badge with the record's name on hover
+  ([`29d243c`](https://github.com/johannehouweling/toxtempassistant/commit/29d243c22fa256610567541777b55931949db139))
+
+### Refactoring
+
+- **uploads**: Read uploads inside one TemporaryDirectory
+  ([`0b215f2`](https://github.com/johannehouweling/toxtempassistant/commit/0b215f276bd836693db0a7024633c0838cb4fd79))
+
+
 ## v3.47.0 (2026-09-15)
 
 ### Features
