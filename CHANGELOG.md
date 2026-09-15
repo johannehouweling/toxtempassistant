@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v3.51.1 (2026-09-15)
+
+### Bug Fixes
+
+- **account**: Count ToxTemps, not investigations, in the delete summary
+  ([`3099348`](https://github.com/johannehouweling/toxtempassistant/commit/30993482c261e025f6274a4a306a14ba3e657eb2))
+
+### Documentation
+
+- **readme**: Update README with beta version information
+  ([`9507d62`](https://github.com/johannehouweling/toxtempassistant/commit/9507d62759dae4b4651baefd2a0f83ec26f966d3))
+
+
 ## v3.51.0 (2026-09-15)
 
 ### Features
