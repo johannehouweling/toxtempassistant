@@ -333,7 +333,7 @@
             <div class="mb-4">
                 <h5 class="mb-1">
                     Shared documents
-                    <i class="bi bi-info-circle text-muted fs-6 ms-1" tabindex="0" role="img" aria-label="What Stop sharing does" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Stop sharing applies from that moment on: the file is no longer used to improve ToxTempAssistant, and the stored copy is deleted after {{ file_withdrawal_grace_hours }} hours (until then you can undo). Improvements already made with the help of the file are not undone. Your ToxTemp answers are not changed. Copies in our backups expire within {{ backup_retention_days }} days and are not used either."></i>
+                    <i class="bi bi-info-circle text-muted fs-6 ms-1" tabindex="0" role="img" aria-label="What Stop sharing does" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Stop sharing applies from that moment on: the file is no longer used to improve ToxTempAssistant, and the stored copy is deleted after {{ file_withdrawal_grace_hours }} hours (until then you can undo). We improve the tool from many documents together, so what a single file contributed is hard to pin down; should it have played a part in earlier improvements, those stay in place. Your ToxTemp answers are not changed. Copies in our backups expire within {{ backup_retention_days }} days and are not used either."></i>
                 </h5>
                 <p class="mb-2 text-muted">Documents you allowed the development team to keep to improve ToxTempAssistant.</p>
                 <div id="sharedFilesContainer" data-url="{% url 'account_shared_files' %}" data-stop-url="{% url 'account_stop_sharing' %}" data-undo-url="{% url 'account_undo_stop_sharing' %}">
