@@ -208,7 +208,7 @@ def test_ror_match_is_a_badge_naming_the_record_on_hover(client):
     account = _pane(_menu(client, matched), "userMenuAccount")
     assert (
         'data-bs-toggle="tooltip" title="Matched to Avient Corporation (United States) '
-        'in ROR">ROR matched</span>'
+        'in the Research Organization Registry">ROR matched</span>'
     ) in account
     assert "Matched to <span" not in account  # no sentence under the field any more
 
