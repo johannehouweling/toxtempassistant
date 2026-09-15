@@ -34,7 +34,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Set flag to continue tour on next page when form is submitted
-document.querySelector('form').addEventListener('submit', function(e) {
+// The page's own form, not one of the user menu's forms that come before it.
+Array.from(document.forms).find(f => !f.closest('#offcanvasUser')).addEventListener('submit', function(e) {
     const urlName = document.body.getAttribute('data-url-name');
     if (urlName === 'create_assay' || urlName === 'update_assay') {
         localStorage.setItem('continueTourTo', 'add_new');

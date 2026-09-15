@@ -235,7 +235,8 @@
 
       // Event listener for the "Save" button to handle form submission with spinner
       okButton.addEventListener('click', function(){
-        var form = document.querySelector('form');
+        // The page's form, not one of the user menu's forms that come before it.
+        var form = Array.from(document.forms).find(function (f) { return !f.closest('#offcanvasUser'); });
         if (form) {
           // Show the spinner
           okButtonSpinner.style.display = 'inline-flex';

@@ -1,7 +1,8 @@
 <script>
 var response = {}
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.querySelector('form');
+    // The page's own form: the user menu in the header comes first and has forms too.
+    const form = Array.from(document.forms).find(function (f) { return !f.closest('#offcanvasUser'); });
 
     // Inline progress bar elements
     const progressContainer = document.getElementById('uploadProgressContainer');
