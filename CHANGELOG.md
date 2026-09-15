@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v3.48.3 (2026-09-15)
+
+### Bug Fixes
+
+- **privacy**: Say that stopping sharing applies from then on, not to past improvements
+  ([`498c691`](https://github.com/johannehouweling/toxtempassistant/commit/498c6916f4959256f2caa1905f2124982ecc6f70))
+
+- **privacy**: Word past improvements from shared files as a possibility
+  ([`62ea322`](https://github.com/johannehouweling/toxtempassistant/commit/62ea3227c5362dc65192a46fa03faae672a8d5c0))
+
+
 ## v3.48.2 (2026-09-15)
 
 ### Bug Fixes
