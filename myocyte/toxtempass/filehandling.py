@@ -4,7 +4,6 @@ import hashlib
 import json
 import logging
 import mimetypes
-import shutil
 import tempfile
 import warnings
 from io import BytesIO
@@ -15,11 +14,7 @@ from zipfile import ZipFile as ZipFileLib
 
 import tiktoken
 from django.core.files.storage import default_storage
-from django.core.files.uploadedfile import (
-    InMemoryUploadedFile,
-    TemporaryUploadedFile,
-    UploadedFile,
-)
+from django.core.files.uploadedfile import UploadedFile
 from django.http import HttpRequest
 from langchain_community.document_loaders import (
     BSHTMLLoader,
@@ -749,32 +744,6 @@ def get_text_or_bytes_perfile_dict(
     return document_contents
 
 
-def convert_to_temporary(file: InMemoryUploadedFile) -> tuple[str, Path]:
-    """Convert an InMemoryUploadedFile to a TemporaryUploadedFile.
-
-    by creating a temporary file on disk with the correct file extension.
-
-    Args:
-    file (InMemoryUploadedFile): The file in memory to convert.
-
-    Returns:
-    str: Path to the new temporary file
-
-    """
-    # Create a temporary file with the same extension
-    tmp_dir = Path(tempfile.mktemp(dir=Path(tempfile.gettempdir()) / "toxtempass"))  # noqa: S306
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    temp_file = tmp_dir / file.name
-
-    # Write the contents of the InMemoryUploadedFile to the temporary file
-    with temp_file.open("wb") as f:
-        for chunk in file.chunks():
-            f.write(chunk)
-            f.flush()
-
-    return str(temp_file)
-
-
 def get_text_or_imagebytes_from_django_uploaded_file(
     files: UploadedFile,
     extract_images: bool = False,
@@ -793,21 +762,23 @@ def get_text_or_imagebytes_from_django_uploaded_file(
     # report human-readable names when a file fails to produce any output.
     original_names: dict[str, str] = {}
     temp_files = []
-    for file in files:
-        if isinstance(file, TemporaryUploadedFile):
-            src_path = Path(file.temporary_file_path())
-            dest_path = src_path.parent / file.name
-            # Copy the temporary file to destination retaining the user-provided filename
-            shutil.copy(src_path, dest_path)
-            temp_files.append(str(dest_path))
-            original_names[str(dest_path)] = file.name
-        elif isinstance(file, InMemoryUploadedFile):
-            temp_path_str = convert_to_temporary(file)
-            temp_files.append(temp_path_str)
-            original_names[temp_path_str] = file.name
+    # The readers open files by path and pick the reader by extension, so each upload
+    # is written under its own name, in a subfolder of its own so that uploads with
+    # the same name don't collide. The folder is deleted when the block ends, also
+    # after an error.
+    with tempfile.TemporaryDirectory() as temp_dir:
+        for number, file in enumerate(files):
+            temp_path = Path(temp_dir) / str(number) / file.name
+            temp_path.parent.mkdir()
+            with temp_path.open("wb") as destination:
+                for chunk in file.chunks():
+                    destination.write(chunk)
+            temp_files.append(str(temp_path))
+            original_names[str(temp_path)] = file.name
 
-    # md5_dict = calculate_md5_multiplefiles(temp_files)
-    text_dict = get_text_or_bytes_perfile_dict(temp_files, extract_images=extract_images)
+        text_dict = get_text_or_bytes_perfile_dict(
+            temp_files, extract_images=extract_images
+        )
 
     # Determine which input files produced no output entry at all.
     # Every successfully processed file leaves at least one entry whose
