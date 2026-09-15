@@ -16,13 +16,18 @@ DEMO_ASSAY = Q(demo_lock=True) | Q(demo_template=True) | Q(demo_source__isnull=F
 
 
 def without_demo_investigations(
-    investigations: QuerySet[Investigation], keep_pk: int | None = None
+    investigations: QuerySet[Investigation],
+    user: Person | None = None,
+    keep_pk: int | None = None,
 ) -> QuerySet[Investigation]:
     """Leave out investigations that hold a demo, so no new work is added to them.
 
     The demo is a read-only example; studies or assays added to it would be mixed
-    up with it. ``keep_pk`` stays in: the investigation an edited object is in.
+    up with it. Staff and superusers still see it, to look after the demo template.
+    ``keep_pk`` stays in: the investigation an edited object is in.
     """
+    if user is not None and (user.is_staff or user.is_superuser):
+        return investigations
     demo = Assay.objects.filter(DEMO_ASSAY).values("study__investigation")
     return investigations.filter(~Q(pk__in=demo) | Q(pk=keep_pk))
 

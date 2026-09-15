@@ -496,7 +496,7 @@ class StartingForm(forms.Form):
         if user is not None:
             # New drafts never go into the demo (see demo.without_demo_investigations).
             accessible_investigations = without_demo_investigations(
-                get_objects_for_user(user, "toxtempass.view_investigation")
+                get_objects_for_user(user, "toxtempass.view_investigation"), user=user
             )
             self.fields["investigation"].queryset = accessible_investigations
             # Bind the current_user into the provenance helper so Django will call
@@ -586,6 +586,7 @@ class StudyForm(forms.ModelForm):
             # Not into the demo; an edited study keeps its own investigation.
             self.fields["investigation"].queryset = without_demo_investigations(
                 get_objects_for_user(user, "toxtempass.view_investigation"),
+                user=user,
                 keep_pk=self.instance.investigation_id,
             )
             self.fields["investigation"].label_from_instance = partial(
@@ -636,7 +637,11 @@ class AssayForm(forms.ModelForm):
             self.fields["study"].queryset = Study.objects.filter(
                 investigation__in=accessible_investigations
             ).filter(
-                Q(investigation__in=without_demo_investigations(accessible_investigations))
+                Q(
+                    investigation__in=without_demo_investigations(
+                        accessible_investigations, user=user
+                    )
+                )
                 | Q(pk=self.instance.study_id)
             )
             # Show provenance for Study choices when the study's investigation owner differs

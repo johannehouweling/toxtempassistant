@@ -63,6 +63,22 @@ def test_a_new_assay_cannot_go_into_the_demo_study(work):
     assert list(form.fields["study"].queryset) == [work.study]
 
 
+@pytest.mark.parametrize("role", ["is_staff", "is_superuser"])
+def test_staff_and_superusers_still_see_the_demo(work, role):
+    setattr(work.user, role, True)
+    work.user.save()
+
+    start = StartingForm(user=work.user)
+    assert set(start.fields["investigation"].queryset) == {
+        work.investigation,
+        work.demo_investigation,
+    }
+    assert work.demo_assay in start.fields["assay"].queryset
+    study_form = StudyForm(user=work.user)
+    assert work.demo_investigation in study_form.fields["investigation"].queryset
+    assert work.demo_study in AssayForm(user=work.user).fields["study"].queryset
+
+
 def test_editing_the_demo_keeps_its_own_investigation_and_study(work):
     study_form = StudyForm(instance=work.demo_study, user=work.user)
     assert set(study_form.fields["investigation"].queryset) == {
