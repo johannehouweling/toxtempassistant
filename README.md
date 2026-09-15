@@ -1,5 +1,8 @@
+>[!Note]
+> The beta version of this tool is hosted at https://toxtempassistant.vhp4safety.nl and can be accessed free of charge with a local username and password, or with your ORCID iD.
+
 # ToxTempAssistant 
-LLM based web-app to assist users in drafting an annotated toxicity test method template (ToxTemp).
+LLM based web-app to assist users in drafting an annotated toxicity test method template (ToxTemp). 
 
 ToxTemp "was developed (i) to fulfill all requirements of GD211, (ii) to guide the user concerning the types of answers and detail of information required, (iii) >to include acceptance criteria for test elements, and (iv) to define the cells sufficiently and transparently." [1]
 
