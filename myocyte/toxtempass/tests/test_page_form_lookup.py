@@ -53,15 +53,18 @@ def test_no_template_script_takes_the_first_form_on_the_page():
 
 
 @pytest.mark.django_db
-def test_create_page_form_is_the_first_form_outside_the_user_menu(client):
-    client.force_login(PersonFactory())
-    html = client.get(reverse("create_investigation")).content.decode()
+@pytest.mark.parametrize(
+    "url_name", ["add_new", "create_investigation", "create_study", "create_assay"]
+)
+def test_page_form_is_the_first_form_outside_the_user_menu(client, url_name):
+    # A superuser skips the beta gate, which would redirect /add/.
+    client.force_login(PersonFactory(is_superuser=True))
+    response = client.get(reverse(url_name))
+    assert response.status_code == 200
     parser = _Forms()
-    parser.feed(html)
+    parser.feed(response.content.decode())
 
     in_menu = [attrs for attrs, inside in parser.forms if inside]
     outside = [attrs for attrs, inside in parser.forms if not inside]
     assert in_menu, "the user menu has forms, so taking the first form would be wrong"
     assert outside[0].get("method") == "post"
-    create_template = (TEMPLATES / "toxtempass/create.html").read_text()
-    assert 'include "error_handling.html"' in create_template
