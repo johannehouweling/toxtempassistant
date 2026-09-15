@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v3.48.1 (2026-09-15)
+
+### Bug Fixes
+
+- **forms**: Submit create and edit forms with AJAX again
+  ([`677355b`](https://github.com/johannehouweling/toxtempassistant/commit/677355be3ce538041b250816f4fc4ffe62fa1fd6))
+
+### Testing
+
+- **forms**: Check the page form lookup on /add and every create page
+  ([`0c404c5`](https://github.com/johannehouweling/toxtempassistant/commit/0c404c5dea4044e7264b0e9eaaf87775ecc2cedd))
+
+
 ## v3.48.0 (2026-09-15)
 
 ### Bug Fixes
