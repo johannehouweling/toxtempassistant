@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v3.48.4 (2026-09-15)
+
+### Bug Fixes
+
+- **demo**: Don't offer the demo investigation for new drafts, studies or assays
+  ([`8395d5e`](https://github.com/johannehouweling/toxtempassistant/commit/8395d5e116f23d9d9fea6a8d306a1d8f488d1976))
+
+- **demo**: Staff and superusers still see the demo investigation
+  ([`4648b42`](https://github.com/johannehouweling/toxtempassistant/commit/4648b427de8b1a0844340be81c4c3d65b61ca3d5))
+
+
 ## v3.48.3 (2026-09-15)
 
 ### Bug Fixes
