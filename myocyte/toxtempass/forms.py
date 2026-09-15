@@ -11,7 +11,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.forms import widgets
 from django.utils.html import escape, format_html
 from django.utils.safestring import SafeText, mark_safe
@@ -19,6 +19,7 @@ from django_q.tasks import async_task
 from guardian.shortcuts import get_objects_for_user
 
 from toxtempass import config, ror
+from toxtempass.demo import without_demo_investigations
 from toxtempass.filehandling import (
     get_text_or_imagebytes_from_django_uploaded_file,
 )
@@ -493,8 +494,9 @@ class StartingForm(forms.Form):
                 self.fields["question_set"].initial = most_recent_qs.pk
 
         if user is not None:
-            accessible_investigations = get_objects_for_user(
-                user, "toxtempass.view_investigation"
+            # New drafts never go into the demo (see demo.without_demo_investigations).
+            accessible_investigations = without_demo_investigations(
+                get_objects_for_user(user, "toxtempass.view_investigation"), user=user
             )
             self.fields["investigation"].queryset = accessible_investigations
             # Bind the current_user into the provenance helper so Django will call
@@ -581,8 +583,11 @@ class StudyForm(forms.ModelForm):
         """
         super().__init__(*args, **kwargs)
         if user is not None:
-            self.fields["investigation"].queryset = get_objects_for_user(
-                user, "toxtempass.view_investigation"
+            # Not into the demo; an edited study keeps its own investigation.
+            self.fields["investigation"].queryset = without_demo_investigations(
+                get_objects_for_user(user, "toxtempass.view_investigation"),
+                user=user,
+                keep_pk=self.instance.investigation_id,
             )
             self.fields["investigation"].label_from_instance = partial(
                 provenance_label_for_item, current_user=user
@@ -628,8 +633,16 @@ class AssayForm(forms.ModelForm):
             accessible_investigations = get_objects_for_user(
                 user, "toxtempass.view_investigation"
             )
+            # Not into the demo; an edited assay keeps its own study.
             self.fields["study"].queryset = Study.objects.filter(
                 investigation__in=accessible_investigations
+            ).filter(
+                Q(
+                    investigation__in=without_demo_investigations(
+                        accessible_investigations, user=user
+                    )
+                )
+                | Q(pk=self.instance.study_id)
             )
             # Show provenance for Study choices when the study's investigation owner differs
             def _study_label_af(obj, current_user=user):

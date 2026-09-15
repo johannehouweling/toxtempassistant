@@ -5,10 +5,31 @@ from __future__ import annotations
 import logging
 
 from django.db import transaction
+from django.db.models import Q, QuerySet
 
 from toxtempass.models import Answer, Assay, Investigation, LLMStatus, Person, Study
 
 logger = logging.getLogger("demo")
+
+# An assay belongs to the demo when it is the template, a copy of it, or locked.
+DEMO_ASSAY = Q(demo_lock=True) | Q(demo_template=True) | Q(demo_source__isnull=False)
+
+
+def without_demo_investigations(
+    investigations: QuerySet[Investigation],
+    user: Person | None = None,
+    keep_pk: int | None = None,
+) -> QuerySet[Investigation]:
+    """Leave out investigations that hold a demo, so no new work is added to them.
+
+    The demo is a read-only example; studies or assays added to it would be mixed
+    up with it. Staff and superusers still see it, to look after the demo template.
+    ``keep_pk`` stays in: the investigation an edited object is in.
+    """
+    if user is not None and (user.is_staff or user.is_superuser):
+        return investigations
+    demo = Assay.objects.filter(DEMO_ASSAY).values("study__investigation")
+    return investigations.filter(~Q(pk__in=demo) | Q(pk=keep_pk))
 
 
 def seed_demo_assay_for_user(user:Person) -> Assay|None:
