@@ -345,28 +345,37 @@
 
     <div class="border-top px-3 pt-3">
         <div class="d-flex justify-content-between mb-3">
-            <div class="d-flex gap-2">
-                <button id="startOnboardingBtn" class="btn btn-outline-primary">
-                    <i class="bi bi-question-circle me-1"></i> Guided Tour
-                </button>
-                <a class="btn btn-outline-primary" href="{% url 'about' %}">
-                    <i class="bi bi-info-circle me-1"></i> About
-                </a>
-            </div>
+            <button id="startOnboardingBtn" class="btn btn-outline-primary">
+                <i class="bi bi-question-circle me-1"></i> Guided Tour
+            </button>
             <a class="btn btn-secondary" role="button" href="{% url 'logout'%}">Logout</a>
         </div>
+        <script>
+          // Each icon below names itself in a tooltip, like the model badge. Legal and
+          // License already use data-bs-toggle for their dialog, so base.html's tooltip
+          // setup skips them; they are set up here. Clicking hides the tooltip, so it does
+          // not linger over an opened dialog.
+          document.addEventListener('DOMContentLoaded', function () {
+            if (!(window.bootstrap && bootstrap.Tooltip)) return;
+            document.querySelectorAll('.js-footer-tooltip').forEach(function (element) {
+              const tooltip = bootstrap.Tooltip.getOrCreateInstance(element);
+              element.addEventListener('click', function () { tooltip.hide(); });
+            });
+          });
+        </script>
         <div class="d-flex justify-content-center pb-3">
             <div class="btn-group" role="group">
-                <a class="btn btn-sm btn-outline-primary d-flex align-items-center" type="button" href="{{ config.github_repo_url }}">
+                <a class="btn btn-sm btn-outline-primary d-flex align-items-center js-footer-tooltip" href="{{ config.github_repo_url }}" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub">
                     <i class="bi bi-github"></i>
                     {% if config.git_hash %}
                         <span class="ms-1 small text-muted">{{ config.git_hash|slice:":7" }}</span>
                     {% endif %}
                 </a>
-                <a class="btn btn-sm btn-outline-primary" type="button" href="mailto:{{config.maintainer_email}}?subject=%5BToxTempAssistant%5D%20%3CEnter%20Subject%20Here%3E"> <i class="bi bi-envelope-paper-heart"></i></a>
-                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-target="#copyrightModal" data-bs-toggle="modal"> <i class="bi bi-c-circle"></i></button>
-                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-target="#termsModal" data-bs-toggle="modal" href="#"> <i class="bi bi-book"></i> </button>
-                <a class="btn btn-sm btn-outline-primary" href="{% url 'about' %}#how-to-cite" title="How to cite" aria-label="How to cite"> <i class="bi bi-chat-left-quote"></i></a>
+                <a class="btn btn-sm btn-outline-primary js-footer-tooltip" href="{% url 'about' %}" title="About" aria-label="About"><i class="bi bi-info-circle"></i></a>
+                <a class="btn btn-sm btn-outline-primary js-footer-tooltip" href="{% url 'about' %}#how-to-cite" title="How to cite" aria-label="How to cite"><i class="bi bi-chat-left-quote"></i></a>
+                <a class="btn btn-sm btn-outline-primary js-footer-tooltip" href="mailto:{{config.maintainer_email}}?subject=%5BToxTempAssistant%5D%20%3CEnter%20Subject%20Here%3E" title="Contact via Email" aria-label="Contact via Email"><i class="bi bi-envelope-paper-heart"></i></a>
+                <button class="btn btn-sm btn-outline-primary js-footer-tooltip" type="button" data-bs-target="#termsModal" data-bs-toggle="modal" title="Legal" aria-label="Legal"><i class="bi bi-book"></i></button>
+                <button class="btn btn-sm btn-outline-primary js-footer-tooltip" type="button" data-bs-target="#copyrightModal" data-bs-toggle="modal" title="License" aria-label="License"><i class="bi bi-c-circle"></i></button>
                 {% if llm_signature %}
                 <a id="llm-signature-badge"
                       class="btn btn-sm btn-outline-primary d-flex align-items-center"
