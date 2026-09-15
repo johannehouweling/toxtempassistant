@@ -196,3 +196,22 @@ def test_your_details_are_text_to_click_and_edit_without_a_save_button(client):
     assert 'aria-label="Edit organization"' in details
     assert '<div class="row g-2 js-profile-inputs" hidden>' in details
     assert "Save</button>" not in details
+
+
+def test_ror_match_is_a_badge_naming_the_record_on_hover(client):
+    matched = PersonFactory(
+        organization="Avient",
+        ror_id="https://ror.org/00example",
+        ror_name="Avient Corporation (United States)",
+        ror_checked_organization="Avient",
+    )
+    account = _pane(_menu(client, matched), "userMenuAccount")
+    assert (
+        'data-bs-toggle="tooltip" title="Matched to Avient Corporation (United States) '
+        'in ROR">ROR matched</span>'
+    ) in account
+    assert "Matched to <span" not in account  # no sentence under the field any more
+
+    unmatched = PersonFactory(organization="Avient", ror_checked_organization="Avient")
+    account = _pane(_menu(client, unmatched), "userMenuAccount")
+    assert ' hidden>ROR matched</span>' in account

@@ -46,9 +46,11 @@
                 <div class="d-flex gap-2 mb-2 js-profile-field">
                     <i class="bi bi-person text-body-secondary" aria-hidden="true"></i>
                     <div class="flex-grow-1">
-                        <button type="button" class="btn btn-link p-0 text-body text-decoration-none text-start js-profile-view" aria-label="Edit name" title="Click to edit">
-                            <span class="js-name-value">{{ user.get_full_name|default:"Add your name" }}</span>
-                        </button>
+                        <div class="js-profile-display">
+                            <button type="button" class="btn btn-link p-0 text-body text-decoration-none text-start js-profile-view" aria-label="Edit name" title="Click to edit">
+                                <span class="js-name-value">{{ user.get_full_name|default:"Add your name" }}</span>
+                            </button>
+                        </div>
                         <div class="row g-2 js-profile-inputs" hidden>
                             <div class="col-6">
                                 <input class="form-control form-control-sm" id="account-first-name" name="first_name" value="{{ user.first_name }}" placeholder="First name" aria-label="First name" autocomplete="given-name">
@@ -62,9 +64,13 @@
                 <div class="d-flex gap-2 mb-2 js-profile-field">
                     <i class="bi bi-building text-body-secondary" aria-hidden="true"></i>
                     <div class="flex-grow-1">
-                        <button type="button" class="btn btn-link p-0 text-body text-decoration-none text-start js-profile-view" aria-label="Edit organization" title="Click to edit">
-                            <span class="js-organization-value">{{ user.organization }}</span>
-                        </button>
+                        <div class="js-profile-display">
+                            <button type="button" class="btn btn-link p-0 text-body text-decoration-none text-start js-profile-view" aria-label="Edit organization" title="Click to edit">
+                                <span class="js-organization-value">{{ user.organization }}</span>
+                            </button>
+                            {# Like the email badge; hovering or focusing it names the ROR record. #}
+                            <span class="badge text-bg-success ms-1 js-ror-match" tabindex="0" data-bs-toggle="tooltip" title="Matched to {{ user.ror_name }} in ROR"{% if not user.ror_name %} hidden{% endif %}>ROR matched</span>
+                        </div>
                         <div class="js-profile-inputs" hidden>
                             <input class="form-control form-control-sm" id="account-organization" name="organization" value="{{ user.organization }}" placeholder="Organization" aria-label="Organization" list="account-ror-suggestions" autocomplete="organization" required>
                             <datalist id="account-ror-suggestions"></datalist>
@@ -76,7 +82,6 @@
                                 <label class="form-check-label small" for="account-organization-not-in-ror">My organization is not in <a href="{{ config.ror_website_url }}" target="_blank" rel="noopener noreferrer">ROR</a></label>
                             </div>
                         </div>
-                        <div class="form-text mt-0 js-ror-match"{% if not user.ror_name %} hidden{% endif %}>Matched to <span class="js-ror-name">{{ user.ror_name }}</span> in ROR</div>
                     </div>
                 </div>
                 <div class="small mb-2 js-profile-status" hidden></div>
@@ -483,7 +488,7 @@
               return Array.from(field.querySelectorAll('.js-profile-inputs input:not([type="checkbox"])'));
             };
             const setOpen = function (field, open) {
-              field.querySelector('.js-profile-view').hidden = open;
+              field.querySelector('.js-profile-display').hidden = open;
               field.querySelector('.js-profile-inputs').hidden = !open;
             };
             const clearOrganizationCheck = function () {
@@ -524,7 +529,12 @@
                 profile.querySelector('.js-name-value').textContent = data.name || 'Add your name';
                 profile.querySelector('.js-organization-value').textContent = data.organization;
                 const match = profile.querySelector('.js-ror-match');
-                match.querySelector('.js-ror-name').textContent = data.ror_name;
+                const matchText = 'Matched to ' + data.ror_name + ' in ROR';
+                if (window.bootstrap && bootstrap.Tooltip) {
+                  bootstrap.Tooltip.getOrCreateInstance(match).setContent({ '.tooltip-inner': matchText });
+                } else {
+                  match.title = matchText;
+                }
                 match.hidden = !data.ror_name;
                 clearOrganizationCheck();
                 setOpen(field, false);
