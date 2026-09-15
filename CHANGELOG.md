@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.46.1 (2026-09-15)
+
+### Bug Fixes
+
+- **deps**: Update unstructured, langchain and setuptools past security alerts
+  ([`34655d1`](https://github.com/johannehouweling/toxtempassistant/commit/34655d14f1c2cd7934f3038545e5c7f7d735aebe))
+
+
 ## v3.46.0 (2026-09-14)
 
 ### Bug Fixes
