@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v3.50.0 (2026-09-15)
+
+### Features
+
+- **seo**: Serve the Google Search Console verification file
+  ([`7f5486a`](https://github.com/johannehouweling/toxtempassistant/commit/7f5486a2ce65c4b5760d1b368db7e99b4700b9b6))
+
+### Refactoring
+
+- **seo**: Verify Google Search Console with a meta tag instead of a file
+  ([`8e4ee62`](https://github.com/johannehouweling/toxtempassistant/commit/8e4ee620f3b086414183d6d6d533d6275ea79752))
+
+
 ## v3.49.0 (2026-09-15)
 
 ### Features
