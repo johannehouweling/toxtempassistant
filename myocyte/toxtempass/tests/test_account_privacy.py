@@ -388,6 +388,24 @@ def test_deleting_an_account_removes_its_data_and_sends_a_receipt(
     assert client.get(reverse("account_deleted")).status_code == 200
 
 
+def test_deletion_summary_counts_toxtemps_and_names_the_demo_apart(client):
+    user = _with_password()
+    question_set = _question().subsection.section.question_set
+    study = StudyFactory(investigation=InvestigationFactory(owner=user))
+    AssayFactory.create_batch(2, study=study, question_set=question_set)
+    AssayFactory(
+        study=StudyFactory(investigation=InvestigationFactory(owner=user)),
+        question_set=question_set,
+        demo_lock=True,
+    )
+    client.force_login(user)
+
+    panel = client.get(reverse("account_delete_panel")).content.decode()
+
+    assert "the 2 ToxTemps in investigations you own" in panel
+    assert "your copy of the read-only demo ToxTemp" in panel
+
+
 def test_workspaces_nobody_else_is_in_are_deleted_with_the_account(client):
     user = _with_password()
     workspace = WorkspaceFactory(owner=user, name="Just me")

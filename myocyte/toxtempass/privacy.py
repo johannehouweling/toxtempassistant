@@ -284,6 +284,10 @@ def deletion_blockers(user: Person) -> dict:
 def deletion_summary(user: Person) -> dict:
     """Describe what deleting ``user``'s account removes, for the confirmation."""
     investigations = Investigation.objects.filter(owner=user)
+    # Counted in ToxTemps, as the overview lists them; the demo is named apart.
+    own_assays = Assay.objects.filter(
+        study__investigation__in=investigations, question_set__isnull=False
+    )
     _with_others, alone = _owned_workspaces(user)
     # Links into the user's own one-person workspaces affect nobody else.
     shared_elsewhere = (
@@ -294,7 +298,8 @@ def deletion_summary(user: Person) -> dict:
     )
     return {
         "own_workspaces": [workspace.name for workspace in alone],
-        "investigation_count": investigations.count(),
+        "assay_count": own_assays.exclude(DEMO_ASSAY).count(),
+        "has_demo": own_assays.filter(DEMO_ASSAY).exists(),
         "shared_investigations": [
             f"{link.investigation.title} ({link.workspace.name})"
             for link in shared_elsewhere

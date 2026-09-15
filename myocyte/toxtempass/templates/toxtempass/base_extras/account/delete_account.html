@@ -28,7 +28,10 @@
 {% else %}
 <p class="small mb-1">Deleting your account removes:</p>
 <ul class="small mb-2">
-    <li>the {{ summary.investigation_count }} investigation{{ summary.investigation_count|pluralize }} you own, with their studies, ToxTemps and answers</li>
+    <li>the {{ summary.assay_count }} ToxTemp{{ summary.assay_count|pluralize }} in investigations you own, with their answers, and those investigations and studies</li>
+    {% if summary.has_demo %}
+    <li>your copy of the read-only demo ToxTemp</li>
+    {% endif %}
     {% if summary.own_workspaces %}
     <li>your workspace{{ summary.own_workspaces|length|pluralize }} {{ summary.own_workspaces|join:", " }}, which nobody else is in</li>
     {% endif %}
