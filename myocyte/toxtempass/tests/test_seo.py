@@ -85,15 +85,17 @@ def test_signup_page_has_heading_and_description():
     assert "Create a free ToxTempAssistant beta account" in html
 
 
-def test_google_search_console_verification_file():
-    """Search Console expects exactly this line at /<file name>, at the site root."""
+@pytest.mark.django_db
+def test_landing_page_carries_the_google_search_console_verification_tag():
+    """Search Console confirms we own the site by finding this tag on the landing page."""
     from toxtempass import config
 
-    response = Client().get(f"/{config.google_verification_file}")
-    assert response.status_code == 200
-    assert response.content.decode() == (
-        f"google-site-verification: {config.google_verification_file}"
-    )
+    html = Client().get(reverse("overview")).content.decode()
+    head = html.split("</head>", 1)[0]
+    assert (
+        f'<meta name="google-site-verification" '
+        f'content="{config.google_site_verification}">'
+    ) in head
 
 
 def test_favicon_redirects_to_static_file():

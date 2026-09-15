@@ -1,12 +1,10 @@
-"""Crawler endpoints: robots.txt, sitemap.xml, favicon, Google verification file."""
+"""Crawler-facing endpoints: robots.txt, sitemap.xml and the root favicon."""
 
 from django.contrib.sitemaps import Sitemap
 from django.http import HttpRequest, HttpResponse, HttpResponsePermanentRedirect
 from django.templatetags.static import static
 from django.urls import reverse
 from django.views.decorators.http import require_GET
-
-from toxtempass import config
 
 # Everything below these prefixes needs a login, so crawlers would only collect
 # redirects to the landing page.
@@ -52,15 +50,6 @@ def robots_txt(request: HttpRequest) -> HttpResponse:
     lines += [f"Disallow: {prefix}" for prefix in ROBOTS_DISALLOWED_PREFIXES]
     lines.append(f"Sitemap: {request.build_absolute_uri(reverse('sitemap'))}")
     return HttpResponse("\n".join(lines) + "\n", content_type="text/plain")
-
-
-@require_GET
-def google_verification(request: HttpRequest) -> HttpResponse:
-    """Serve the file Google Search Console fetches to confirm we own the site."""
-    return HttpResponse(
-        f"google-site-verification: {config.google_verification_file}",
-        content_type="text/html",
-    )
 
 
 @require_GET
