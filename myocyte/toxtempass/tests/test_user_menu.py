@@ -215,3 +215,21 @@ def test_ror_match_is_a_badge_naming_the_record_on_hover(client):
     unmatched = PersonFactory(organization="Avient", ror_checked_organization="Avient")
     account = _pane(_menu(client, unmatched), "userMenuAccount")
     assert ' hidden>ROR matched</span>' in account
+
+
+def test_footer_has_about_after_the_tour_and_how_to_cite_after_the_legal_buttons(client):
+    menu = _menu(client, PersonFactory())
+    start = menu.index('class="border-top px-3 pt-3"')
+    footer = menu[start : menu.index("<!-- Modal -->")]
+    about = reverse("about")
+
+    assert "If useful, please cite" not in footer
+    tour = footer.index('id="startOnboardingBtn"')
+    about_button = footer.index(f'href="{about}"')
+    logout = footer.index(f'href="{reverse("logout")}"')
+    assert tour < about_button < logout
+
+    terms = footer.index('data-bs-target="#termsModal"')
+    cite = footer.index(f'href="{about}#how-to-cite"')
+    assert terms < cite
+    assert 'aria-label="How to cite"> <i class="bi bi-chat-left-quote"></i></a>' in footer
