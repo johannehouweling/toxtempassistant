@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.51.0 (2026-09-15)
+
+### Features
+
+- **ui**: Name each user menu icon in a tooltip and move About into the icons
+  ([`ff6ff7e`](https://github.com/johannehouweling/toxtempassistant/commit/ff6ff7ee2fa681ee94f2626586f55f78b0949660))
+
+
 ## v3.50.0 (2026-09-15)
 
 ### Features
