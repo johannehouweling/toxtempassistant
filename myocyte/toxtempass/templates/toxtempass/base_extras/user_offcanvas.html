@@ -69,7 +69,7 @@
                                 <span class="js-organization-value">{{ user.organization }}</span>
                             </button>
                             {# Like the email badge; hovering or focusing it names the ROR record. #}
-                            <span class="badge text-bg-success ms-1 js-ror-match" tabindex="0" data-bs-toggle="tooltip" title="Matched to {{ user.ror_name }} in ROR"{% if not user.ror_name %} hidden{% endif %}>ROR matched</span>
+                            <span class="badge text-bg-success ms-1 js-ror-match" tabindex="0" data-bs-toggle="tooltip" title="Matched to {{ user.ror_name }} in the Research Organization Registry"{% if not user.ror_name %} hidden{% endif %}>ROR matched</span>
                         </div>
                         <div class="js-profile-inputs" hidden>
                             <input class="form-control form-control-sm" id="account-organization" name="organization" value="{{ user.organization }}" placeholder="Organization" aria-label="Organization" list="account-ror-suggestions" autocomplete="organization" required>
@@ -529,7 +529,7 @@
                 profile.querySelector('.js-name-value').textContent = data.name || 'Add your name';
                 profile.querySelector('.js-organization-value').textContent = data.organization;
                 const match = profile.querySelector('.js-ror-match');
-                const matchText = 'Matched to ' + data.ror_name + ' in ROR';
+                const matchText = 'Matched to ' + data.ror_name + ' in the Research Organization Registry';
                 if (window.bootstrap && bootstrap.Tooltip) {
                   bootstrap.Tooltip.getOrCreateInstance(match).setContent({ '.tooltip-inner': matchText });
                 } else {
