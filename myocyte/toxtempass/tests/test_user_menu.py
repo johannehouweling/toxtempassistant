@@ -1,5 +1,6 @@
 """Tests for the tabbed user menu (the offcanvas opened from the header)."""
 
+import re
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -61,7 +62,7 @@ def test_menu_opens_on_workspaces_and_puts_privacy_in_its_own_tab(client):
     assert 'class="nav-link active px-2" id="userMenuWorkspacesTab"' in menu
     assert "New Workspace" in _pane(menu, "userMenuWorkspaces")
     account = _pane(menu, "userMenuAccount")
-    assert "Your details" in account
+    assert 'class="js-profile"' in account
     assert "Delete account" in account
     privacy = _pane(menu, "userMenuPrivacy")
     assert "Email notifications" in privacy
@@ -137,28 +138,36 @@ def test_linked_orcid_icon_opens_the_record_but_the_id_is_plain_text(client):
     assert f">{orcid_id}</a>" not in account
     assert f"<span>{orcid_id}</span>" in account
     assert "Link ORCID" not in account
+    # The iD is a row under the email address, with a small unlink link beside it.
+    row = account.index(f"<span>{orcid_id}</span>")
+    assert account.index("bi-envelope") < row < account.index("Change email address")
+    assert f'data-url="{reverse("account_unlink_orcid")}"' in account[row:]
 
 
-def test_account_tab_puts_identifiers_first_and_deletion_last(client):
-    account = _pane(_menu(client, PersonFactory()), "userMenuAccount")
-    headings = [
-        "Email address",
-        "ORCID",
-        "Your details",
-        "Password",
-        "Delete account",
+def test_account_tab_lists_who_you_are_then_buttons_without_headings(client):
+    account = _pane(_menu(client, PersonFactory(orcid_id=None)), "userMenuAccount")
+    assert "<h5" not in account  # each row's value or button says what it is
+    order = [
+        'class="js-profile"',
+        "bi-envelope",
+        "Link ORCID",
+        "Change email address",
+        "Change password",
+        "Delete account</button>",
     ]
-    positions = [account.index(f'<h5 class="mb-2">{name}</h5>') for name in headings]
+    positions = [account.index(item) for item in order]
     assert positions == sorted(positions)
+    assert "Delete account…" not in account
 
 
 def test_link_orcid_spans_the_tab_like_the_other_buttons(client):
     account = _pane(_menu(client, PersonFactory(orcid_id=None)), "userMenuAccount")
-    assert (
-        '<div class="d-grid">\n'
-        '                    <a class="btn btn-sm btn-outline-secondary d-flex '
-        f'align-items-center justify-content-center" href="{reverse("orcid_login")}">'
-    ) in account
+    button = (
+        r'<div class="d-grid mb-2">\s*<a class="btn btn-sm btn-outline-secondary d-flex '
+        r'align-items-center justify-content-center" '
+        f'href="{re.escape(reverse("orcid_login"))}">'
+    )
+    assert re.search(button, account)
 
 
 def test_not_in_ror_checkbox_is_hidden_in_the_account_tab(client):
@@ -178,7 +187,8 @@ def test_organization_errors_show_between_the_field_and_the_not_in_ror_box(clien
 def test_your_details_are_text_to_click_and_edit_without_a_save_button(client):
     user = PersonFactory(first_name="Ada", last_name="Lovelace", organization="RIVM")
     account = _pane(_menu(client, user), "userMenuAccount")
-    details = account[account.index("Your details") : account.index(">Password</h5>")]
+    start = account.index('class="js-profile"')
+    details = account[start : account.index("</form>", start)]
 
     assert '<span class="js-name-value">Ada Lovelace</span>' in details
     assert '<span class="js-organization-value">RIVM</span>' in details
