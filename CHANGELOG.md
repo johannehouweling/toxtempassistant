@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.47.0 (2026-09-15)
+
+### Features
+
+- **account**: Show who you are first in the Account tab, without headings
+  ([`2ffca3e`](https://github.com/johannehouweling/toxtempassistant/commit/2ffca3e33e2030fa2e3c0660229b37ee1b2245f3))
+
+
 ## v3.46.1 (2026-09-15)
 
 ### Bug Fixes
