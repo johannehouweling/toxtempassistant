@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.48.2 (2026-09-15)
+
+### Bug Fixes
+
+- **account**: Spell out Research Organization Registry in the ROR badge tooltip
+  ([`0576152`](https://github.com/johannehouweling/toxtempassistant/commit/0576152984b7fc2a79acdf5f4b04a4edd6bac90d))
+
+
 ## v3.48.1 (2026-09-15)
 
 ### Bug Fixes
