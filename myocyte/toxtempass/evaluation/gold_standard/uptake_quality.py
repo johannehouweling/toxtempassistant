@@ -292,7 +292,7 @@ def _cell(col: str, value: object) -> str:
     return str(value)
 
 
-def make_figure(tbl: pd.DataFrame, summary: str) -> go.Figure:
+def make_figure(tbl: pd.DataFrame, summary: str, title: str) -> go.Figure:
     """Render the table landscape, wide enough for the assay titles."""
     n = len(tbl)
     zebra = ["#f7f9fa" if i % 2 else "white" for i in range(n)]
@@ -318,7 +318,7 @@ def make_figure(tbl: pd.DataFrame, summary: str) -> go.Figure:
     fig.update_layout(
         title=dict(
             text=(
-                "<b>ToxTempAssistant — uptake and what became of the model's drafts</b>"
+                f"<b>{title}</b>"
                 f"<br><span style='font-size:13px'>{'<br>'.join(sub)}</span>"
             ),
             x=0.01, xanchor="left", font=dict(size=18),
@@ -393,7 +393,11 @@ def main() -> None:
         + (f" · assays created on or before {until}" if until else "")
         + f". Scientists have accepted {len(acc)} answers "
         f"({len(acc) / max(len(answers), 1):.0%} of the questionnaire), of which "
-        f"{int(acc.final_is_nf.sum())} state the information was absent."
+        f"{int(acc.final_is_nf.sum())} state the information was absent. "
+        "A draft counts as substantive when the assistant answered the question from "
+        "the documents instead of stating that the information was absent — it says "
+        "nothing about whether the answer is correct, which is what the reviewing "
+        "scientist judges."
     )
     if columns is FULL_COLUMNS:
         # The recovery story belongs with the columns it explains, not above the plain
@@ -415,7 +419,12 @@ def main() -> None:
     if until:
         stem += "_until_" + until.replace("-", "")
     (PLOTTING_DIR / f"{stem}.md").write_text(f"{summary}\n\n{md}\n", encoding="utf-8")
-    fig = make_figure(view, summary)
+    fig = make_figure(
+        view,
+        summary,
+        "ToxTempAssistant — assays created and expert-accepted answers"
+        + (" · what became of the model's drafts" if columns is FULL_COLUMNS else ""),
+    )
     fig.write_html(PLOTTING_DIR / f"{stem}.html")
     sys.stdout.write(f"Wrote {PLOTTING_DIR / f'{stem}.md'} and .html\n")
     try:
