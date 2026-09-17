@@ -5,12 +5,13 @@ substantive answer or the standardised abstention), and what became of it once a
 scientist reviewed it.
 
     poetry run python toxtempass/evaluation/gold_standard/uptake_quality.py \\
-        [--until 2026-07-10] [--all]
+        [--until 2026-07-10] [--all] [--full]
 
 ``--until`` keeps assays *created* on or before that date (a manuscript data freeze);
 ``--all`` also keeps assays nobody has reviewed, which the default drops to match the
-gold set. Reads ``output/_analysis/raw_{answers,history}.csv``, writes markdown + an
-HTML/PNG figure to ``output/_plotting/``.
+gold set; ``--full`` adds the draft-recovery columns (see ``FULL_COLUMNS``). Reads
+``output/_analysis/raw_{answers,history}.csv``, writes markdown + an HTML/PNG figure
+to ``output/_plotting/``.
 
 ## How the original draft is recovered
 
@@ -105,6 +106,15 @@ COLUMNS: list[tuple[str, str, float]] = [
     (DOCS, DOCS, 1.3),
     (SUB, "LLM drafts (N_non-trivial)", 1.5),
     (NF, "LLM not found (N_trivial)", 1.5),
+    (ACC, ACC, 1.8),
+    (PCT, PCT, 1.7),
+]
+# --full adds what the recovery buys, for a supplement or a reviewer's question. It is
+# NOT the default: per assay, "originally not found" without "draft on record" beside it
+# reads as "the model never abstained here" when the truth is "we hold 3 of its 77
+# drafts", and the pair costs four columns to state honestly.
+FULL_COLUMNS: list[tuple[str, str, float]] = [
+    *COLUMNS[:6],
     (ONF, ONF, 1.5),
     (KNOWN, KNOWN, 1.4),
     (ACC, ACC, 1.8),
@@ -287,7 +297,7 @@ def make_figure(tbl: pd.DataFrame, summary: str) -> go.Figure:
     n = len(tbl)
     zebra = ["#f7f9fa" if i % 2 else "white" for i in range(n)]
     shaded = [_green(v * QUESTIONNAIRE / 100) for v in tbl[PCT]]
-    widths = {html: w for html, _, w in COLUMNS}
+    widths = {html: w for html, _, w in FULL_COLUMNS}
     fill = [shaded if c == PCT else zebra for c in tbl.columns]
     sub = textwrap.wrap(summary.replace("**", ""), 150)
     sub_px = 34 * len(sub)
@@ -330,6 +340,7 @@ def main() -> None:
             raise SystemExit("--until needs a date, e.g. --until 2026-07-10")
         until = args[i + 1]
     keep_all = "--all" in args
+    columns = FULL_COLUMNS if "--full" in args else COLUMNS
 
     answers = pd.read_csv(ANALYSIS_DIR / "raw_answers.csv", keep_default_na=False)
     history = pd.read_csv(ANALYSIS_DIR / "raw_history.csv", keep_default_na=False)
@@ -348,18 +359,20 @@ def main() -> None:
     tbl = per_assay(answers)
     tbl = tbl.sort_values([PCT, ONF], ascending=[False, True]).reset_index(drop=True)
     tbl.insert(0, NUM, range(1, len(tbl) + 1))
-    view = tbl[[c for c, _, _ in COLUMNS]].copy()
+    view = tbl[[c for c, _, _ in columns]].copy()
     # A total row, so every column can be checked against the text that cites it.
     total = {c: "" for c in view.columns}
     total[ASSAY] = f"All {len(tbl)} assays"
     for col in (DOCS, SUB, NF, ONF, KNOWN, ACC, ACCNF):
-        total[col] = int(tbl[col].sum()) if col != DOCS else int(tbl[DOCS].sum())
+        if col in total:
+            total[col] = int(tbl[col].sum())
     lo, hi, n = (int(tbl[c].sum()) for c in ("edit_floor", "edit_ceiling", "acc_drafted"))
-    total[EDIT] = f"{lo}–{hi} of {n}"
+    if EDIT in total:
+        total[EDIT] = f"{lo}–{hi} of {n}"
     total[PCT] = 100 * int(tbl[ACC].sum()) / (QUESTIONNAIRE * len(tbl))
     view.loc[len(view)] = total
 
-    plain = {html: text for html, text, _ in COLUMNS}
+    plain = {html: text for html, text, _ in columns}
     header = "| " + " | ".join(plain[c] for c in view.columns) + " |"
     sep = "| " + " | ".join("---" for _ in view.columns) + " |"
     body = "\n".join(
@@ -378,20 +391,29 @@ def main() -> None:
         f"{answers.assay_id.nunique()} assays · {tbl[INST].nunique()} institutes · "
         f"{len(d)} of {len(answers)} questions drafted by the model"
         + (f" · assays created on or before {until}" if until else "")
-        + f". The model's own wording is on record for {known} drafts "
-        f"({known / max(len(d), 1):.0%}); in {orig_nf} of them it stated the information "
-        f"was absent, so it did so for at least {orig_nf / max(len(d), 1):.0%} of the "
-        "questions it drafted. Scientists have accepted "
-        f"{len(acc)} answers "
-        f"({len(acc) / max(len(answers), 1):.0%} of the questionnaire), "
-        f"of which {int(acc.final_is_nf.sum())} state the information was absent. Of the "
-        f"{n} accepted answers the model drafted, between {lo} and {hi} were edited "
-        f"({lo / max(n, 1):.0%}–{hi / max(n, 1):.0%}) before they were accepted."
+        + f". Scientists have accepted {len(acc)} answers "
+        f"({len(acc) / max(len(answers), 1):.0%} of the questionnaire), of which "
+        f"{int(acc.final_is_nf.sum())} state the information was absent."
     )
+    if columns is FULL_COLUMNS:
+        # The recovery story belongs with the columns it explains, not above the plain
+        # table, where it would raise questions the plain table cannot answer.
+        summary += (
+            f" The model's own wording is on record for {known} drafts "
+            f"({known / max(len(d), 1):.0%}); in {orig_nf} of them it stated the "
+            "information was absent, so it did so for at least "
+            f"{orig_nf / max(len(d), 1):.0%} of the questions it drafted. Of the {n} "
+            f"accepted answers the model drafted, between {lo} and {hi} were edited "
+            f"({lo / max(n, 1):.0%}–{hi / max(n, 1):.0%}) before acceptance."
+        )
 
     sys.stdout.write(f"{summary}\n\n{md}\n\n")
     PLOTTING_DIR.mkdir(parents=True, exist_ok=True)
-    stem = f"uptake_quality{'_until_' + until.replace('-', '') if until else ''}"
+    stem = "uptake_quality"
+    if "--full" in args:
+        stem += "_full"
+    if until:
+        stem += "_until_" + until.replace("-", "")
     (PLOTTING_DIR / f"{stem}.md").write_text(f"{summary}\n\n{md}\n", encoding="utf-8")
     fig = make_figure(view, summary)
     fig.write_html(PLOTTING_DIR / f"{stem}.html")
