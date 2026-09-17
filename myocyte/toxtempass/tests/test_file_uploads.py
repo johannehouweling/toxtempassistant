@@ -66,6 +66,45 @@ class FileUploadTests(TestCase):
             self.assertTrue(queued)
             self.assertTrue(getattr(form, "async_enqueued", False))
 
+    def test_rerun_passes_user_model_and_image_flag(self):
+        """A re-run of selected questions uses the user's model and image choice."""
+        qs = QuestionSet.objects.create(
+            display_name="rerun-qs", created_by=self.assay.study.investigation.owner
+        )
+        section = Section.objects.create(question_set=qs, title="Sec")
+        subsection = Subsection.objects.create(section=section, title="Subsec")
+        question = Question.objects.create(subsection=subsection, question_text="Q1?")
+        Answer.objects.get_or_create(assay=self.assay, question=question)
+        self.assay.question_set = qs
+        self.assay.save()
+
+        doc = {
+            "a.txt": {"text": "alpha", "source_document": "a.txt", "origin": "document"}
+        }
+        upload = SimpleUploadedFile("a.txt", b"alpha", content_type="text/plain")
+        files = MultiValueDict({"file_upload": [upload]})
+
+        with patch(
+            "toxtempass.forms.get_text_or_imagebytes_from_django_uploaded_file",
+            return_value=(doc, []),
+        ) as mock_get_text, patch("toxtempass.forms.async_task") as mock_async, patch(
+            "toxtempass.llm.current_llm_key", return_value="1:TESTMODEL"
+        ):
+            form = AssayAnswerForm(
+                data={f"earmarked_{question.id}": True, "extract_images": True},
+                files=files,
+                assay=self.assay,
+                user=self.user,
+            )
+            self.assertTrue(form.is_valid(), msg=f"Form errors: {form.errors}")
+            self.assertTrue(form.save())
+
+        # The user ticked "extract images", so the upload path must honour it.
+        self.assertTrue(mock_get_text.call_args.kwargs["extract_images"])
+        kwargs = mock_async.call_args.kwargs
+        self.assertEqual(kwargs["user_id"], self.user.pk)
+        self.assertEqual(kwargs["llm_model"], "1:TESTMODEL")
+
     def test_assayanswerform_clean_accepts_multiple_files(self):
         """
         Direct form-level test: instantiate AssayAnswerForm with files mapping containing

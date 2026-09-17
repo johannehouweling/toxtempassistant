@@ -601,7 +601,10 @@ def truncate_context_to_token_limit(
 
 
 def get_text_or_bytes_perfile_dict(
-    document_filenames: list[str | Path], unlink: bool = True, extract_images: bool = True
+    document_filenames: list[str | Path],
+    unlink: bool = True,
+    extract_images: bool = True,
+    summarize_images: bool = True,
 ) -> dict[str, dict[str, str]]:
     """Load content from a list of documents.
 
@@ -609,6 +612,9 @@ def get_text_or_bytes_perfile_dict(
     document_filenames (list of str): List of file paths to the documents.
     unlink (bool): if files shall be deleted afterwards
     extract_images (bool): whether to extract images from PDFs and DOCX files
+    summarize_images (bool): describe the images now. False leaves them encoded for
+        the async worker (``process_llm_async``) to describe, so an upload is not held
+        open for one vision call per image.
 
     Returns:
     dict: A dictionary where keys are filenames (or synthetic identifiers) and values
@@ -738,7 +744,7 @@ def get_text_or_bytes_perfile_dict(
                 except FileNotFoundError:
                     pass
 
-    if extract_images:
+    if extract_images and summarize_images:
         summarize_image_entries(document_contents)
 
     return document_contents
@@ -776,8 +782,9 @@ def get_text_or_imagebytes_from_django_uploaded_file(
             temp_files.append(str(temp_path))
             original_names[str(temp_path)] = file.name
 
+        # Images stay encoded here; process_llm_async describes them in the worker.
         text_dict = get_text_or_bytes_perfile_dict(
-            temp_files, extract_images=extract_images
+            temp_files, extract_images=extract_images, summarize_images=False
         )
 
     # Determine which input files produced no output entry at all.

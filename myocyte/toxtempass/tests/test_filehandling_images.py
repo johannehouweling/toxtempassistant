@@ -109,3 +109,16 @@ def test_image_descriptions_are_added_when_requested(tmp_path):
     assert "text" in entry
     assert "Stub description" in entry["text"]
     assert entry["origin"] == "image_description"
+
+
+def test_image_descriptions_can_be_left_to_the_worker(tmp_path):
+    image_path = tmp_path / "figure.png"
+    Image.new("RGB", (60, 60), color="red").save(image_path)
+
+    with patch("toxtempass.filehandling._describe_image") as describe:
+        doc_dict = get_text_or_bytes_perfile_dict(
+            [image_path], unlink=False, extract_images=True, summarize_images=False
+        )
+
+    describe.assert_not_called()
+    assert "encodedbytes" in doc_dict[str(image_path)]

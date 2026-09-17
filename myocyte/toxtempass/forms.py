@@ -821,8 +821,10 @@ class AssayAnswerForm(forms.Form):
         self.async_enqueued = False
 
         if uploaded_files:
+            # Honour the user's choice: images are extracted here but described by
+            # the worker, so an upload with images no longer blocks on vision calls.
             doc_dict, unreadable = get_text_or_imagebytes_from_django_uploaded_file(
-                uploaded_files, extract_images=False
+                uploaded_files, extract_images=extract_images
             )
             logger.debug(f"Received {len(uploaded_files)} uploaded files for processing.")
             if unreadable:
