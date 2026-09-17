@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.52.0 (2026-09-17)
+
+### Features
+
+- **seo**: Give every sitemap URL a lastmod date
+  ([`8176a70`](https://github.com/johannehouweling/toxtempassistant/commit/8176a70f83bf7447441f0db5fd09551810d8c56d))
+
+
 ## v3.51.1 (2026-09-15)
 
 ### Bug Fixes
