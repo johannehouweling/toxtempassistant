@@ -86,9 +86,10 @@ DASH = "—"
 TITLE_CHARS = 52  # landscape figure, so titles can breathe
 
 NUM, ASSAY, INST, DOCS = "#", "Assay", "Institute", "Documents (n)"
-# Both columns count drafts, so neither is "the drafts": they are the two things the
-# assistant did with a question, named after the paper's vocabulary.
-SUB = "Substantive (N<sub>non-trivial</sub>)"
+# Both columns read the CURRENT text of a drafted question, so they describe its state,
+# not its authorship: a reviewed answer may carry the scientist's wording. Named after
+# the paper's vocabulary. (The model's own wording needs the history — see --full.)
+SUB = "Answered (N<sub>non-trivial</sub>)"
 NF = "Not found (N<sub>trivial</sub>)"
 # The model's own wording, read from the revision history. A "≥" because an abstention
 # the scientist answered instead is no longer in the record — never an over-count.
@@ -106,7 +107,7 @@ COLUMNS: list[tuple[str, str, float]] = [
     (ASSAY, ASSAY, 4.3),
     (INST, INST, 1.8),
     (DOCS, DOCS, 1.3),
-    (SUB, "Substantive (N_non-trivial)", 1.5),
+    (SUB, "Answered (N_non-trivial)", 1.5),
     (NF, "Not found (N_trivial)", 1.5),
     (ACC, ACC, 1.8),
     (PCT, PCT, 1.7),
@@ -396,10 +397,10 @@ def main() -> None:
         + f". Scientists have accepted {len(acc)} answers "
         f"({len(acc) / max(len(answers), 1):.0%} of the questionnaire), of which "
         f"{int(acc.final_is_nf.sum())} state the information was absent. "
-        "A draft counts as substantive when the assistant answered the question from "
-        "the documents instead of stating that the information was absent — it says "
-        "nothing about whether the answer is correct, which is what the reviewing "
-        "scientist judges."
+        "The two draft columns read each question's current text: 'not found' is the "
+        "standardised statement that the documents do not cover it, 'answered' is "
+        "everything else. Reviewed answers may carry the scientist's wording, and "
+        "neither column says whether an answer is correct."
     )
     if columns is FULL_COLUMNS:
         # The recovery story belongs with the columns it explains, not above the plain
