@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v3.54.0 (2026-09-17)
+
+### Features
+
+- **cost**: Record the temperature and keep a re-run's tokens
+  ([`2a49e83`](https://github.com/johannehouweling/toxtempassistant/commit/2a49e8340ed9bfc9dc339e9fd13682e11d88b6ea))
+
+- **uploads**: Honour "extract images" and describe them in the worker
+  ([`ba73921`](https://github.com/johannehouweling/toxtempassistant/commit/ba739214198c55ccf977c3bf9a0bac8fbac0aa86))
+
+
 ## v3.53.0 (2026-09-17)
 
 ### Bug Fixes
