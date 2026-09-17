@@ -2,6 +2,39 @@
 
 <!-- version list -->
 
+## v3.55.0 (2026-09-17)
+
+### Code Style
+
+- **gold**: Label the summary row Total
+  ([`f4f16d3`](https://github.com/johannehouweling/toxtempassistant/commit/f4f16d3b9fabdb6da7d001f9a8b07215f8cb6630))
+
+- **gold**: Narrow the plain table and stop the caption touching the header
+  ([`31c0206`](https://github.com/johannehouweling/toxtempassistant/commit/31c0206b935f4b27079ee32b700d6cc2581c14d9))
+
+### Documentation
+
+- **gold**: Name both draft columns for what they contain
+  ([`1e9b76a`](https://github.com/johannehouweling/toxtempassistant/commit/1e9b76a0b77d4d0653f2d82a04360e14af309ba6))
+
+- **gold**: The split describes the answer state, not who wrote it
+  ([`c3c4197`](https://github.com/johannehouweling/toxtempassistant/commit/c3c41973af78aae539fd1ed8c5146671d540cded))
+
+- **gold**: Title each table variant and define a substantive draft
+  ([`842c25f`](https://github.com/johannehouweling/toxtempassistant/commit/842c25f79252204844b4b1b20a581f522c7bd695))
+
+### Features
+
+- **answers**: Make drafting measurable — normalise newlines, record abstention
+  ([`c7946c7`](https://github.com/johannehouweling/toxtempassistant/commit/c7946c7a58e73a52174dd6f71c00212cbe2dab74))
+
+- **gold**: Per-assay uptake and what became of the model's drafts
+  ([`cb4468c`](https://github.com/johannehouweling/toxtempassistant/commit/cb4468cae660455806863c07d6a913b9a0124374))
+
+- **gold**: Plain table by default, draft-recovery columns behind --full
+  ([`b7b6dc5`](https://github.com/johannehouweling/toxtempassistant/commit/b7b6dc592f507035e648575ce67c4732e0f08cee))
+
+
 ## v3.54.0 (2026-09-17)
 
 ### Features
