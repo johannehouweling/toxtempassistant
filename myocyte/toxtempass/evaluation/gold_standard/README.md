@@ -16,11 +16,15 @@ but **only for assays generated before 2025-09-13** (git-verified):
 
 | assay generated | draft write path | draft in history? |
 |---|---|---|
-| before 2025-09-13 | `answer.save()` | **yes** — earliest non-blank history snapshot |
+| before 2025-05-12 (`3797e35`) | `answer.save()` **inside the request** | **yes** — but the row carries the *uploader's* user id, not NULL |
+| 2025-05-12 → 2025-09-13 | `answer.save()` in the django-q worker | **yes** — the row has `history_user_id` NULL |
 | on/after 2025-09-13 | queryset `.update()` (commit `5f12fd7`) | **no** — bypasses simple-history |
 
-For post-cutoff assays the draft must be reconstructed by re-running gpt-4o-mini (a follow-up).
-Most reviewed assays predate the cutoff, so edit-typing is available now for the bulk of them.
+`edit_analysis` only accepts a NULL-user row as a draft, so drafts from the first era are
+mislabelled `first_human_save` (conservative: it under-counts exact deltas, never invents
+them). **Only one assay in the 2026-06-16 extract predates the cutoff**, so post-cutoff
+recovery — the rule in *Raw dump* below, plus re-running the model where the files survive
+— is what matters in practice, not this table.
 
 ## Edit-typing is semantic
 The draft→final change is typed using **embedding cosine similarity** (the primary, *meaning*
@@ -104,6 +108,87 @@ prod pull djangoapp && sudo docker compose --profile prod up -d djangoapp`, then
 
 The companion **sufficiency** check (how much gold exists, by whom, with what docs) is
 `python manage.py assess_ground_truth` — same read-only / prod-ops pattern.
+
+### Per-assay columns (status table)
+
+Besides the per-answer rows, the extract stamps per-assay values onto every row:
+
+| column | meaning |
+|---|---|
+| `extracted_at` | when the DB was read. The filename can't say — the prod→local hop names the CSV by hand and the local cosine pass re-stamps it. |
+| `n_context_documents` | distinct source filenames over **all** the assay's answers; same definition as `assess_ground_truth`'s `n_docs`. |
+| `n_drafted_answers` | answers the LLM wrote: `answer_documents IS NOT NULL`. Era-independent, unlike history snapshots — the post-2025-09-13 queryset `.update()` writes none. |
+| `n_drafted_non_trivial` | of those drafts, the substantive ones. |
+| `n_drafted_not_found` | of those drafts, the standardised abstention. |
+
+`n_drafted_answers` is **77 or 0** for a run that completed — the LLM drafts the whole
+questionnaire once documents are supplied, and never runs without them — but a failed
+future is skipped (`views.py` `continue`) and a deleted assay or a dead worker truncates
+the run, leaving those rows NULL. Use the per-assay count as the denominator, never a
+hard-coded 77.
+
+The split reads the *current* `answer_text`, so a scientist who replaced an abstention
+moves that row from trivial to non-trivial: `n_drafted_not_found` is a **lower bound** on
+the model's abstentions and `n_drafted_non_trivial` an **upper bound** on its answers —
+exact for rows nobody has reviewed, which dominate a partial review. It is a lower bound
+in the other direction too: `is_not_found` is fuzzy, and the sentence is quoted in the FAQ,
+the onboarding tooltip and the about page (and `export.py` substitutes it for blank
+answers), so a human **can** paste it back. For what the model actually drafted, use the
+raw dump below, not this column. A CSV extracted before these columns existed renders em
+dashes for the split (it deliberately does *not* substitute accepted-abstentions, a
+different quantity) and falls back to documents cited by *accepted* answers only, so
+re-extract to fill them properly.
+
+## Raw dump — uptake & what happened to each draft
+
+The gold CSV holds accepted answers only, already reduced to one baseline→final
+comparison, and skips assays nobody reviewed — so it cannot answer "how many answers did
+the model originally abstain on, and what happened to them?". `extract_raw_answers` dumps
+the inputs unreduced; every classification then runs **locally**, so a changed definition
+costs a local re-run instead of another read on production.
+
+```bash
+# on prod — READ-ONLY, no API key (one physical line)
+sudo docker exec djangoapp python manage.py extract_raw_answers --out /tmp/raw
+sudo docker cp djangoapp:/tmp/raw_answers.csv /home/$USER/ && sudo docker cp djangoapp:/tmp/raw_history.csv /home/$USER/ && sudo docker cp djangoapp:/tmp/raw_costs.csv /home/$USER/
+sudo chmod 644 /home/$USER/raw_*.csv
+# then, locally: scp them down, and afterwards wipe BOTH copies (answer text + emails)
+sudo docker exec djangoapp rm -f /tmp/raw_*.csv && sudo rm -f /home/$USER/raw_*.csv
+```
+
+| file | rows |
+|---|---|
+| `raw_answers.csv` | every answer of every non-demo assay (`--min-accepted 0`), with `drafted`, `accepted` as a tri-state, both abstention flags and the live text. |
+| `raw_history.csv` | every saved version, oldest-first, with `documents_set`, `history_user_id`, `accepted` and the text at that moment. |
+| `raw_costs.csv` | `AssayCost` rows — which deployment actually drafted an assay, so "gpt-4o-mini" is checked per assay rather than assumed. |
+
+**Draft recovery rule** (per answer, over its history oldest-first). Let `F` = the first
+row with `documents_set` true. Only a drafting run writes `answer_documents`, and seeding
+leaves it NULL, so `F` is the first save *after* a drafting run.
+
+| case | what the draft is | confidence |
+|---|---|---|
+| no `F` | the live `answer_text` — nobody saved the row since the run | exact for that run |
+| `F` before the 2025-09-13 cutoff, or `history_user_id` empty | `F` **is** the draft row (the era that still saved through the model) | exact |
+| `F.accepted` true and the row before it isn't | accept-only submit: `F.answer_text` is the untouched draft | exact for that run |
+| otherwise (`F` is a text change) | **gone** — a text row exists only because the posted text differed, so the stored draft was provably not the exact sentinel | lost |
+
+Two biases to state whenever these counts are published:
+
+* "Exact for that run" is not "exact for the first run". The earmark re-draft
+  (`forms.py`) and the whole-assay overwrite (`views.py`) both re-draft through the same
+  history-less `.update()`, so a sentinel draft that was neither accepted nor edited is
+  overwritten without trace. Earmarking is exactly what a scientist does to a not-found
+  answer after uploading more documents, so this removes **abstentions specifically** and
+  pushes the recovered count **down**. Per-assay flag: answers whose `answer_documents`
+  differs from the assay's modal list were re-drafted.
+* Use exact equality with `config.not_found_string` for "the model abstained", and keep
+  the fuzzy `is_not_found` as a separate, labelled column — it also matches human
+  paraphrases such as "Not found in documents.".
+
+The **forward fix**, so this stops being archaeology: write drafts through
+`simple_history.utils.bulk_update_with_history(...)` instead of the bare queryset
+`.update()`, which makes every future draft a labelled history row.
 
 ## Layout
 Mirrors `real_world/output/` — outputs bucketed by purpose; all scripts stay tracked in the
