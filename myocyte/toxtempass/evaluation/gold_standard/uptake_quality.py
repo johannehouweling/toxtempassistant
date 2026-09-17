@@ -83,7 +83,7 @@ SENTINEL = "Answer not found in documents."
 CUTOFF = pd.Timestamp("2025-09-13T11:22:00Z")
 _TRI = {"True": True, "False": False, "": None}
 DASH = "—"
-TITLE_CHARS = 52  # landscape figure, so titles can breathe
+TITLE_CHARS = 46  # long enough for most titles without widening the table
 
 NUM, ASSAY, INST, DOCS = "#", "Assay", "Institute", "Documents (n)"
 # Both columns read the CURRENT text of a drafted question, so they describe its state,
@@ -295,15 +295,17 @@ def _cell(col: str, value: object) -> str:
     return str(value)
 
 
-def make_figure(tbl: pd.DataFrame, summary: str, title: str) -> go.Figure:
+def make_figure(
+    tbl: pd.DataFrame, summary: str, title: str, width: int = 1280
+) -> go.Figure:
     """Render the table landscape, wide enough for the assay titles."""
     n = len(tbl)
     zebra = ["#f7f9fa" if i % 2 else "white" for i in range(n)]
     shaded = [_green(v * QUESTIONNAIRE / 100) for v in tbl[PCT]]
     widths = {html: w for html, _, w in FULL_COLUMNS}
     fill = [shaded if c == PCT else zebra for c in tbl.columns]
-    sub = textwrap.wrap(summary.replace("**", ""), 150)
-    sub_px = 34 * len(sub)
+    sub = textwrap.wrap(summary.replace("**", ""), width // 11)
+    sub_px = 38 * len(sub)
     fig = go.Figure(
         go.Table(
             columnwidth=[widths[c] for c in tbl.columns],
@@ -326,7 +328,7 @@ def make_figure(tbl: pd.DataFrame, summary: str, title: str) -> go.Figure:
             ),
             x=0.01, xanchor="left", font=dict(size=18),
         ),
-        width=1600, height=120 + sub_px + 26 * n,
+        width=width, height=120 + sub_px + 26 * n,
         margin=dict(l=12, r=12, t=70 + sub_px, b=12),
         template="plotly_white",
     )
@@ -397,10 +399,9 @@ def main() -> None:
         + f". Scientists have accepted {len(acc)} answers "
         f"({len(acc) / max(len(answers), 1):.0%} of the questionnaire), of which "
         f"{int(acc.final_is_nf.sum())} state the information was absent. "
-        "The two draft columns read each question's current text: 'not found' is the "
-        "standardised statement that the documents do not cover it, 'answered' is "
-        "everything else. Reviewed answers may carry the scientist's wording, and "
-        "neither column says whether an answer is correct."
+        " 'Not found' is the standardised statement that the documents do not cover "
+        "the question, 'answered' is everything else; both read the question's current "
+        "text, which for a reviewed answer may be the scientist's wording."
     )
     if columns is FULL_COLUMNS:
         # The recovery story belongs with the columns it explains, not above the plain
@@ -427,6 +428,9 @@ def main() -> None:
         summary,
         "ToxTempAssistant — assays created and expert-accepted answers"
         + (" · what became of the model's drafts" if columns is FULL_COLUMNS else ""),
+        # The plain table has eight columns and does not need the full width; the
+        # recovery variant has twelve and does.
+        1600 if columns is FULL_COLUMNS else 1180,
     )
     fig.write_html(PLOTTING_DIR / f"{stem}.html")
     sys.stdout.write(f"Wrote {PLOTTING_DIR / f'{stem}.md'} and .html\n")
