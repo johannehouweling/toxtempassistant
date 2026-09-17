@@ -458,7 +458,10 @@ def _dump_rows(opts: dict) -> tuple[list[dict], list[dict], list[dict]]:
                     "assay_id": c.assay_id,
                     "model_key": c.model_key,
                     "model_id": c.model_id,
-                    "temperature": c.temperature,
+                    # getattr, not attribute access: a deployment older than the field
+                    # has no such attribute at all (the savepoint below only catches the
+                    # other half of that skew, a model field with no column yet).
+                    "temperature": getattr(c, "temperature", ""),
                     "input_tokens": c.input_tokens,
                     "output_tokens": c.output_tokens,
                     "created_at": c.created_at.isoformat(),
