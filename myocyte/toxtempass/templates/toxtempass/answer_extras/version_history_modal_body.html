@@ -37,7 +37,9 @@
                 {% endfor %}
               </td>
 
-              <td>{{ entry.version.history_user }}</td>
+              {# No history user = written by the LLM worker, not a person. Django
+                 renders None as "None", so name the author instead. #}
+              <td>{{ entry.version.history_user|default:"ToxTemp Assistant (LLM)" }}</td>
               <td>{{ entry.version.history_id }}</td>
             </tr>
           {% endif %}
