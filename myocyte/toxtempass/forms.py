@@ -665,6 +665,24 @@ class AssayForm(forms.ModelForm):
             self.fields["study"].label_from_instance = _study_label_af
 
 
+class AnswerTextField(forms.CharField):
+    """An answer textarea whose value is stored with Unix line endings.
+
+    Browsers submit textarea content with CRLF line breaks (the HTML spec says so),
+    while the LLM writes LF. Without this, resubmitting an untouched multi-line answer
+    yields text that differs byte-wise from the stored one, the save path writes a new
+    version, and the version history can no longer tell an untouched draft from an
+    edited one — which is exactly what made the drafts before this change
+    unrecoverable (evaluation/gold_standard/README.md). Normalising here keeps "the
+    text changed" meaning "a person changed it".
+    """
+
+    def to_python(self, value: object) -> str:
+        """Return the submitted text with CRLF and CR line endings folded to LF."""
+        value = super().to_python(value)
+        return value.replace("\r\n", "\n").replace("\r", "\n") if value else value
+
+
 class AssayAnswerForm(forms.Form):
     def __init__(self, *args, **kwargs):
         """Expect both 'assay' and optionally 'user' to be provided.
@@ -713,7 +731,7 @@ class AssayAnswerForm(forms.Form):
                 for question in subsection.questions.all():
                     # Create a text field for the answer.
                     field_name = f"question_{question.id}"
-                    self.fields[field_name] = forms.CharField(
+                    self.fields[field_name] = AnswerTextField(
                         label=question.question_text,
                         required=False,
                         widget=forms.Textarea(
@@ -878,8 +896,13 @@ class AssayAnswerForm(forms.Form):
                 question=question,
                 defaults={"answer_text": data.get("answer_text", "")},
             )
-            if not created and answer.answer_text != data.get("answer_text", ""):
-                answer.answer_text = data.get("answer_text", "")
+            posted = data.get("answer_text", "")
+            # Compare with the stored text normalised too: answers saved before
+            # AnswerTextField still hold CRLF, and without this every one of them
+            # would record one last spurious "edit" the first time it is resubmitted.
+            stored = (answer.answer_text or "").replace("\r\n", "\n").replace("\r", "\n")
+            if not created and stored != posted:
+                answer.answer_text = posted
                 answer.save()
                 logger.debug(f"Updated answer_text for question id {qid}.")
 

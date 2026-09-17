@@ -75,8 +75,8 @@ CSV_COLUMNS = [
 RAW_ANSWER_COLUMNS = [
     "extracted_at", "assay_id", "assay_title", "owner_email", "submission_date",
     "question_set_label", "answer_id", "question_id", "section", "subsection",
-    "drafted", "answer_documents", "accepted", "is_sentinel", "is_not_found",
-    "answer_text",
+    "drafted", "answer_documents", "accepted", "llm_abstained", "is_sentinel",
+    "is_not_found", "answer_text",
 ]
 RAW_HISTORY_COLUMNS = [
     "answer_id", "assay_id", "history_id", "history_date", "history_type",
@@ -395,6 +395,11 @@ def _dump_rows(opts: dict) -> tuple[list[dict], list[dict], list[dict]]:
                 # Raw tri-state (True / False / empty for NULL) — "not accepted" and
                 # "never looked at" are different states and the CSV keeps them apart.
                 "accepted": "" if a.accepted is None else a.accepted,
+                # What the model decided at drafting time, recorded since 2026-09-17.
+                # Blank for earlier drafts, where the text is the only evidence.
+                "llm_abstained": (
+                    "" if a.llm_abstained is None else a.llm_abstained
+                ),
                 **_sentinel_flags(a.answer_text),
                 "answer_text": a.answer_text or "",
             }
