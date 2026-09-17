@@ -765,6 +765,22 @@
                 }
             });
 
+            // Closing the menu folds the Account sections shut again: they are
+            // deliberate one-off actions, so re-opening the menu later should not
+            // land on an expanded password or delete-account form. Done once the
+            // menu is hidden, so the folding is never seen.
+            userMenu.addEventListener("hidden.bs.offcanvas", function () {
+                ["accountEmailChange", "accountPasswordChange", "accountDeletion"]
+                    .forEach(function (id) {
+                        const section = document.getElementById(id);
+                        if (!section) return;
+                        // toggle: false, or creating the instance opens a closed section.
+                        bootstrap.Collapse
+                            .getOrCreateInstance(section, { toggle: false })
+                            .hide();
+                    });
+            });
+
             // More robust: wait for the offcanvas "hidden" event before showing modal
             document.querySelectorAll("[data-bs-toggle='modal']").forEach((btn) => {
                 btn.addEventListener("click", function () {
