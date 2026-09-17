@@ -65,6 +65,12 @@ def test_sitemap_lists_public_pages():
     assert f"<loc>http://testserver{reverse('signup')}</loc>" in body
 
 
+def test_sitemap_gives_every_page_a_lastmod():
+    """Google schedules recrawls from <lastmod>, so every URL needs one."""
+    body = Client().get("/sitemap.xml").content.decode()
+    assert body.count("<lastmod>") == body.count("<loc>")
+
+
 @pytest.mark.django_db
 def test_link_preview_image_exists_at_1200_by_630():
     """og:image points at a real 1200x630 file, the size link previews expect."""

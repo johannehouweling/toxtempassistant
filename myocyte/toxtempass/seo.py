@@ -1,5 +1,7 @@
 """Crawler-facing endpoints: robots.txt, sitemap.xml and the root favicon."""
 
+from datetime import date
+
 from django.contrib.sitemaps import Sitemap
 from django.http import HttpRequest, HttpResponse, HttpResponsePermanentRedirect
 from django.templatetags.static import static
@@ -26,6 +28,18 @@ ROBOTS_DISALLOWED_PREFIXES = (
 )
 
 
+# When each public page last changed; this order is also the sitemap's order.
+# Google schedules recrawls from <lastmod> but distrusts a date that always
+# claims "today", so bump these only when the page's content really changes.
+# It ignores <changefreq> and <priority> entirely.
+PAGE_LASTMOD = {
+    "overview": date(2026, 9, 12),
+    "about": date(2026, 9, 12),
+    "toxtemp_questions": date(2026, 9, 12),
+    "signup": date(2026, 9, 12),
+}
+
+
 class StaticViewSitemap(Sitemap):
     """The public pages worth indexing."""
 
@@ -33,11 +47,15 @@ class StaticViewSitemap(Sitemap):
 
     def items(self) -> list[str]:
         """Return the URL names of the public pages."""
-        return ["overview", "about", "toxtemp_questions", "signup"]
+        return list(PAGE_LASTMOD)
 
     def location(self, item: str) -> str:
         """Resolve a URL name to its path."""
         return reverse(item)
+
+    def lastmod(self, item: str) -> date:
+        """Return the date the page's content last changed."""
+        return PAGE_LASTMOD[item]
 
 
 SITEMAPS = {"static": StaticViewSitemap}
