@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v3.53.0 (2026-09-17)
+
+### Bug Fixes
+
+- **gold**: Tolerate a deployment older than AssayCost.temperature
+  ([`3e5ad59`](https://github.com/johannehouweling/toxtempassistant/commit/3e5ad5982bc8d1e543523a5c6894af9de511ca57))
+
+- **history**: Name the LLM as the author of its own draft rows
+  ([`3da1d7b`](https://github.com/johannehouweling/toxtempassistant/commit/3da1d7b9055a4887c61b88bc52a96c9c78b88818))
+
+- **llm**: Record the draft in history instead of bypassing it
+  ([`fdb2e88`](https://github.com/johannehouweling/toxtempassistant/commit/fdb2e8896371d7c0f0099cc80f96be195e1e6474))
+
+### Features
+
+- **gold**: Dump raw answers + version history for draft recovery
+  ([`6e59d9e`](https://github.com/johannehouweling/toxtempassistant/commit/6e59d9e052ea6e8eb5b9e7e46b31e0b98d39a04e))
+
+
 ## v3.52.1 (2026-09-17)
 
 ### Bug Fixes
