@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import time
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Callable
 
@@ -12,6 +13,37 @@ from toxtempass import config
 from toxtempass.models import Assay, Investigation, Person, Study
 
 logger = logging.getLogger(__name__)
+
+
+# An abstention that is *almost* the standardised sentence — a model that paraphrases
+# it, a mangled paste — is still an abstention. Only short texts are fuzzy-matched:
+# prose that merely ends with the sentence is a real answer.
+_ABSTENTION_MIN_RATIO = 0.85
+_ABSTENTION_MAX_LEN_FACTOR = 2
+
+
+def is_standard_abstention(text: str) -> bool:
+    """Report whether ``text`` says the answer was not in the supplied documents.
+
+    Used to record what the model decided at drafting time (``Answer.llm_abstained``)
+    instead of re-deriving it later by string matching: the current default model
+    writes ``config.not_found_string`` verbatim, but a different model paraphrases it,
+    and once a scientist edits the answer the original wording is gone. Deliberately
+    NOT a substring test — an answer containing real content that happens to end with
+    the sentence is a substantive answer.
+    """
+
+    def norm(value: str) -> str:
+        return str(value).strip().lower().rstrip(".,;:! ")
+
+    t, ref = norm(text), norm(config.not_found_string)
+    if not ref:
+        return False
+    if t == ref:
+        return True
+    if len(t) <= _ABSTENTION_MAX_LEN_FACTOR * len(ref):
+        return SequenceMatcher(None, t, ref).ratio() >= _ABSTENTION_MIN_RATIO
+    return False
 
 
 def log_processing_event(

@@ -862,6 +862,16 @@ class Answer(AccessibleModel):
     accepted = models.BooleanField(
         null=True, blank=True, help_text="Marked as final answer."
     )
+    llm_abstained = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text=(
+            "What the LLM decided when it last drafted this answer: True if it said "
+            "the information was absent from the documents. Recorded at drafting time "
+            "because the wording is model-specific and a scientist's edit replaces it. "
+            "Empty for answers no run has drafted, or drafted before this was tracked."
+        ),
+    )
     history = HistoricalRecords()
 
     def __str__(self):

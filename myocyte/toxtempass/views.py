@@ -114,6 +114,7 @@ from toxtempass.tables import AssayTable
 from toxtempass.utilities import (
     add_user_alert,
     get_password_reset_wait_seconds,
+    is_standard_abstention,
     log_processing_event,
     provenance_label_for_item,
     record_password_reset_attempt,
@@ -1790,8 +1791,17 @@ def process_llm_async(
                             draft = futures[future]
                             draft.answer_text = text
                             draft.answer_documents = source_documents
+                            # Record the decision, not just the words: the sentence is
+                            # model-specific and a later edit replaces it, so counting
+                            # abstentions afterwards by matching text under-counts any
+                            # model that paraphrases and any answer since rewritten.
+                            draft.llm_abstained = is_standard_abstention(text)
                             draft.save(
-                                update_fields=["answer_text", "answer_documents"]
+                                update_fields=[
+                                    "answer_text",
+                                    "answer_documents",
+                                    "llm_abstained",
+                                ]
                             )
                         except Exception as e:
                             log_processing_event(assay, str(e))
