@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.52.1 (2026-09-17)
+
+### Bug Fixes
+
+- **account**: Close the Account sections when the user menu closes
+  ([`a97a5b0`](https://github.com/johannehouweling/toxtempassistant/commit/a97a5b044fd0733c1962479e65f175675db5f1d0))
+
+
 ## v3.52.0 (2026-09-17)
 
 ### Features
