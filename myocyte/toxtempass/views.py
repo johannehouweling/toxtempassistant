@@ -1763,9 +1763,19 @@ def process_llm_async(
                             continue  # discard this completed future's result
 
                         try:
-                            Answer.objects.filter(pk=aid).update(
-                                answer_text=text,
-                                answer_documents=source_documents,
+                            # Save through the model, not a queryset .update(): the
+                            # version history is the only record of what the model wrote
+                            # before a scientist edited it, and .update() bypasses
+                            # simple-history — which is why drafts written between
+                            # 2025-09-13 and here cannot be recovered (see
+                            # evaluation/gold_standard/README.md). update_fields keeps
+                            # this to the two drafted columns, so a review that accepted
+                            # the answer while the run was in flight is not clobbered.
+                            draft = futures[future]
+                            draft.answer_text = text
+                            draft.answer_documents = source_documents
+                            draft.save(
+                                update_fields=["answer_text", "answer_documents"]
                             )
                         except Exception as e:
                             log_processing_event(assay, str(e))
