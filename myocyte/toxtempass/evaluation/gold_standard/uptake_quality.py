@@ -367,7 +367,7 @@ def main() -> None:
     view = tbl[[c for c, _, _ in columns]].copy()
     # A total row, so every column can be checked against the text that cites it.
     total = {c: "" for c in view.columns}
-    total[ASSAY] = f"All {len(tbl)} assays"
+    total[ASSAY] = "Total"
     for col in (DOCS, SUB, NF, ONF, KNOWN, ACC, ACCNF):
         if col in total:
             total[col] = int(tbl[col].sum())
