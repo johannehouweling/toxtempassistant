@@ -1385,6 +1385,8 @@ def _save_assay_cost(
     input_tokens: int,
     output_tokens: int,
     user_id: int | None = None,
+    temperature: str = "",
+    add_to_existing: bool = False,
 ) -> None:
     """Persist (or update) an ``AssayCost`` row for a completed LLM run.
 
@@ -1395,6 +1397,11 @@ def _save_assay_cost(
 
     Also appends an ``LLMRun``: ``AssayCost`` is overwritten by the next run,
     the run log is what the daily cost alert sums.
+
+    ``add_to_existing`` adds this run's tokens to the assay's existing row (a
+    re-run of selected questions) instead of replacing them, so re-generating a
+    few answers no longer erases what the full run cost. The ``LLMRun`` row
+    always records THIS run alone — that log is what the spend alert sums.
     """
     model_id, cost_input_per_1m, cost_output_per_1m, cost_unit = _llm_cost_rates(
         model_key
@@ -1413,6 +1420,14 @@ def _save_assay_cost(
         cost=_run_cost(cost_input, cost_output),
         cost_unit=cost_unit,
     )
+    if add_to_existing:
+        prev = AssayCost.objects.filter(assay_id=assay_id, model_key=model_key).first()
+        if prev:
+            input_tokens += prev.input_tokens
+            output_tokens += prev.output_tokens
+            # Recompute from the running totals, so the row's cost matches its tokens.
+            cost_input = _token_cost(cost_input_per_1m, input_tokens)
+            cost_output = _token_cost(cost_output_per_1m, output_tokens)
     AssayCost.objects.update_or_create(
         assay_id=assay_id,
         model_key=model_key,
@@ -1425,6 +1440,7 @@ def _save_assay_cost(
             cost_input=cost_input,
             cost_output=cost_output,
             cost_unit=cost_unit,
+            temperature=temperature,
         ),
     )
     logger.info(
@@ -1796,12 +1812,19 @@ def process_llm_async(
         # to avoid creating spurious cost rows with no data.
         if llm_model and ":" in llm_model and (total_input_tokens or total_output_tokens):
             try:
+                # The client's temperature is what was sent; None means it was
+                # omitted and the provider applied its default.
+                _temp = getattr(chatopenai, "temperature", None)
                 _save_assay_cost(
                     assay_id=assay_id,
                     model_key=llm_model,
                     input_tokens=total_input_tokens,
                     output_tokens=total_output_tokens,
                     user_id=user_id,
+                    temperature="provider default" if _temp is None else f"{_temp:g}",
+                    # answer_ids set = a re-run of selected questions, so its tokens
+                    # add to the full run's row instead of replacing it.
+                    add_to_existing=answer_ids is not None,
                 )
             except Exception as exc:
                 logger.warning(
@@ -2151,7 +2174,7 @@ def new_form_view(request: HttpRequest) -> HttpResponse | JsonResponse:
             # If files were uploaded and either overwrite is True or no existing
             if files and (overwrite or not answers_exist):
                 doc_dict, unreadable = get_text_or_imagebytes_from_django_uploaded_file(
-                    files, extract_images=False
+                    files, extract_images=extract_images
                 )
                 if unreadable:
                     for name in unreadable:

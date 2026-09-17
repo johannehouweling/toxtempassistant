@@ -1211,6 +1211,15 @@ class AssayCost(models.Model):
         default="",
         help_text='Currency unit from the cost-unit tag at run time, e.g. "Eur".',
     )
+    temperature = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text=(
+            'Temperature sent to the model at run time, e.g. "0" or '
+            '"provider default"; empty for runs recorded before this was tracked.'
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
