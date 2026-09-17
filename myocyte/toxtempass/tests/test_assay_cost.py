@@ -6,7 +6,15 @@ from unittest.mock import patch
 
 import pytest
 
-from toxtempass.models import Answer, AssayCost, Question, QuestionSet, Section, Subsection
+from toxtempass.models import (
+    Answer,
+    AssayCost,
+    LLMRun,
+    Question,
+    QuestionSet,
+    Section,
+    Subsection,
+)
 from toxtempass.tests.fixtures.factories import AssayFactory
 from toxtempass.views import process_llm_async, _save_assay_cost
 
@@ -74,6 +82,52 @@ def test_process_llm_async_saves_assaycost_when_llm_model_set(assay_with_questio
     # 2 questions → 2 * 200 input, 2 * 80 output
     assert row.input_tokens == 400
     assert row.output_tokens == 160
+    # The fake has no temperature attribute, i.e. none was sent.
+    assert row.temperature == "provider default"
+
+
+@pytest.mark.django_db
+def test_run_temperature_is_recorded_and_exported(assay_with_questions):
+    """The temperature sent is stored on AssayCost and shown in the export metadata."""
+    from toxtempass.export import generate_json_from_assay
+
+    assay = assay_with_questions
+    _save_assay_cost(
+        assay_id=assay.id,
+        model_key="1:GPT4O",
+        input_tokens=10,
+        output_tokens=5,
+        temperature="1",
+    )
+
+    assert AssayCost.objects.get(assay=assay).temperature == "1"
+    meta = generate_json_from_assay(assay)["metadata"]
+    assert meta["models_used"][0]["temperature"] == "1"
+    assert "temperature 1" in meta["config"]["model"]
+
+
+@pytest.mark.django_db
+def test_rerun_tokens_add_to_the_full_runs_row(assay_with_questions):
+    """A re-run of selected questions adds its tokens instead of erasing the full run."""
+    assay = assay_with_questions
+
+    with patch("toxtempass.azure_registry.get_model", return_value=None):
+        _save_assay_cost(
+            assay_id=assay.id, model_key="1:RERUN", input_tokens=100, output_tokens=50
+        )
+        _save_assay_cost(
+            assay_id=assay.id,
+            model_key="1:RERUN",
+            input_tokens=30,
+            output_tokens=10,
+            add_to_existing=True,
+        )
+
+    row = AssayCost.objects.get(assay=assay, model_key="1:RERUN")
+    assert (row.input_tokens, row.output_tokens) == (130, 60)
+    # The append-only run log keeps them apart: one row per run, not the total.
+    runs = LLMRun.objects.filter(assay=assay).order_by("id")
+    assert [r.input_tokens for r in runs] == [100, 30]
 
 
 @pytest.mark.django_db

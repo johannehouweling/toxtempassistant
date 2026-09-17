@@ -225,14 +225,17 @@ def generate_json_from_assay(assay: Assay) -> dict | None:
                     "model_key": c.model_key,
                     "model_id": c.model_id,
                     "info_url": info_url,
+                    # Blank for runs that predate temperature tracking — say so rather
+                    # than imply a default nobody recorded.
+                    "temperature": c.temperature or "not recorded",
                 }
             )
 
         if models_used:
             model_summary = ", ".join(
-                f"{m['model_id']} ({m['model_key']})"
+                f"{m['model_id']} ({m['model_key']}; temperature {m['temperature']})"
                 if m["model_id"]
-                else m["model_key"]
+                else f"{m['model_key']} (temperature {m['temperature']})"
                 for m in models_used
             )
             # De-duplicate URLs while preserving order; drop empties.
