@@ -86,8 +86,10 @@ DASH = "—"
 TITLE_CHARS = 52  # landscape figure, so titles can breathe
 
 NUM, ASSAY, INST, DOCS = "#", "Assay", "Institute", "Documents (n)"
-SUB = "LLM drafts (N<sub>non-trivial</sub>)"
-NF = "LLM not found (N<sub>trivial</sub>)"
+# Both columns count drafts, so neither is "the drafts": they are the two things the
+# assistant did with a question, named after the paper's vocabulary.
+SUB = "Substantive (N<sub>non-trivial</sub>)"
+NF = "Not found (N<sub>trivial</sub>)"
 # The model's own wording, read from the revision history. A "≥" because an abstention
 # the scientist answered instead is no longer in the record — never an over-count.
 ONF = "Originally not found (≥)"
@@ -104,8 +106,8 @@ COLUMNS: list[tuple[str, str, float]] = [
     (ASSAY, ASSAY, 4.3),
     (INST, INST, 1.8),
     (DOCS, DOCS, 1.3),
-    (SUB, "LLM drafts (N_non-trivial)", 1.5),
-    (NF, "LLM not found (N_trivial)", 1.5),
+    (SUB, "Substantive (N_non-trivial)", 1.5),
+    (NF, "Not found (N_trivial)", 1.5),
     (ACC, ACC, 1.8),
     (PCT, PCT, 1.7),
 ]
