@@ -55,7 +55,7 @@ from openai import BadRequestError, RateLimitError
 from tqdm.auto import tqdm
 
 from myocyte import settings
-from toxtempass import config, notifications, ror
+from toxtempass import config, model_metadata, notifications, ror
 from toxtempass import utilities as beta_util
 from toxtempass.azure_registry import get_model as get_azure_model
 from toxtempass.export import export_assay_to_file
@@ -181,6 +181,22 @@ except ImportError:  # pragma: no cover - anthropic is an optional provider
     pass
 
 MAX_TRANSIENT_RETRIES = 4  # cap so a permanently-failing request can't loop forever
+
+
+class AnswerGenerationError(Exception):
+    """An answer could not be generated because the LLM call failed.
+
+    Raised rather than returning an empty answer: an empty string would be
+    written over the user's existing text, and a run where every call failed
+    would still report success. ``reason`` carries the underlying error for the
+    internal log — never for a user-facing alert.
+    """
+
+    def __init__(self, answer_id: int, reason: str) -> None:
+        """Record which answer failed and why, for the internal log."""
+        super().__init__(f"Answer {answer_id} failed: {reason}")
+        self.answer_id = answer_id
+        self.reason = reason
 
 
 # Login stuff
@@ -1301,7 +1317,11 @@ def generate_answer(
                     "Giving up on answer %s after %d transient errors: %s",
                     ans.id, transient_attempts, exc,
                 )
-                return ans.id, "", 0, 0
+                raise AnswerGenerationError(
+                    ans.id,
+                    f"{transient_attempts} transient errors, "
+                    f"last {type(exc).__name__}: {exc}",
+                ) from exc
             backoff = min(2 ** transient_attempts, 30)
             logger.warning(
                 "Transient error for answer %s (attempt %d/%d), retrying in %ds: %s",
@@ -1321,7 +1341,9 @@ def generate_answer(
                 delta_ans,
                 exc,
             )
-            return ans.id, "", 0, 0
+            raise AnswerGenerationError(
+                ans.id, f"{type(exc).__name__}: {exc}"
+            ) from exc
 
         except Exception as exc:
             logger.exception(
@@ -1331,39 +1353,77 @@ def generate_answer(
                 delta_ans,
                 exc,
             )
-            return ans.id, "", 0, 0
+            raise AnswerGenerationError(
+                ans.id, f"{type(exc).__name__}: {exc}"
+            ) from exc
 
 
-def _llm_cost_rates(model_key: str) -> tuple[str, Decimal | None, Decimal | None, str]:
-    """Return ``(model_id, input price, output price, cost unit)`` for a deployment.
+def _llm_cost_rates(
+    model_key: str,
+) -> tuple[str, Decimal | None, Decimal | None, str, Decimal | None]:
+    """Return ``(model_id, input price, output price, cost unit, fx rate)``.
 
-    Prices are per million tokens, from the Azure registry tags, and ``None``
-    when the model has no pricing tags configured. The unit is the ``cost-unit``
-    tag (e.g. ``Eur``).
+    Prices are per million tokens. They come from the model catalogue, which is
+    published in USD, converted with the rate Azure itself bills at (see
+    :mod:`toxtempass.fx`). The rate is returned so the caller can record it:
+    that is what keeps a stored cost reproducible once the monthly rate moves.
+
+    Without a known rate the USD figures are stored as-is and the unit says so,
+    rather than silently presenting dollars as euros.
     """
     from toxtempass.azure_registry import get_model as get_azure_model_entry
+    from toxtempass.models import AzureFxRate
 
-    cost_input_per_1m = None
-    cost_output_per_1m = None
-    cost_unit = ""
     model_id = ""
-
+    tier = residency = None
     try:
         idx_s, tag = model_key.split(":", 1)
         result = get_azure_model_entry(int(idx_s), tag)
         if result is not None:
-            _ep, _m = result
-            model_id = _m.model_id
-            cost_unit = _m.cost_unit
-            cip = _m.cost_input_per_1m_tokens
-            cop = _m.cost_output_per_1m_tokens
-            if cip is not None:
-                cost_input_per_1m = Decimal(str(cip))
-            if cop is not None:
-                cost_output_per_1m = Decimal(str(cop))
+            _ep, entry = result
+            model_id = entry.model_id
+            tier = entry.tags.get("tier")
+            residency = entry.tags.get("residency")
     except Exception as exc:
-        logger.warning("Could not resolve cost rates for model %r: %s", model_key, exc)
-    return model_id, cost_input_per_1m, cost_output_per_1m, cost_unit
+        logger.warning("Could not resolve deployment %r: %s", model_key, exc)
+        return model_id, None, None, "", None
+
+    if not model_id:
+        return model_id, None, None, "", None
+
+    metadata = model_metadata.lookup(model_id, tier=tier, residency=residency)
+    if metadata.input_cost_per_1m_tokens is None:
+        return model_id, None, None, "", None
+    if metadata.price_is_approximate:
+        logger.info(
+            "No catalogue row for tier %r; pricing %s at the Global rate, "
+            "which understates it.",
+            tier,
+            model_id,
+        )
+
+    usd_input = Decimal(str(metadata.input_cost_per_1m_tokens))
+    usd_output = (
+        Decimal(str(metadata.output_cost_per_1m_tokens))
+        if metadata.output_cost_per_1m_tokens is not None
+        else None
+    )
+
+    rate_row = AzureFxRate.current()
+    if rate_row is None:
+        logger.warning(
+            "No Azure USD->EUR rate stored yet; recording %s costs in USD.",
+            model_id,
+        )
+        return model_id, usd_input, usd_output, "Usd", None
+    rate = rate_row.rate
+    return (
+        model_id,
+        usd_input * rate,
+        usd_output * rate if usd_output is not None else None,
+        "Eur",
+        rate,
+    )
 
 
 def _token_cost(price_per_1m: Decimal | None, tokens: int) -> Decimal | None:
@@ -1391,10 +1451,10 @@ def _save_assay_cost(
 ) -> None:
     """Persist (or update) an ``AssayCost`` row for a completed LLM run.
 
-    Looks up cost-per-million-token rates from the Azure registry and
-    calculates the estimated costs.  Cost fields are left ``None``
-    when the model has no pricing tags configured.  The ``cost_unit``
-    field stores the currency code from the ``cost-unit`` tag (e.g. ``Eur``).
+    Rates come from the model catalogue, converted with the rate Azure bills
+    at; both the converted price and the rate itself are stored, so the figure
+    stays reproducible after the monthly rate moves. Cost fields are left
+    ``None`` when the catalogue has no price for the model.
 
     Also appends an ``LLMRun``: ``AssayCost`` is overwritten by the next run,
     the run log is what the daily cost alert sums.
@@ -1404,9 +1464,13 @@ def _save_assay_cost(
     few answers no longer erases what the full run cost. The ``LLMRun`` row
     always records THIS run alone — that log is what the spend alert sums.
     """
-    model_id, cost_input_per_1m, cost_output_per_1m, cost_unit = _llm_cost_rates(
-        model_key
-    )
+    (
+        model_id,
+        cost_input_per_1m,
+        cost_output_per_1m,
+        cost_unit,
+        fx_rate,
+    ) = _llm_cost_rates(model_key)
     cost_input = _token_cost(cost_input_per_1m, input_tokens)
     cost_output = _token_cost(cost_output_per_1m, output_tokens)
 
@@ -1420,6 +1484,7 @@ def _save_assay_cost(
         output_tokens=output_tokens,
         cost=_run_cost(cost_input, cost_output),
         cost_unit=cost_unit,
+        fx_rate=fx_rate,
     )
     if add_to_existing:
         prev = AssayCost.objects.filter(assay_id=assay_id, model_key=model_key).first()
@@ -1442,6 +1507,7 @@ def _save_assay_cost(
             cost_output=cost_output,
             cost_unit=cost_unit,
             temperature=temperature,
+            fx_rate=fx_rate,
         ),
     )
     logger.info(
@@ -1472,10 +1538,15 @@ def _record_failed_llm_run(
     """
     cost = None
     model_id, cost_unit = "", ""
+    fx_rate = None
     if ":" in model_key:
-        model_id, cost_input_per_1m, cost_output_per_1m, cost_unit = _llm_cost_rates(
-            model_key
-        )
+        (
+            model_id,
+            cost_input_per_1m,
+            cost_output_per_1m,
+            cost_unit,
+            fx_rate,
+        ) = _llm_cost_rates(model_key)
         cost = _run_cost(
             _token_cost(cost_input_per_1m, input_tokens),
             _token_cost(cost_output_per_1m, output_tokens),
@@ -1491,6 +1562,7 @@ def _record_failed_llm_run(
         output_tokens=output_tokens,
         cost=cost,
         cost_unit=cost_unit,
+        fx_rate=fx_rate,
         error=error[:2000],
     )
 
@@ -1579,47 +1651,100 @@ def process_llm_async(
         full_pdf_context = stringyfy_text_dict(text_dict)
 
         # --- Context-window guard -----------------------------------------
-        # Proactively truncate the document context so it stays within the
-        # token budget available to the active model.  Without this guard, an
-        # oversized context would either cause the LLM API to raise a
-        # BadRequestError (silently turned into empty answers) or, for APIs
-        # that do their own truncation, silently crop the input.
+        # Truncate the document context so it stays inside what the endpoint
+        # will actually accept. The ceiling comes from the catalogue's
+        # ``max_input_tokens``, which is the API's own input limit, rather than
+        # from a hand-maintained tag: a tag naming a model's *total* 400k
+        # window once let a 275k-token request reach an endpoint that accepts
+        # 272k, and all 76 answers came back empty.
         #
-        # Budget = model's context_window tag - headroom (prompts/output).
-        # When the model has no context-window tag we use a conservative
-        # fallback so the guard is always active.
-        _context_budget: int = (
-            config.context_window_fallback_tokens
-            - config.context_window_headroom_tokens
-        )
+        # Budget = max_input_tokens * reserve - headroom. The reserve absorbs
+        # tokenizer drift -- the estimator is tiktoken cl100k_base while the
+        # GPT-4o/5 families tokenize with o200k_base, and PDF extraction
+        # produces exactly the ligature-heavy text where the two diverge.
+        # Headroom covers the prompts and the response. ``max_output_tokens``
+        # is deliberately NOT subtracted: ``max_input_tokens`` already excludes
+        # it, and subtracting again would cut a 272k ceiling to 144k.
+        # Only a model we actually resolved can be held to a known ceiling.
+        # Two cases deliberately fall through to the conservative fallback
+        # instead of refusing, because in both we do not know what we are
+        # talking to, and the fallback errs small while the incident came from
+        # a budget that was too large:
+        #   * no model named -- the evaluation harness and tests hand in a
+        #     client directly, as does the legacy OPENAI_API_KEY path;
+        #   * a name the registry no longer has -- the client resolution above
+        #     has already fallen back to a different deployment, so refusing on
+        #     the stale name would refuse the wrong thing.
+        _metadata = None
         if llm_model and ":" in llm_model:
             try:
                 _idx_s, _mtag = llm_model.split(":", 1)
                 _result = get_azure_model(int(_idx_s), _mtag)
                 if _result is not None:
                     _ep, _model_entry = _result
-                    if _model_entry.context_window is not None:
-                        _context_budget = (
-                            _model_entry.context_window
-                            - config.context_window_headroom_tokens
-                        )
-                        logger.debug(
-                            "Context budget for assay %s: %d tokens "
-                            "(model=%s context_window=%d, headroom=%d)",
-                            assay_id,
-                            _context_budget,
-                            _model_entry.model_id,
-                            _model_entry.context_window,
-                            config.context_window_headroom_tokens,
-                        )
+                    _metadata = model_metadata.lookup(
+                        _model_entry.model_id,
+                        tier=_model_entry.tags.get("tier"),
+                        residency=_model_entry.tags.get("residency"),
+                        # A background task can afford a cold-start fetch; a
+                        # request rendering a page cannot.
+                        allow_fetch=True,
+                    )
             except Exception as exc:
                 logger.warning(
-                    "Could not resolve context-window for model %r; "
-                    "using fallback budget of %d tokens. Error: %s",
-                    llm_model,
-                    _context_budget,
-                    exc,
+                    "Could not resolve model metadata for %r: %s", llm_model, exc
                 )
+
+        if _metadata is not None and not _metadata.has_limits:
+            # Refuse rather than guess. A ceiling invented for a model we can
+            # name is precisely what turned an oversized context into a silent
+            # run of empty answers, and an unknown limit is not evidence that a
+            # large one is safe.
+            logger.error(
+                "No input limit known for model %r (assay %s); refusing to "
+                "draft rather than guessing a context budget.",
+                llm_model,
+                assay_id,
+            )
+            log_processing_event(
+                assay,
+                f"No max_input_tokens for model {llm_model!r}; run refused.",
+            )
+            add_user_alert(
+                assay,
+                (
+                    "The selected model's input limit could not be determined, "
+                    "so your documents were not sent and no answers were "
+                    "generated. This usually clears on its own within a few "
+                    "hours; if it does not, please choose another model or "
+                    "contact the maintainers."
+                ),
+                level="danger",
+            )
+            assay.status = LLMStatus.ERROR
+            assay.save()
+            return
+
+        if _metadata is not None and _metadata.has_limits:
+            _ceiling = _metadata.max_input_tokens
+            _ceiling_source = f"catalogue max_input_tokens for {_metadata.model_id}"
+        else:
+            _ceiling = config.context_window_fallback_tokens
+            _ceiling_source = "conservative fallback (no model named)"
+        _context_budget: int = (
+            int(_ceiling * config.context_window_estimate_reserve)
+            - config.context_window_headroom_tokens
+        )
+        logger.debug(
+            "Context budget for assay %s: %d tokens (%s, ceiling=%d "
+            "reserve=%s headroom=%d)",
+            assay_id,
+            _context_budget,
+            _ceiling_source,
+            _ceiling,
+            config.context_window_estimate_reserve,
+            config.context_window_headroom_tokens,
+        )
 
         # Guard against misconfiguration: if headroom >= context_window the
         # budget can be 0 or negative. truncate_context_to_token_limit returns
@@ -1709,6 +1834,8 @@ def process_llm_async(
         # Accumulate token usage across all rounds.
         total_input_tokens = 0
         total_output_tokens = 0
+        # Reasons for answers that never came back, for the post-run report.
+        failed_answers: list[str] = []
 
         for rnd in rounds:
             # Gate every round on the assay still existing. Prevents round N+1
@@ -1754,10 +1881,19 @@ def process_llm_async(
                             total_output_tokens += out_tok
                         except TimeoutError as te:
                             logger.error(str(te))
+                            failed_answers.append(
+                                f"answer {futures[future].id}: timed out"
+                            )
                             continue
                         except Exception as exc:
                             logger.exception(
                                 f"Fatal error for answer {futures[future].id}: {exc}"
+                            )
+                            reason = getattr(exc, "reason", None) or (
+                                f"{type(exc).__name__}: {exc}"
+                            )
+                            failed_answers.append(
+                                f"answer {futures[future].id}: {reason}"
                             )
                             continue
                         finally:
@@ -1813,7 +1949,37 @@ def process_llm_async(
             if assay_gone:
                 return
 
-        assay.status = LLMStatus.DONE
+        if failed_answers:
+            # A failed run must not read as a clean one. Without this the task
+            # returns success, the status shows DONE and nothing reaches the
+            # user -- which is how a whole run of empty answers went unnoticed.
+            # Raw error text stays in the internal log; the banner gets vetted
+            # wording (see utilities.add_user_alert).
+            all_failed = len(failed_answers) >= len(all_answers)
+            log_processing_event(
+                assay,
+                f"{len(failed_answers)} of {len(all_answers)} answers failed: "
+                + "; ".join(failed_answers[:5]),
+            )
+            if any("context_length_exceeded" in r for r in failed_answers):
+                message = (
+                    "The uploaded documents are too large for the selected "
+                    f"model, so {len(failed_answers)} of {len(all_answers)} "
+                    "questions could not be answered. Upload fewer or shorter "
+                    "documents, or choose a model with a larger context window, "
+                    "and start a new draft."
+                )
+            else:
+                message = (
+                    f"{len(failed_answers)} of {len(all_answers)} questions "
+                    "could not be answered because the request to the language "
+                    "model failed. Any answers that did come back have been "
+                    "saved; start a new draft to retry the empty ones."
+                )
+            add_user_alert(assay, message, level="danger" if all_failed else "warning")
+            assay.status = LLMStatus.ERROR if all_failed else LLMStatus.DONE
+        else:
+            assay.status = LLMStatus.DONE
         assay.save()
 
         # ── Persist token usage & cost ─────────────────────────────────────────
@@ -2993,7 +3159,11 @@ def set_llm_preference(request: HttpRequest) -> JsonResponse:
                     "retirement_date": (
                         m.retirement_date.isoformat() if m.retirement_date else ""
                     ),
-                    "context_window": m.context_window,
+                    "context_window": model_metadata.lookup(
+                        m.model_id,
+                        tier=m.tags.get("tier"),
+                        residency=m.tags.get("residency"),
+                    ).max_input_tokens,
                 }
         return JsonResponse({"success": True, "llm_model": None, "signature": sig})
 
@@ -3049,7 +3219,11 @@ def set_llm_preference(request: HttpRequest) -> JsonResponse:
                 "retirement_date": (
                     m.retirement_date.isoformat() if m.retirement_date else ""
                 ),
-                "context_window": m.context_window,
+                "context_window": model_metadata.lookup(
+                    m.model_id,
+                    tier=m.tags.get("tier"),
+                    residency=m.tags.get("residency"),
+                ).max_input_tokens,
             },
         }
     )

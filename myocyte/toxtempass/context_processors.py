@@ -4,6 +4,7 @@ from typing import Dict
 from .workspace import get_workspace_list
 from django.http import HttpRequest
 from django.utils.functional import SimpleLazyObject
+from toxtempass import model_metadata
 from toxtempass import config
 
 logger = logging.getLogger(__name__)
@@ -165,7 +166,13 @@ def llm_info(request) -> dict:
                 m.retirement_date.isoformat() if m.retirement_date else ""
             ),
             "retirement_status": m.retirement_status,
-            "context_window": m.context_window,
+            # The input ceiling the token budget is derived from, from the
+            # model catalogue. Never fetches: this runs on every page render.
+            "context_window": model_metadata.lookup(
+                m.model_id,
+                tier=m.tags.get("tier"),
+                residency=m.tags.get("residency"),
+            ).max_input_tokens,
             "source": "user" if current else "admin_default",
         }
 

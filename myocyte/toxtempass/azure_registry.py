@@ -72,8 +72,18 @@ def _parse_tags(raw: str) -> dict[str, str]:
 KNOWN_TAG_KEYS = {
     "tier", "residency", "provider", "direct-from-azure",
     "version", "label", "api", "retirement-date", "default",
-    "context-window", "cost-input-1mtoken", "cost-output-1mtoken", "cost-unit",
     "temperature",
+}
+
+# Retired: model limits and prices now come from the published catalogue (see
+# toxtempass.model_metadata) rather than from hand-maintained tags that went
+# stale silently. Listed so _validate_tags can name them specifically instead of
+# reporting them as unknown keys.
+RETIRED_TAG_KEYS = {
+    "context-window",
+    "cost-input-1mtoken",
+    "cost-output-1mtoken",
+    "cost-unit",
 }
 
 # Maps uppercase ISO 4217 currency codes to display symbols.
@@ -135,7 +145,16 @@ def privacy_badge(tags: dict[str, str]) -> str:
 def _validate_tags(idx: int, tag: str, tags: dict[str, str]) -> None:
     """Warn on unknown tag keys or values outside the controlled vocabulary."""
     for k in tags:
-        if k not in KNOWN_TAG_KEYS:
+        if k in RETIRED_TAG_KEYS:
+            logger.warning(
+                "AZURE_E%d_TAGS_%s: %r is no longer read -- limits and prices "
+                "come from the model catalogue now. It is ignored; remove it "
+                "when convenient.",
+                idx,
+                tag,
+                k,
+            )
+        elif k not in KNOWN_TAG_KEYS:
             logger.warning("AZURE_E%d_TAGS_%s: unknown key %r", idx, tag, k)
     tier = tags.get("tier")
     if tier and tier not in KNOWN_TIERS:
@@ -218,50 +237,6 @@ class ModelEntry:
         (fresh deploys, headless tests, CI). Only the first such model wins.
         """
         return (self.tags.get("default") or "").lower() == "true"
-
-    @property
-    def context_window(self) -> int | None:
-        """Maximum context window in tokens, parsed from the ``context-window`` tag."""
-        raw = self.tags.get("context-window", "").strip()
-        if not raw:
-            return None
-        try:
-            return int(raw)
-        except ValueError:
-            logger.warning("Invalid context-window %r on tag %s", raw, self.tag)
-            return None
-
-    @property
-    def cost_input_per_1m_tokens(self) -> float | None:
-        """Cost in EUR per 1 million input tokens, parsed from the ``cost-input-1mtoken`` tag."""
-        raw = self.tags.get("cost-input-1mtoken", "").strip()
-        if not raw:
-            return None
-        try:
-            return float(raw)
-        except ValueError:
-            logger.warning("Invalid cost-input-1mtoken %r on tag %s", raw, self.tag)
-            return None
-
-    @property
-    def cost_output_per_1m_tokens(self) -> float | None:
-        """Cost in EUR per 1 million output tokens, parsed from the ``cost-output-1mtoken`` tag."""
-        raw = self.tags.get("cost-output-1mtoken", "").strip()
-        if not raw:
-            return None
-        try:
-            return float(raw)
-        except ValueError:
-            logger.warning("Invalid cost-output-1mtoken %r on tag %s", raw, self.tag)
-            return None
-
-    @property
-    def cost_unit(self) -> str:
-        """Currency unit from the ``cost-unit`` tag (e.g. ``Eur``, ``USD``).
-
-        Returns an empty string when the tag is absent.
-        """
-        return self.tags.get("cost-unit", "").strip()
 
     @property
     def retirement_date(self) -> "date | None":

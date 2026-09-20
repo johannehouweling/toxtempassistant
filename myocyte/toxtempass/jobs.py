@@ -7,18 +7,26 @@ import logging
 
 from django.utils import timezone
 
-from toxtempass import notifications, privacy
+from toxtempass import fx, model_metadata, notifications, privacy
 
 logger = logging.getLogger(__name__)
 
 
 def run_periodic_jobs() -> None:
-    """Send due emails and delete withdrawn files whose waiting period is over.
+    """Send due emails, delete expired files, and refresh externally-sourced data.
 
-    Each part is safe to repeat, and one failing does not stop the other.
+    Each part is safe to repeat, and one failing does not stop the others. The
+    two refreshes throttle themselves -- this job ticks every couple of minutes
+    while the model catalogue changes daily at most and the Azure FX rate
+    monthly -- so they are cheap no-ops between their own intervals.
     """
     now = timezone.now()
-    for job in (notifications.run_email_jobs, privacy.delete_withdrawn_files):
+    for job in (
+        notifications.run_email_jobs,
+        privacy.delete_withdrawn_files,
+        model_metadata.refresh,
+        fx.refresh_fx_rate,
+    ):
         try:
             job(now)
         except Exception:
