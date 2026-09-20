@@ -1268,7 +1268,26 @@ def generate_answer(
             # `or 0` guards against providers that explicitly return None for these keys.
             input_tokens = usage.get("input_tokens", 0) or 0
             output_tokens = usage.get("output_tokens", 0) or 0
+            # A generation that ran out of output budget is reported as a
+            # *successful* response whose content is truncated -- or, on a
+            # reasoning model whose budget went entirely on invisible reasoning
+            # tokens, empty. Storing that would put a half-sentence (or nothing)
+            # in the ToxTemp and call the run a success, which is the failure
+            # this module exists to prevent. OpenAI says "length", Anthropic
+            # says "max_tokens".
+            metadata = getattr(resp, "response_metadata", None) or {}
+            finish = metadata.get("finish_reason") or metadata.get("stop_reason") or ""
+            if finish in ("length", "max_tokens"):
+                raise AnswerGenerationError(
+                    ans.id,
+                    f"generation hit the output cap (finish_reason={finish!r}, "
+                    f"{output_tokens} output tokens)",
+                )
             return ans.id, (resp.content or ""), input_tokens, output_tokens
+
+        except AnswerGenerationError:
+            # Already the right failure; don't re-wrap it as an unexpected error.
+            raise
 
         except _RATE_LIMIT_ERRORS as e:
             # Determine how long to back off. Prefer the standard Retry-After
@@ -1961,7 +1980,14 @@ def process_llm_async(
                 f"{len(failed_answers)} of {len(all_answers)} answers failed: "
                 + "; ".join(failed_answers[:5]),
             )
-            if any("context_length_exceeded" in r for r in failed_answers):
+            if any("output cap" in r for r in failed_answers):
+                message = (
+                    f"{len(failed_answers)} of {len(all_answers)} answers were "
+                    "cut off because they ran past the length limit for a "
+                    "single answer, so they were not saved. The question may be "
+                    "too broad to answer in one go; narrowing it usually helps."
+                )
+            elif any("context_length_exceeded" in r for r in failed_answers):
                 message = (
                     "The uploaded documents are too large for the selected "
                     f"model, so {len(failed_answers)} of {len(all_answers)} "

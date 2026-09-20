@@ -212,3 +212,72 @@ def test_context_budget_is_scaled_down_to_absorb_estimator_error():
     assay.refresh_from_db()
     alert_text = " ".join(a.get("message", "") for a in assay.user_alerts).lower()
     assert "truncated" in alert_text
+
+
+class _TruncatedFakeLLM:
+    """Fake LLM that ran out of output budget.
+
+    The provider reports this as a *successful* response whose content is cut
+    short -- or empty, when a reasoning model spent the whole budget on
+    invisible tokens.
+    """
+
+    def __init__(self, content="Half a senten", key="finish_reason", value="length"):
+        self._content = content
+        self._metadata = {key: value}
+
+    def invoke(self, messages):
+        return SimpleNamespace(
+            content=self._content,
+            response_metadata=self._metadata,
+            usage_metadata={"input_tokens": 10, "output_tokens": 8000},
+        )
+
+
+@pytest.mark.django_db
+def test_hitting_the_output_cap_is_a_failure_not_a_short_answer():
+    """A truncated generation must not be stored as though it were the answer."""
+    assay = AssayFactory()
+    answer = _seed_one_question(assay)
+
+    with pytest.raises(AnswerGenerationError) as excinfo:
+        generate_answer(answer, "context", assay, _TruncatedFakeLLM())
+
+    assert "output cap" in excinfo.value.reason
+    assert "length" in excinfo.value.reason
+
+
+@pytest.mark.django_db
+def test_anthropics_own_name_for_the_same_thing_is_caught():
+    """OpenAI says finish_reason=length; Anthropic says stop_reason=max_tokens."""
+    assay = AssayFactory()
+    answer = _seed_one_question(assay)
+
+    llm = _TruncatedFakeLLM(key="stop_reason", value="max_tokens")
+    with pytest.raises(AnswerGenerationError):
+        generate_answer(answer, "context", assay, llm)
+
+
+@pytest.mark.django_db
+def test_an_empty_answer_from_an_exhausted_reasoning_budget_still_fails():
+    """The dangerous case: the budget went on reasoning and nothing came back."""
+    assay = AssayFactory()
+    answer = _seed_one_question(assay, answer_text="Text the user wrote earlier.")
+
+    with pytest.raises(AnswerGenerationError):
+        generate_answer(answer, "context", assay, _TruncatedFakeLLM(content=""))
+
+    # And because it raised, the user's own text was never overwritten.
+    answer.refresh_from_db()
+    assert answer.answer_text == "Text the user wrote earlier."
+
+
+@pytest.mark.django_db
+def test_a_normal_stop_is_not_mistaken_for_truncation():
+    """Only length/max_tokens count; a normal completion must pass through."""
+    assay = AssayFactory()
+    answer = _seed_one_question(assay)
+
+    llm = _TruncatedFakeLLM(content="A complete answer.", value="stop")
+    _aid, text, _in, _out = generate_answer(answer, "context", assay, llm)
+    assert text == "A complete answer."
