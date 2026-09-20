@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.56.0 (2026-09-20)
+
+### Features
+
+- **llm**: Take model limits and prices from the published catalogue
+  ([`996cec7`](https://github.com/johannehouweling/toxtempassistant/commit/996cec739c6d0a95fa2ba1c4e604224d7b6aa43e))
+
+
 ## v3.55.0 (2026-09-17)
 
 ### Code Style
