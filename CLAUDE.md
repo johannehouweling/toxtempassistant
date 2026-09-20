@@ -105,6 +105,43 @@ Reasoning models (o1/o3/o4/o5/gpt-5*) reject custom temperature; `_is_reasoning_
 
 `current_llm_key(user)` snapshots the user's resolved deployment at queue time so a worker uses the same model when the task fires later (regardless of preference changes in between).
 
+### Token budget and the output cap
+
+Two separate limits apply to every drafting call, and they are not
+interchangeable.
+
+**Input** is bounded by `max_input_tokens` from the model catalogue
+(`toxtempass/model_metadata.py`), which is the API's own input ceiling, not the
+advertised context window. `gpt-5.4-mini` advertises 400k and accepts 272k of
+input. The document context is truncated to
+`max_input_tokens * context_window_estimate_reserve - context_window_headroom_tokens`.
+A resolved model with no known ceiling refuses the run rather than guessing —
+a guessed ceiling is what once turned an oversized context into 76 empty
+answers that reported success.
+
+**Output** is capped at `Config.llm_max_output_tokens` (8,000), passed as
+`max_tokens` at every client construction site in `llm.py`; langchain-openai
+renames it to `max_completion_tokens` for the models that require it. Sized
+against a measured maximum answer of 1,992 tokens (abstentions excluded), so
+ordinary drafting never approaches it.
+
+Anything that makes answers longer — tool use, web search, multi-step drafting,
+a question set that asks for extended prose — has to be weighed against that
+8,000. **On a reasoning model the cap also pays for invisible reasoning
+tokens**, so a future model reasoning heavily could exhaust it without writing
+anything.
+
+Reaching the cap is detected, not silent: `generate_answer` treats
+`finish_reason` of `length` (OpenAI) or `stop_reason` of `max_tokens`
+(Anthropic) as a failure and raises `AnswerGenerationError`. The run counts it,
+logs the reason internally, and shows the user an alert saying the answer ran
+past the length limit. It is never stored as a short answer — a truncated
+half-sentence in a regulatory template is worse than an explicit failure.
+
+Raising the cap on Azure frees no input: the input ceiling there is fixed and
+does not move with the output request (measured). On Anthropic it does, because
+`max_tokens` is validated against the context window together with the input.
+
 ### Azure deployment auto-discovery
 
 `toxtempass/azure_registry.py` parses env vars at startup. Convention:

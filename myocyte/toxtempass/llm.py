@@ -8,6 +8,8 @@ from langchain_core.messages import BaseMessage
 from langchain_openai import ChatOpenAI
 from pydantic import Field, model_validator
 
+from toxtempass import config as app_config
+
 # Get logger
 logger = logging.getLogger("llm")
 
@@ -132,6 +134,9 @@ def get_llm():
         temperature=temperature,
         default_headers=extra_headers,
         timeout=120,
+        # langchain-openai renames this to max_completion_tokens for the models
+        # that require it, so one name is safe across the family.
+        max_tokens=app_config.llm_max_output_tokens,
     )
 
 
@@ -363,6 +368,12 @@ def get_llm_for_endpoint(endpoint_index: int, model_tag: str, temperature: float
             base_url=base,
             model=m.deployment_name,
             timeout=120,
+            # Set explicitly: langchain otherwise picks a default from the model
+            # profile, and `model` here is our deployment name rather than a
+            # canonical id, so an unrecognised one silently falls back to 4096.
+            # Anthropic also counts max_tokens against the context window, so
+            # this reserves input room as well as capping output.
+            max_tokens=app_config.llm_max_output_tokens,
             **temp_kwargs,
         )
 
@@ -387,6 +398,7 @@ def get_llm_for_endpoint(endpoint_index: int, model_tag: str, temperature: float
             azure_deployment=m.deployment_name,
             model=m.model_id,
             timeout=120,
+            max_tokens=app_config.llm_max_output_tokens,
             **temp_kwargs,
         )
 
@@ -405,6 +417,7 @@ def get_llm_for_endpoint(endpoint_index: int, model_tag: str, temperature: float
             credential=ep.api_key,
             model=m.deployment_name,
             api_version=ep.api_version or None,
+            max_tokens=app_config.llm_max_output_tokens,
             **temp_kwargs,
         )
 
@@ -414,6 +427,7 @@ def get_llm_for_endpoint(endpoint_index: int, model_tag: str, temperature: float
         base_url=ep.endpoint,
         model=m.deployment_name,
         timeout=120,
+        max_tokens=app_config.llm_max_output_tokens,
         **temp_kwargs,
     )
 

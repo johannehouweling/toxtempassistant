@@ -350,13 +350,35 @@ class Config:
     # character-to-token ratio.
     truncation_safety_margin = 0.95
     # Applied to the catalogue's max_input_tokens before headroom is taken off.
-    # tiktoken (cl100k_base) is an estimator, not the model's tokenizer -- the
-    # GPT-4o/5 families use o200k_base -- and PDF extraction yields exactly the
-    # ligature-heavy text where the two diverge. The size of that drift is not
-    # measured here, so this is deliberate slack rather than a computed figure;
-    # it did not cause the 272k incident (a stale context-window tag did) and is
-    # not what fixed it.
-    context_window_estimate_reserve = 0.95
+    # 1.0 because the estimator was measured and errs the safe way:
+    #   * a 285,001-token estimate billed as 285,018 on a live gpt-5.4-mini
+    #     deployment -- 0.006% apart;
+    #   * encoding the same text with cl100k_base and o200k_base gives parity on
+    #     clean prose, and cl100k OVERcounting by 3.4% on PDF-extracted text,
+    #     where ligatures and hyphenation make o200k the more efficient of the
+    #     two.
+    # tiktoken never under-reports here, so slack for it would be slack against
+    # nothing. Room for the prompts and the response is reserved explicitly by
+    # context_window_headroom_tokens. Kept as a knob for a future model whose
+    # tokenizer has not been measured.
+    context_window_estimate_reserve = 1.0
+
+    # Ceiling on what one answer may generate. Not a context saving: a live
+    # probe showed this deployment's input ceiling stays at 272k however little
+    # output is requested. It is a runaway guard, so that a model which loops
+    # stops at a known cost instead of the provider's 128k default.
+    #
+    # 8k against a measured maximum answer of 1,992 tokens (abstentions
+    # excluded, n=579). Deliberately loose rather than close to the data: on
+    # Azure the input ceiling is fixed, so a tighter cap frees no context and
+    # would only buy risk. One probe billed 56 output tokens for 54 visible,
+    # i.e. no measurable reasoning overhead -- but the API reports an absent
+    # figure and a genuine zero identically, and that probe asked an easy
+    # question. On a reasoning model this budget also pays for invisible
+    # reasoning tokens, and a budget they exhaust returns an empty string with
+    # finish_reason="length", which the client sees as success. generate_answer
+    # treats that as a failure; this margin keeps it from arising.
+    llm_max_output_tokens = 8_000
     max_workers_django_q = settings.Q_CLUSTER[
         "workers"
     ]  # 1 worker for django_q, we use threading for parallelism
