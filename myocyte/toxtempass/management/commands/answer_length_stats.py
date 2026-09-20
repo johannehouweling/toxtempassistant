@@ -23,6 +23,7 @@ Aggregates only: counts and percentiles, never answer text.
 from __future__ import annotations
 
 from argparse import ArgumentParser
+from collections.abc import Iterable
 
 from django.core.management.base import BaseCommand
 from django.db.models import Count, QuerySet
@@ -31,6 +32,7 @@ from toxtempass import config
 from toxtempass.demo import DEMO_ASSAY
 from toxtempass.filehandling import estimate_token_count
 from toxtempass.models import Answer
+from toxtempass.utilities import is_standard_abstention
 
 PERCENTILES = (50, 75, 90, 95, 99, 100)
 
@@ -43,6 +45,25 @@ def _percentile(sorted_values: list[int], pct: int) -> int:
         return sorted_values[-1]
     index = (len(sorted_values) - 1) * pct // 100
     return sorted_values[index]
+
+
+def _split(texts: Iterable[str | None]) -> tuple[list[int], int]:
+    """Return ``(token counts of substantive answers, abstention count)``.
+
+    Uses the same check that records ``Answer.llm_abstained`` rather than
+    matching the phrase here, so a paraphrase from a different model is caught
+    too.
+    """
+    kept: list[int] = []
+    skipped = 0
+    for text in texts:
+        if not text or not text.strip():
+            continue
+        if is_standard_abstention(text):
+            skipped += 1
+            continue
+        kept.append(estimate_token_count(text))
+    return kept, skipped
 
 
 def _demo_assay_ids() -> "QuerySet":
@@ -76,6 +97,21 @@ class Command(BaseCommand):
             name = "max" if pct >= 100 else f"p{pct}"
             self.stdout.write(f"  {name:<6} {_percentile(lengths, pct):>8,} tokens")
         return _percentile(lengths, 99)
+
+    def _report_abstentions(self, label: str, kept: list[int], skipped: int) -> None:
+        """Report how much of the cohort was the model declining to answer.
+
+        These are excluded from the length figures below: "Answer not found in
+        documents." is six tokens, and enough of them drag a median to six
+        tokens while saying nothing about how long a real answer runs.
+        """
+        total = len(kept) + skipped
+        if not total:
+            return
+        self.stdout.write(
+            f"{label:<9} {skipped:,} of {total:,} "
+            f"({skipped * 100 // total}%) were standard abstentions, excluded below"
+        )
 
     def _report_billed(self) -> None:
         """Compare billed completion tokens with the visible text stored.
@@ -145,22 +181,20 @@ class Command(BaseCommand):
         answers = Answer.objects.exclude(answer_text="").exclude(answer_text=None)
         if not include_demo:
             answers = answers.exclude(assay__in=_demo_assay_ids())
-        current = [
-            estimate_token_count(text)
-            for text in answers.values_list("answer_text", flat=True).iterator()
-            if text
-        ]
+        current, current_abstained = _split(
+            answers.values_list("answer_text", flat=True).iterator()
+        )
 
         historical = Answer.history.model.objects.filter(
             history_user__isnull=True
         ).exclude(answer_text="").exclude(answer_text=None)
         if not include_demo:
             historical = historical.exclude(assay_id__in=_demo_assay_ids())
-        drafts = [
-            estimate_token_count(text)
-            for text in historical.values_list("answer_text", flat=True).iterator()
-            if text
-        ]
+        drafts, drafts_abstained = _split(
+            historical.values_list("answer_text", flat=True).iterator()
+        )
+        self._report_abstentions("history", drafts, drafts_abstained)
+        self._report_abstentions("current", current, current_abstained)
 
         self._report_billed()
         p99_draft = self._report("history  (worker-written drafts)", drafts)
