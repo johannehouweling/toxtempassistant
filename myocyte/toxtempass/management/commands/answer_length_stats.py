@@ -25,7 +25,7 @@ from __future__ import annotations
 from argparse import ArgumentParser
 
 from django.core.management.base import BaseCommand
-from django.db.models import QuerySet
+from django.db.models import Count, QuerySet
 
 from toxtempass import config
 from toxtempass.demo import DEMO_ASSAY
@@ -77,6 +77,67 @@ class Command(BaseCommand):
             self.stdout.write(f"  {name:<6} {_percentile(lengths, pct):>8,} tokens")
         return _percentile(lengths, 99)
 
+    def _report_billed(self) -> None:
+        """Compare billed completion tokens with the visible text stored.
+
+        ``max_completion_tokens`` budgets visible output and invisible
+        reasoning tokens together, so sizing it from stored answer text alone
+        is wrong. Billed completion tokens include both; the gap between the
+        two is what reasoning costs, and that decides whether a cap near the
+        visible p99 is safe or reckless.
+
+        Both counters are per *run* -- one call to the drafting task, many
+        questions -- so this reports run totals and a per-answer mean, not a
+        per-call p99.
+        """
+        from toxtempass.models import LLMRun
+
+        runs = list(
+            LLMRun.objects.filter(output_tokens__gt=0).values_list(
+                "output_tokens", "assay_id"
+            )
+        )
+        if not runs:
+            self.stdout.write(
+                self.style.WARNING(
+                    "billed: no LLMRun rows with output tokens yet, so the "
+                    "reasoning overhead cannot be measured and any output cap "
+                    "is a guess."
+                )
+            )
+            return
+        totals = sorted(t for t, _ in runs)
+        self.stdout.write(
+            self.style.HTTP_INFO(
+                f"\nbilled completion tokens per RUN  (n={len(totals)})"
+            )
+        )
+        for pct in PERCENTILES:
+            name = "max" if pct >= 100 else f"p{pct}"
+            self.stdout.write(f"  {name:<6} {_percentile(totals, pct):>8,} tokens")
+
+        counts = dict(
+            Answer.objects.filter(assay_id__in={a for _, a in runs})
+            .values_list("assay_id")
+            .annotate(n=Count("id"))
+        )
+        per_answer = sorted(
+            total // counts[assay_id]
+            for total, assay_id in runs
+            if counts.get(assay_id)
+        )
+        if per_answer:
+            self.stdout.write(
+                "\n  billed per answer (a run's total over its answers): "
+                f"p50 {_percentile(per_answer, 50):,} | "
+                f"p95 {_percentile(per_answer, 95):,} | "
+                f"max {_percentile(per_answer, 100):,} tokens"
+            )
+            self.stdout.write(
+                "  Against the visible lengths below, the difference is what "
+                "reasoning costs -- an output cap has to cover both."
+            )
+
     def handle(self, *args: object, **options: object) -> None:
         """Measure both cohorts and suggest a reservation."""
         include_demo = bool(options["include_demo"])
@@ -101,6 +162,7 @@ class Command(BaseCommand):
             if text
         ]
 
+        self._report_billed()
         p99_draft = self._report("history  (worker-written drafts)", drafts)
         p99_current = self._report("current  (includes human edits)", current)
 
