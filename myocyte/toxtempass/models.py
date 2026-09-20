@@ -1152,6 +1152,143 @@ class LLMConfig(models.Model):
         return f"LLM Config (default={self.default_model or 'auto'})"
 
 
+class LLMCatalogue(models.Model):
+    """Cached copy of LiteLLM's published catalogue of model limits and prices.
+
+    The catalogue is referenced upstream rather than committed, so this row is
+    the only copy the app holds. It replaces numbers that used to live in
+    ``AZURE_E<n>_TAGS_*`` and went stale silently: a ``context-window`` tag
+    naming a model's *total* window once let a 275k-token request reach an
+    endpoint that accepts 272k of input, and every answer came back empty.
+
+    Refreshed by the periodic job -- never at import or per request, so a
+    network blip cannot become a startup failure. The refresh is conditional on
+    ``etag``, so an unchanged catalogue costs one 304 and no payload.
+
+    Singleton (pk=1), like :class:`LLMConfig`.
+    """
+
+    models_json = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Catalogue keyed by model name, each entry holding max_input_tokens, "
+            "max_output_tokens and per-token prices. Merged on refresh, so a "
+            "field upstream drops keeps its last known value instead of "
+            "reverting to unknown."
+        ),
+    )
+    etag = models.CharField(
+        max_length=200,
+        default="",
+        blank=True,
+        help_text="Upstream ETag, sent as If-None-Match on the next refresh.",
+    )
+    source_url = models.URLField(
+        max_length=500,
+        default="",
+        blank=True,
+        help_text="Which mirror the current copy came from.",
+    )
+    fetched_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the catalogue last actually changed.",
+    )
+    checked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When upstream was last contacted, changed or not.",
+    )
+
+    class Meta:
+        verbose_name = "LLM Catalogue"
+        verbose_name_plural = "LLM Catalogue"
+
+    def __str__(self) -> str:
+        """Describe the cached catalogue for the admin list."""
+        return f"LLM Catalogue ({self.entry_count} models, fetched {self.fetched_at})"
+
+    def save(self, *args: object, **kwargs: object) -> None:
+        """Persist the singleton row (always pk=1)."""
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls) -> "LLMCatalogue":
+        """Return the singleton row, creating it empty if needed."""
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def entry_count(self) -> int:
+        """Number of models the cached catalogue describes."""
+        return len(self.models_json or {})
+
+
+class AzureFxRate(models.Model):
+    """The USD->EUR rate Azure bills at, taken from Azure's own price list.
+
+    Azure prices everything in USD and converts with "London closing spot rates
+    captured in the two business days prior to the last business day of the
+    previous month end", fixed for the following calendar month. So the rate is
+    not a live FX quote and must not be fetched from one: deriving it from the
+    retail price list reproduces the invoice exactly.
+
+    Append-only, one row per distinct rate. Runs snapshot the rate they used,
+    so a historical cost stays reproducible after the rate moves.
+
+    The change is detected by comparing the rate itself, not by reading
+    ``effectiveStartDate``: that field records when the *USD* list price last
+    changed (meters still carry 2024 dates) while the EUR figure floats with
+    the monthly rate on top of it, so it never signals an FX reset.
+
+    The rate is read from a high-priced meter on purpose. Published EUR figures
+    are rounded, so a per-token meter gives a ratio off by as much as 16%, while
+    meters above USD 5 agree to seven decimal places.
+    """
+
+    rate = models.DecimalField(
+        max_digits=14,
+        decimal_places=10,
+        help_text="EUR per USD, in force for the month starting effective_start.",
+    )
+    observed_on = models.DateField(
+        unique=True,
+        help_text=(
+            "Day this rate was first seen in the price list. Azure fixes the "
+            "rate for a calendar month, so in practice this lands early in the "
+            "month the rate took effect."
+        ),
+    )
+    confirmed_at = models.DateTimeField(
+        auto_now=True,
+        help_text=(
+            "Last time the price list was checked and still showed this rate. "
+            "Throttles the check to once a day -- a monthly rate needs no more."
+        ),
+    )
+    source_meter = models.CharField(
+        max_length=200,
+        default="",
+        blank=True,
+        help_text="Meter the ratio was derived from, for auditing.",
+    )
+    fetched_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-observed_on"]
+        verbose_name = "Azure FX rate"
+        verbose_name_plural = "Azure FX rates"
+
+    def __str__(self) -> str:
+        """Describe the rate for the admin list."""
+        return f"1 USD = {self.rate} EUR from {self.observed_on}"
+
+    @classmethod
+    def current(cls) -> "AzureFxRate | None":
+        """Return the most recent rate, or None when none has been fetched."""
+        return cls.objects.first()
 
 
 class AssayCost(models.Model):
@@ -1219,7 +1356,18 @@ class AssayCost(models.Model):
         max_length=16,
         blank=True,
         default="",
-        help_text='Currency unit from the cost-unit tag at run time, e.g. "Eur".',
+        help_text='Currency the cost is expressed in at run time, e.g. "Eur".',
+    )
+    fx_rate = models.DecimalField(
+        max_digits=14,
+        decimal_places=10,
+        null=True,
+        blank=True,
+        help_text=(
+            "USD->EUR rate used to convert the catalogue's USD price at run "
+            "time. Recorded so the cost stays reproducible after the monthly "
+            "rate moves; empty when the price was already in the stored unit."
+        ),
     )
     temperature = models.CharField(
         max_length=32,
@@ -1306,7 +1454,18 @@ class LLMRun(models.Model):
         max_length=16,
         blank=True,
         default="",
-        help_text='Currency unit from the cost-unit tag at run time, e.g. "Eur".',
+        help_text='Currency the cost is expressed in at run time, e.g. "Eur".',
+    )
+    fx_rate = models.DecimalField(
+        max_digits=14,
+        decimal_places=10,
+        null=True,
+        blank=True,
+        help_text=(
+            "USD->EUR rate used to convert the catalogue's USD price at run "
+            "time. Recorded so the cost stays reproducible after the monthly "
+            "rate moves; empty when the price was already in the stored unit."
+        ),
     )
     error = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)

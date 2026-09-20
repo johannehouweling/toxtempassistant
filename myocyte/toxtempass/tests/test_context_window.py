@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
+from toxtempass import model_metadata
 from toxtempass.filehandling import (
     estimate_token_count,
     truncate_context_to_token_limit,
@@ -21,7 +22,6 @@ from toxtempass.models import (
 )
 from toxtempass.tests.fixtures.factories import AssayFactory
 from toxtempass.views import process_llm_async
-
 
 # ---------------------------------------------------------------------------
 # Unit tests for the utility functions
@@ -203,14 +203,26 @@ def test_process_llm_async_no_warning_when_context_fits():
     )
 
 
-@pytest.mark.django_db
-def test_process_llm_async_uses_model_context_window_tag():
-    """When llm_model resolves to a ModelEntry with a context_window tag,
-    the budget is computed as context_window - headroom (not the fallback).
-    """
+def _entry(model_id="tiny-model", tier="global", residency="eu"):
+    """A ModelEntry stand-in; only model_id and tags are read for the budget."""
     from unittest.mock import MagicMock
 
-    assay = AssayFactory()
+    entry = MagicMock()
+    entry.model_id = model_id
+    entry.tags = {"tier": tier, "residency": residency}
+    return MagicMock(), entry
+
+
+def _seed_catalogue(models):
+    from toxtempass.models import LLMCatalogue
+
+    catalogue = LLMCatalogue.load()
+    catalogue.models_json = models
+    catalogue.save()
+    model_metadata.invalidate()
+
+
+def _one_question(assay):
     qs = QuestionSet.objects.create(
         display_name="qs", created_by=assay.study.investigation.owner
     )
@@ -219,113 +231,103 @@ def test_process_llm_async_uses_model_context_window_tag():
     q = Question.objects.create(subsection=subsection, question_text="What is this?")
     Answer.objects.create(assay=assay, question=q)
 
-    # Build a large context that would exceed a 100-token budget but fit 200 k
-    large_text = "word " * 500  # well over 100 tokens
+
+@pytest.mark.django_db
+def test_budget_comes_from_the_catalogue_input_ceiling_not_a_tag():
+    """The ceiling is the API's own max_input_tokens.
+
+    A hand-maintained ``context-window`` tag naming a model's *total* window is
+    what let a 275k-token request reach an endpoint accepting 272k.
+    """
+    assay = AssayFactory()
+    _one_question(assay)
+    _seed_catalogue({"azure/tiny-model": {"max_input_tokens": 150}})
     doc_dict = {
         "doc.txt": {
-            "text": large_text,
+            "text": "word " * 500,
             "source_document": "doc.txt",
             "origin": "document",
         }
     }
 
-    fake_llm = _SimpleFakeLLM()
-
-    # Fabricate a ModelEntry-like mock whose context_window is 150 tokens
-    mock_model_entry = MagicMock()
-    mock_model_entry.context_window = 150  # tiny, so truncation kicks in
-    mock_model_entry.model_id = "fake-model"
-
-    mock_ep = MagicMock()
-
     with (
         patch("toxtempass.views.config.context_window_headroom_tokens", new=50),
-        patch("toxtempass.views.config.context_window_fallback_tokens", new=1_000_000),
-        patch(
-            "toxtempass.views.get_azure_model",
-            return_value=(mock_ep, mock_model_entry),
-        ),
+        patch("toxtempass.views.config.context_window_estimate_reserve", new=1.0),
+        patch("toxtempass.views.get_azure_model", return_value=_entry()),
     ):
         process_llm_async(
             assay.id,
             doc_dict=doc_dict,
             extract_images=False,
-            chatopenai=fake_llm,
+            chatopenai=_SimpleFakeLLM(),
             llm_model="1:FAKE",
         )
 
     assay.refresh_from_db()
-
-    # Budget was 150 - 50 = 100 tokens; large_text is ~500 tokens → truncated
-    assert assay.user_alerts, "Expected a truncation alert in user_alerts"
+    # Budget was 150 - 50 = 100 tokens; the text is ~500 → truncated.
     alert_text = " ".join(a.get("message", "") for a in assay.user_alerts).lower()
     assert "truncated" in alert_text
 
 
 @pytest.mark.django_db
-def test_process_llm_async_aborts_when_budget_non_positive():
-    """When headroom >= context_window the budget is <= 0; the guard should
-    abort the run with status=ERROR and a user-visible alert (rather than
-    silently passing a negative limit into the truncator and producing
-    useless context-free answers).
-    """
-    from unittest.mock import MagicMock
+def test_a_named_model_with_no_known_ceiling_refuses_instead_of_guessing():
+    """An unknown limit is not evidence that a large one is safe."""
+    from toxtempass.models import LLMStatus
 
     assay = AssayFactory()
-    qs = QuestionSet.objects.create(
-        display_name="qs", created_by=assay.study.investigation.owner
-    )
-    section = Section.objects.create(question_set=qs, title="S1")
-    subsection = Subsection.objects.create(section=section, title="Sub1")
-    q = Question.objects.create(subsection=subsection, question_text="What is this?")
-    Answer.objects.create(assay=assay, question=q)
+    _one_question(assay)
+    _seed_catalogue({"azure/some-other-model": {"max_input_tokens": 272000}})
+    fake = _SimpleFakeLLM()
 
-    doc_dict = {
-        "doc.txt": {
-            "text": "word " * 100,
-            "source_document": "doc.txt",
-            "origin": "document",
-        }
-    }
+    with patch("toxtempass.views.get_azure_model", return_value=_entry()):
+        process_llm_async(
+            assay.id,
+            doc_dict={},
+            extract_images=False,
+            chatopenai=fake,
+            llm_model="1:FAKE",
+        )
 
-    fake_llm = _SimpleFakeLLM()
+    assay.refresh_from_db()
+    assert assay.status == LLMStatus.ERROR
+    alert_text = " ".join(a.get("message", "") for a in assay.user_alerts).lower()
+    assert "input limit could not be determined" in alert_text
+    # Nothing was sent: refusing means refusing, not truncating to zero.
+    assert fake._calls == 0
 
-    # Headroom (200) larger than the model's context window (100) → budget=-100
-    mock_model_entry = MagicMock()
-    mock_model_entry.context_window = 100
-    mock_model_entry.model_id = "tiny-model"
-    mock_ep = MagicMock()
+
+@pytest.mark.django_db
+def test_run_aborts_when_headroom_exceeds_the_models_whole_ceiling():
+    """Misconfigured headroom yields a non-positive budget; abort, don't send."""
+    from toxtempass.models import LLMStatus
+
+    assay = AssayFactory()
+    _one_question(assay)
+    _seed_catalogue({"azure/tiny-model": {"max_input_tokens": 100}})
+    fake = _SimpleFakeLLM()
 
     with (
         patch("toxtempass.views.config.context_window_headroom_tokens", new=200),
-        patch("toxtempass.views.config.context_window_fallback_tokens", new=1_000_000),
-        patch(
-            "toxtempass.views.get_azure_model",
-            return_value=(mock_ep, mock_model_entry),
-        ),
+        patch("toxtempass.views.config.context_window_estimate_reserve", new=1.0),
+        patch("toxtempass.views.get_azure_model", return_value=_entry()),
     ):
         process_llm_async(
             assay.id,
-            doc_dict=doc_dict,
+            doc_dict={
+                "doc.txt": {
+                    "text": "word " * 100,
+                    "source_document": "doc.txt",
+                    "origin": "document",
+                }
+            },
             extract_images=False,
-            chatopenai=fake_llm,
+            chatopenai=fake,
             llm_model="1:TINY",
         )
 
     assay.refresh_from_db()
-
-    assert assay.user_alerts, "Expected a user alert when budget is non-positive"
     alert_text = " ".join(a.get("message", "") for a in assay.user_alerts).lower()
-    assert "context window" in alert_text and "too small" in alert_text, (
-        "Alert should explain the model's window is too small; got: "
-        + repr(assay.user_alerts)
-    )
-    # Internal log should also record the misconfiguration for ops.
+    assert "context window" in alert_text and "too small" in alert_text
     assert "non-positive" in (assay.processing_log or "").lower()
-    # The run must abort with ERROR rather than continue producing useless
-    # context-free answers.
-    from toxtempass.models import LLMStatus
-
     assert assay.status == LLMStatus.ERROR
-    # No LLM calls should have been made.
-    assert fake_llm._calls == 0
+    assert fake._calls == 0

@@ -67,13 +67,18 @@ def test_process_llm_async_saves_assaycost_when_llm_model_set(assay_with_questio
     assay = assay_with_questions
     fake = FakeLLMWithUsage(input_tokens=200, output_tokens=80)
 
-    process_llm_async(
-        assay.id,
-        doc_dict={},
-        extract_images=False,
-        chatopenai=fake,
-        llm_model="1:GPT4O",
-    )
+    # This test is about cost accounting, not model resolution. Whether the
+    # ambient environment happens to define AZURE_E1_* decides whether the
+    # budget guard resolves a model and demands a catalogue entry for it, so
+    # pin resolution to "unknown" and let the conservative fallback apply.
+    with patch("toxtempass.views.get_azure_model", return_value=None):
+        process_llm_async(
+            assay.id,
+            doc_dict={},
+            extract_images=False,
+            chatopenai=fake,
+            llm_model="1:GPT4O",
+        )
 
     cost_rows = AssayCost.objects.filter(assay=assay)
     assert cost_rows.count() == 1
@@ -165,46 +170,94 @@ def test_process_llm_async_no_assaycost_when_zero_tokens(assay_with_questions):
 
 
 @pytest.mark.django_db
-def test_save_assay_cost_calculates_cost_from_registry(assay_with_questions):
-    """_save_assay_cost calculates cost correctly when pricing tags are in registry."""
+def test_save_assay_cost_prices_from_the_catalogue_and_records_the_rate(
+    assay_with_questions,
+):
+    """Prices come from the catalogue in USD, converted with the stored rate.
+
+    The rate is stored alongside so the figure stays reproducible after the
+    monthly rate moves.
+    """
+    from datetime import date
+
+    from toxtempass import model_metadata
+    from toxtempass.azure_registry import ModelEntry
+    from toxtempass.models import AzureFxRate, LLMCatalogue
+
     assay = assay_with_questions
 
-    # Patch the registry to return a model with known pricing tags
-    from toxtempass.azure_registry import ModelEntry
+    catalogue = LLMCatalogue.load()
+    catalogue.models_json = {
+        "azure/test-model": {
+            "input_cost_per_token": 2e-06,
+            "output_cost_per_token": 8e-06,
+        }
+    }
+    catalogue.save()
+    model_metadata.invalidate()
+    # A round rate keeps the arithmetic obvious.
+    AzureFxRate.objects.create(rate=Decimal("0.5"), observed_on=date(2026, 9, 1))
 
     fake_model = ModelEntry(
         tag="TESTMODEL",
         deployment_name="test-deployment",
         model_id="test-model",
-        tags={
-            "cost-input-1mtoken": "2.00",
-            "cost-output-1mtoken": "8.00",
-            "cost-unit": "Eur",
-        },
+        tags={"tier": "global", "residency": "eu"},
     )
-
     with patch("toxtempass.azure_registry.get_model") as mock_get_model:
-        # Return a fake (endpoint, model) tuple
         mock_ep = SimpleNamespace(endpoint="https://test.example.com", api_key="key")
         mock_get_model.return_value = (mock_ep, fake_model)
-
         _save_assay_cost(
             assay_id=assay.id,
             model_key="1:TESTMODEL",
-            input_tokens=1_000_000,  # 1M tokens → $2.00
-            output_tokens=500_000,   # 0.5M tokens → $4.00
+            input_tokens=1_000_000,
+            output_tokens=500_000,
         )
 
     row = AssayCost.objects.get(assay=assay, model_key="1:TESTMODEL")
-    assert row.input_tokens == 1_000_000
-    assert row.output_tokens == 500_000
-    assert row.cost_input_per_1m == Decimal("2.00")
-    assert row.cost_output_per_1m == Decimal("8.00")
-    assert row.cost_input == Decimal("2.000000")
-    assert row.cost_output == Decimal("4.000000")
-    assert row.total_cost == Decimal("6.000000")
+    # USD 2.00/1M and 8.00/1M at 0.5 → EUR 1.00 and 4.00 per 1M.
+    assert row.cost_input_per_1m == Decimal("1.00")
+    assert row.cost_output_per_1m == Decimal("4.00")
+    assert row.cost_input == Decimal("1.000000")
+    assert row.cost_output == Decimal("2.000000")
     assert row.cost_unit == "Eur"
-    assert row.cost_unit_symbol == "€"
+    assert row.fx_rate == Decimal("0.5")
+
+
+@pytest.mark.django_db
+def test_save_assay_cost_falls_back_to_usd_when_no_rate_is_stored(
+    assay_with_questions,
+):
+    """Dollars must not be presented as euros just because a rate is missing."""
+    from toxtempass import model_metadata
+    from toxtempass.azure_registry import ModelEntry
+    from toxtempass.models import LLMCatalogue
+
+    assay = assay_with_questions
+    catalogue = LLMCatalogue.load()
+    catalogue.models_json = {"azure/test-model": {"input_cost_per_token": 2e-06}}
+    catalogue.save()
+    model_metadata.invalidate()
+
+    fake_model = ModelEntry(
+        tag="TESTMODEL",
+        deployment_name="test-deployment",
+        model_id="test-model",
+        tags={"tier": "global"},
+    )
+    with patch("toxtempass.azure_registry.get_model") as mock_get_model:
+        mock_get_model.return_value = (SimpleNamespace(), fake_model)
+        _save_assay_cost(
+            assay_id=assay.id,
+            model_key="1:TESTMODEL",
+            input_tokens=1_000_000,
+            output_tokens=0,
+        )
+
+    row = AssayCost.objects.get(assay=assay, model_key="1:TESTMODEL")
+    assert row.cost_unit == "Usd"
+    assert row.cost_input_per_1m == Decimal("2.00")
+    assert row.fx_rate is None
 
 
 @pytest.mark.django_db
@@ -268,74 +321,3 @@ def test_save_assay_cost_updates_existing_row(assay_with_questions):
     row = rows.first()
     assert row.input_tokens == 300
     assert row.output_tokens == 150
-
-
-def test_model_entry_cost_properties_parse_tags():
-    """ModelEntry.cost_input_per_1m_tokens and cost_output_per_1m_tokens parse tags."""
-    from toxtempass.azure_registry import ModelEntry
-
-    m = ModelEntry(
-        tag="T1",
-        deployment_name="dep",
-        model_id="gpt-4o",
-        tags={"cost-input-1mtoken": "2.50", "cost-output-1mtoken": "10.00"},
-    )
-    assert m.cost_input_per_1m_tokens == 2.50
-    assert m.cost_output_per_1m_tokens == 10.00
-
-
-def test_model_entry_cost_properties_return_none_when_absent():
-    """ModelEntry returns None when cost tags are absent."""
-    from toxtempass.azure_registry import ModelEntry
-
-    m = ModelEntry(tag="T2", deployment_name="dep", model_id="gpt-4o", tags={})
-    assert m.cost_input_per_1m_tokens is None
-    assert m.cost_output_per_1m_tokens is None
-
-
-def test_model_entry_cost_properties_return_none_on_invalid():
-    """ModelEntry returns None when cost tags contain non-numeric values."""
-    from toxtempass.azure_registry import ModelEntry
-
-    m = ModelEntry(
-        tag="T3",
-        deployment_name="dep",
-        model_id="gpt-4o",
-        tags={"cost-input-1mtoken": "notanumber", "cost-output-1mtoken": "also-bad"},
-    )
-    assert m.cost_input_per_1m_tokens is None
-    assert m.cost_output_per_1m_tokens is None
-
-
-def test_model_entry_cost_unit_property():
-    """ModelEntry.cost_unit reads the cost-unit tag."""
-    from toxtempass.azure_registry import ModelEntry
-
-    m_with = ModelEntry(
-        tag="T4", deployment_name="dep", model_id="gpt-4o",
-        tags={"cost-unit": "Eur"},
-    )
-    assert m_with.cost_unit == "Eur"
-
-    m_without = ModelEntry(tag="T5", deployment_name="dep", model_id="gpt-4o", tags={})
-    assert m_without.cost_unit == ""
-
-
-def test_assay_cost_cost_unit_symbol():
-    """AssayCost.cost_unit_symbol maps known units to symbols and falls back gracefully."""
-    from toxtempass.models import AssayCost
-
-    for unit, expected_sym in [("Eur", "€"), ("EUR", "€"), ("USD", "$"), ("GBP", "£")]:
-        obj = AssayCost.__new__(AssayCost)
-        obj.cost_unit = unit
-        assert obj.cost_unit_symbol == expected_sym, f"unit={unit!r}"
-
-    # Unknown unit — returns the raw unit string
-    obj2 = AssayCost.__new__(AssayCost)
-    obj2.cost_unit = "JPY"
-    assert obj2.cost_unit_symbol == "JPY"
-
-    # Empty unit — falls back to €
-    obj3 = AssayCost.__new__(AssayCost)
-    obj3.cost_unit = ""
-    assert obj3.cost_unit_symbol == "€"

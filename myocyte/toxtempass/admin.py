@@ -352,11 +352,13 @@ def _render_deployments_table(
                 else mark_safe("")
             )
 
-            # Cost per 1M tokens display
-            cip = m.cost_input_per_1m_tokens
-            cop = m.cost_output_per_1m_tokens
+            # Cost per 1M tokens display. Prices come from the model
+            # catalogue and the stored Azure FX rate -- the same source the
+            # runs are billed from -- so this never disagrees with AssayCost.
             from toxtempass.azure_registry import cost_unit_symbol as _sym
-            cost_sym = _sym(m.cost_unit)
+            from toxtempass.views import _llm_cost_rates
+            _, cip, cop, cost_unit, _fx = _llm_cost_rates(key)
+            cost_sym = _sym(cost_unit)
             if cip is not None and cop is not None:
                 cost_html = format_html(
                     '<span style="color:#198754;font-family:monospace">'
@@ -367,14 +369,14 @@ def _render_deployments_table(
                 cost_html = format_html(
                     '<span style="color:#198754;font-family:monospace">'
                     'in&nbsp;{sym}{cip}/1M</span>'
-                    '<span style="color:#a75d00" title="Missing cost-output-1mtoken tag"> ⚠️</span>',
+                    '<span style="color:#a75d00" title="Catalogue has no output price for this model"> ⚠️</span>',
                     sym=cost_sym, cip=cip,
                 )
             elif cop is not None:
                 cost_html = format_html(
                     '<span style="color:#198754;font-family:monospace">'
                     'out&nbsp;{sym}{cop}/1M</span>'
-                    '<span style="color:#a75d00" title="Missing cost-input-1mtoken tag"> ⚠️</span>',
+                    '<span style="color:#a75d00" title="Catalogue has no input price for this model"> ⚠️</span>',
                     sym=cost_sym, cop=cop,
                 )
             else:
@@ -632,15 +634,18 @@ class LLMConfigAdmin(admin.ModelAdmin):
     discovered_endpoints_count.short_description = "Discovered"
 
     def pricing_summary(self, obj):
-        """Show how many models have pricing tags configured."""
+        """Show how many models the catalogue has a price for."""
+        from toxtempass.views import _llm_cost_rates
+
         registry = get_registry()
-        all_models = [m for ep in registry for m in ep.models]
+        all_models = [(ep, m) for ep in registry for m in ep.models]
         if not all_models:
             return "—"
-        with_pricing = sum(
-            1 for m in all_models
-            if m.cost_input_per_1m_tokens is not None and m.cost_output_per_1m_tokens is not None
-        )
+        with_pricing = 0
+        for ep, m in all_models:
+            _, cip, cop, _unit, _fx = _llm_cost_rates(f"{ep.index}:{m.tag}")
+            if cip is not None and cop is not None:
+                with_pricing += 1
         total = len(all_models)
         if with_pricing == total:
             return format_html(
@@ -652,14 +657,14 @@ class LLMConfigAdmin(admin.ModelAdmin):
         elif with_pricing == 0:
             return format_html(
                 '<span style="color:#a75d00"'
-                ' title="Add cost-input-1mtoken and cost-output-1mtoken tags to '
-                'AZURE_E*_TAGS_* to enable cost tracking">'
+                ' title="The model catalogue has no prices for these deployments; '
+                'check AZURE_E*_MODEL_* names against the catalogue">'
                 "&#9888; 0/{} priced</span>",
                 total,
             )
         return format_html(
             '<span style="color:#fd7e14"'
-            ' title="{} of {} models are missing pricing tags">'
+            ' title="{} of {} models have no catalogue price">'
             "&#9888; {}/{} priced</span>",
             total - with_pricing, total, with_pricing, total,
         )

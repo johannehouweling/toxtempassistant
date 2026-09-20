@@ -349,6 +349,14 @@ class Config:
     # length, leaving a 5 % buffer to compensate for imprecision in the
     # character-to-token ratio.
     truncation_safety_margin = 0.95
+    # Applied to the catalogue's max_input_tokens before headroom is taken off.
+    # tiktoken (cl100k_base) is an estimator, not the model's tokenizer -- the
+    # GPT-4o/5 families use o200k_base -- and PDF extraction yields exactly the
+    # ligature-heavy text where the two diverge. The size of that drift is not
+    # measured here, so this is deliberate slack rather than a computed figure;
+    # it did not cause the 272k incident (a stale context-window tag did) and is
+    # not what fixed it.
+    context_window_estimate_reserve = 0.95
     max_workers_django_q = settings.Q_CLUSTER[
         "workers"
     ]  # 1 worker for django_q, we use threading for parallelism
