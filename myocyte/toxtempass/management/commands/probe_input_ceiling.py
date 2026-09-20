@@ -84,10 +84,73 @@ class Command(BaseCommand):
             help="Explicit output cap to request (default: 1000).",
         )
         parser.add_argument(
+            "--reasoning",
+            action="store_true",
+            help=(
+                "Instead of the ceiling probe, ask one realistic question and "
+                "report how many of the billed output tokens were reasoning. "
+                "Costs a fraction of a cent."
+            ),
+        )
+        parser.add_argument(
             "--dry-run",
             action="store_true",
             help="Show what would be sent, send nothing, spend nothing.",
         )
+
+    def _measure_reasoning(self, index: int, tag: str, entry: object) -> None:
+        """Ask one realistic question and report the reasoning share of output.
+
+        ``max_completion_tokens`` budgets visible output and reasoning together,
+        so the cap cannot be sized from stored answer text. The API reports the
+        split; one call measures it.
+        """
+        llm = get_llm_for_endpoint(index, tag, temperature=0)
+        context = (
+            "The assay uses HepG2 cells cultured in DMEM supplemented with 10% "
+            "fetal bovine serum at 37 degrees Celsius under 5% CO2. Cells were "
+            "seeded at 10,000 per well in 96-well plates and exposed for 24 "
+            "hours. Viability was measured with a resazurin reduction assay and "
+            "read on a fluorescence plate reader."
+        )
+        messages = [
+            SystemMessage(content="Context for this question:\n" + context),
+            HumanMessage(
+                content=(
+                    "Describe the cell culture conditions used in this assay, "
+                    "including medium, supplements, temperature and atmosphere."
+                )
+            ),
+        ]
+        self.stdout.write("asking one question...")
+        response = llm.invoke(messages)
+
+        usage = getattr(response, "usage_metadata", None) or {}
+        details = usage.get("output_token_details") or {}
+        output = usage.get("output_tokens") or 0
+        reasoning = details.get("reasoning") or 0
+        visible = estimate_token_count(str(response.content or ""))
+
+        self.stdout.write(self.style.SUCCESS("\nusage"))
+        self.stdout.write(f"  billed output tokens   {output:,}")
+        self.stdout.write(f"  of which reasoning     {reasoning:,}")
+        self.stdout.write(f"  visible answer (est.)  {visible:,}")
+        if reasoning and visible:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"\nReasoning cost {reasoning / max(visible, 1):.1f}x the "
+                    "visible answer. An output cap has to cover both, so size "
+                    "it from the billed figure, not from stored answer text."
+                )
+            )
+        elif output:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "\nNo reasoning tokens reported: billed output is the "
+                    "visible answer, so the cap can be sized from answer "
+                    "length directly."
+                )
+            )
 
     def handle(self, *args: object, **options: object) -> None:
         """Send the probe and report whether the ceiling moved."""
@@ -100,6 +163,10 @@ class Command(BaseCommand):
         if resolved is None:
             raise CommandError(f"No deployment {model_key!r} in the registry.")
         _endpoint, entry = resolved
+
+        if options["reasoning"]:
+            self._measure_reasoning(int(index_s), tag, entry)
+            return
 
         target = int(options["input_tokens"])
         max_output = int(options["max_output"])
