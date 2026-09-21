@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v3.57.2 (2026-09-21)
+
+### Bug Fixes
+
+- **llm**: Count the subsection context against the token budget
+  ([`13b7b99`](https://github.com/johannehouweling/toxtempassistant/commit/13b7b992f9e66964496384f25b46d9635c009ae7))
+
+- **llm**: Say how much context was dropped, and what would hold it
+  ([`5c8d55c`](https://github.com/johannehouweling/toxtempassistant/commit/5c8d55c2ca427915461f88e8a3626a33a8300e8b))
+
+- **tests**: Stop the gold-standard tests depending on row ids
+  ([`5745be4`](https://github.com/johannehouweling/toxtempassistant/commit/5745be471ceed539724d15f39c41dfd38dc7b199))
+
+### Build System
+
+- **deps**: Bump anyio from 4.13.0 to 4.14.2
+  ([`f1065ec`](https://github.com/johannehouweling/toxtempassistant/commit/f1065ec3e2617a56cd4cab4af30e6fbccc2592da))
+
+
 ## v3.57.1 (2026-09-21)
 
 ### Bug Fixes
