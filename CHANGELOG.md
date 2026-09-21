@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.57.1 (2026-09-21)
+
+### Bug Fixes
+
+- **build**: Retry the supercronic download instead of failing the image
+  ([`a6a0092`](https://github.com/johannehouweling/toxtempassistant/commit/a6a0092ae6f24bf612dac06e490f13b05ef0455a))
+
+
 ## v3.57.0 (2026-09-21)
 
 ### Features
