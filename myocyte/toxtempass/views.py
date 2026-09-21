@@ -61,6 +61,7 @@ from toxtempass.azure_registry import get_model as get_azure_model
 from toxtempass.export import export_assay_to_file
 from toxtempass.filehandling import (
     collect_source_documents,
+    estimate_token_count,
     get_text_or_imagebytes_from_django_uploaded_file,
     split_doc_dict_by_type,
     store_files_to_storage,
@@ -1142,6 +1143,8 @@ def generate_answer(
     assay: Assay,
     chatopenai: ChatOpenAI,
     base_prompt: str | None = None,
+    context_budget: int | None = None,
+    context_tokens: int = 0,
 ) -> tuple[int, str, int, int]:
     """Generate an answer for a single Answer instance.
 
@@ -1184,6 +1187,12 @@ def generate_answer(
     # Build context, separating the large *stable* document bundle (identical
     # across every question of an assay → the cache target) from any per-question
     # subsection answers (variable → must follow the cache breakpoint).
+    # What the subsection answers may occupy. The document was already
+    # truncated to ``context_budget`` upstream, and whatever it did not use is
+    # what is left for this. Trimming here rather than the document is
+    # deliberate: the document bundle has to stay byte-identical across the
+    # assay's questions for the prompt cache to hit.
+    subsection_allowance = None
     if q.only_subsections_for_context and q.subsections_for_context.exists():
         # gather answers to *all* questions in those subsections
         ctx_answers = Answer.objects.filter(
@@ -1192,6 +1201,8 @@ def generate_answer(
             answer_text__isnull=False,
         )
         stable_bundle = ""
+        # No document in this prompt, so the whole budget is available.
+        subsection_allowance = context_budget
         variable_ctx = "\n\n".join(
             f"--- Q: {ca.question.question_text}\nA: {ca.answer_text}"
             for ca in ctx_answers
@@ -1209,6 +1220,24 @@ def generate_answer(
             variable_ctx = "\n\n".join(
                 f"--- Q: {ca.question.question_text}\nA: {ca.answer_text}"
                 for ca in ctx_answers
+            )
+            if context_budget is not None:
+                subsection_allowance = max(0, context_budget - context_tokens)
+
+    # Until this was bounded, the subsection answers were appended after the
+    # document had already been truncated to the budget, so they were spent
+    # from the headroom without ever being counted -- the budget said one thing
+    # and the request carried another.
+    if variable_ctx and subsection_allowance is not None:
+        variable_ctx, subsection_truncated = truncate_context_to_token_limit(
+            variable_ctx, subsection_allowance
+        )
+        if subsection_truncated:
+            logger.warning(
+                "Subsection context for answer %s trimmed to %d tokens; the "
+                "document left that much of the budget.",
+                ans.id,
+                subsection_allowance,
             )
 
     # build messages
@@ -1827,6 +1856,10 @@ def process_llm_async(
             assay.save()
         # ------------------------------------------------------------------
 
+        # Measured once: the pool would otherwise re-encode a 250k-token string
+        # for every question.
+        _context_tokens = estimate_token_count(full_pdf_context)
+
         all_answers = list(
             assay.answers.select_related("question__subsection__section__question_set")
         )
@@ -1882,7 +1915,7 @@ def process_llm_async(
                 futures = {
                     pool.submit(
                         generate_answer, a, full_pdf_context, assay, chatopenai,
-                        base_prompt,
+                        base_prompt, _context_budget, _context_tokens,
                     ): a
                     for a in round_answers
                 }

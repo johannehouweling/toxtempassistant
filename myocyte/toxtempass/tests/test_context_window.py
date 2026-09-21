@@ -21,7 +21,7 @@ from toxtempass.models import (
     Subsection,
 )
 from toxtempass.tests.fixtures.factories import AssayFactory
-from toxtempass.views import process_llm_async
+from toxtempass.views import generate_answer, process_llm_async
 
 # ---------------------------------------------------------------------------
 # Unit tests for the utility functions
@@ -331,3 +331,128 @@ def test_run_aborts_when_headroom_exceeds_the_models_whole_ceiling():
     assert "non-positive" in (assay.processing_log or "").lower()
     assert assay.status == LLMStatus.ERROR
     assert fake._calls == 0
+
+
+class _RecordingFakeLLM:
+    """Fake LLM that keeps the messages it was handed."""
+
+    def __init__(self):
+        self.messages = None
+
+    def invoke(self, messages):
+        self.messages = messages
+        return SimpleNamespace(content="ok", response_metadata={"finish_reason": "stop"})
+
+
+def _prompt_text(llm):
+    """Flatten every message the LLM received into one string."""
+    parts = []
+    for message in llm.messages or []:
+        content = message.content
+        if isinstance(content, list):
+            parts.extend(str(block.get("text", "")) for block in content)
+        else:
+            parts.append(str(content))
+    return "\n".join(parts)
+
+
+def _assay_with_subsection_context(*, only_subsections=False):
+    """Build a question whose context is drawn from a sibling subsection."""
+    from toxtempass.models import Answer as AnswerModel
+
+    assay = AssayFactory()
+    qs = QuestionSet.objects.create(
+        display_name="qs", created_by=assay.study.investigation.owner
+    )
+    section = Section.objects.create(question_set=qs, title="S1")
+    source = Subsection.objects.create(section=section, title="Source")
+    target = Subsection.objects.create(section=section, title="Target")
+
+    # A sibling answer long enough to matter against a small budget.
+    source_q = Question.objects.create(subsection=source, question_text="Source?")
+    AnswerModel.objects.create(
+        assay=assay, question=source_q, answer_text="sibling " * 400
+    )
+
+    main_q = Question.objects.create(
+        subsection=target,
+        question_text="Main?",
+        only_subsections_for_context=only_subsections,
+    )
+    main_q.subsections_for_context.add(source)
+    answer = AnswerModel.objects.create(assay=assay, question=main_q)
+    return assay, answer
+
+
+@pytest.mark.django_db
+def test_subsection_context_is_cut_down_to_what_the_document_left():
+    """It used to be appended after truncation, so it was never counted.
+
+    The sibling answer is ~800 tokens; the document leaves 200, so part of it
+    survives behind the truncation marker.
+    """
+    assay, answer = _assay_with_subsection_context()
+    llm = _RecordingFakeLLM()
+
+    generate_answer(
+        answer, "document text", assay, llm, context_budget=1_000, context_tokens=800
+    )
+
+    prompt = _prompt_text(llm).lower()
+    assert "truncated" in prompt
+    assert "sibling" in prompt
+
+
+@pytest.mark.django_db
+def test_subsection_context_is_dropped_when_the_document_left_nothing():
+    """Five tokens cannot even hold the marker, so none of it may be sent."""
+    assay, answer = _assay_with_subsection_context()
+    llm = _RecordingFakeLLM()
+
+    generate_answer(
+        answer, "document text", assay, llm, context_budget=100, context_tokens=95
+    )
+
+    # Previously this went out in full, on top of an already-full budget.
+    assert "sibling" not in _prompt_text(llm).lower()
+
+
+@pytest.mark.django_db
+def test_subsection_context_is_left_alone_when_there_is_room():
+    assay, answer = _assay_with_subsection_context()
+    llm = _RecordingFakeLLM()
+
+    generate_answer(
+        answer, "document text", assay, llm, context_budget=100_000, context_tokens=10
+    )
+
+    prompt = _prompt_text(llm)
+    assert "sibling" in prompt
+    assert "truncated" not in prompt.lower()
+
+
+@pytest.mark.django_db
+def test_a_subsections_only_question_may_use_the_whole_budget():
+    """No document in that prompt, so the document's size must not shrink it."""
+    assay, answer = _assay_with_subsection_context(only_subsections=True)
+    llm = _RecordingFakeLLM()
+
+    # A document that consumed the entire budget must not starve this question.
+    generate_answer(
+        answer, "document text", assay, llm, context_budget=100_000, context_tokens=99_999
+    )
+
+    prompt = _prompt_text(llm)
+    assert "sibling" in prompt
+    assert "truncated" not in prompt.lower()
+
+
+@pytest.mark.django_db
+def test_no_budget_means_no_trimming_for_direct_callers():
+    """The evaluation harness calls this without a budget; it must still work."""
+    assay, answer = _assay_with_subsection_context()
+    llm = _RecordingFakeLLM()
+
+    generate_answer(answer, "document text", assay, llm)
+
+    assert "sibling" in _prompt_text(llm)
