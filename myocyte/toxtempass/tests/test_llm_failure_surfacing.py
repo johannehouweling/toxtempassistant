@@ -211,7 +211,7 @@ def test_context_budget_is_scaled_down_to_absorb_estimator_error():
 
     assay.refresh_from_db()
     alert_text = " ".join(a.get("message", "") for a in assay.user_alerts).lower()
-    assert "truncated" in alert_text
+    assert "left out of this draft" in alert_text
 
 
 class _TruncatedFakeLLM:

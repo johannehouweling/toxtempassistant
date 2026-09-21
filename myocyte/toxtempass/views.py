@@ -61,6 +61,7 @@ from toxtempass.azure_registry import get_model as get_azure_model
 from toxtempass.export import export_assay_to_file
 from toxtempass.filehandling import (
     collect_source_documents,
+    estimate_token_count,
     get_text_or_imagebytes_from_django_uploaded_file,
     split_doc_dict_by_type,
     store_files_to_storage,
@@ -82,6 +83,7 @@ from toxtempass.llm import (
     current_llm_key,
     get_llm,
     get_llm_for_endpoint,
+    model_with_room_for,
     resolve_user_llm,
 )
 from toxtempass.models import (
@@ -1142,6 +1144,8 @@ def generate_answer(
     assay: Assay,
     chatopenai: ChatOpenAI,
     base_prompt: str | None = None,
+    context_budget: int | None = None,
+    context_tokens: int = 0,
 ) -> tuple[int, str, int, int]:
     """Generate an answer for a single Answer instance.
 
@@ -1184,6 +1188,12 @@ def generate_answer(
     # Build context, separating the large *stable* document bundle (identical
     # across every question of an assay → the cache target) from any per-question
     # subsection answers (variable → must follow the cache breakpoint).
+    # What the subsection answers may occupy. The document was already
+    # truncated to ``context_budget`` upstream, and whatever it did not use is
+    # what is left for this. Trimming here rather than the document is
+    # deliberate: the document bundle has to stay byte-identical across the
+    # assay's questions for the prompt cache to hit.
+    subsection_allowance = None
     if q.only_subsections_for_context and q.subsections_for_context.exists():
         # gather answers to *all* questions in those subsections
         ctx_answers = Answer.objects.filter(
@@ -1192,6 +1202,8 @@ def generate_answer(
             answer_text__isnull=False,
         )
         stable_bundle = ""
+        # No document in this prompt, so the whole budget is available.
+        subsection_allowance = context_budget
         variable_ctx = "\n\n".join(
             f"--- Q: {ca.question.question_text}\nA: {ca.answer_text}"
             for ca in ctx_answers
@@ -1209,6 +1221,24 @@ def generate_answer(
             variable_ctx = "\n\n".join(
                 f"--- Q: {ca.question.question_text}\nA: {ca.answer_text}"
                 for ca in ctx_answers
+            )
+            if context_budget is not None:
+                subsection_allowance = max(0, context_budget - context_tokens)
+
+    # Until this was bounded, the subsection answers were appended after the
+    # document had already been truncated to the budget, so they were spent
+    # from the headroom without ever being counted -- the budget said one thing
+    # and the request carried another.
+    if variable_ctx and subsection_allowance is not None:
+        variable_ctx, subsection_truncated = truncate_context_to_token_limit(
+            variable_ctx, subsection_allowance
+        )
+        if subsection_truncated:
+            logger.warning(
+                "Subsection context for answer %s trimmed to %d tokens; the "
+                "document left that much of the budget.",
+                ans.id,
+                subsection_allowance,
             )
 
     # build messages
@@ -1802,30 +1832,62 @@ def process_llm_async(
             assay.save()
             return
 
+        # Measured before truncating, so the alert can say how much was lost
+        # rather than only that something was.
+        _uploaded_tokens = estimate_token_count(full_pdf_context)
         full_pdf_context, context_was_truncated = truncate_context_to_token_limit(
             full_pdf_context, _context_budget
         )
         if context_was_truncated:
+            _dropped_pct = (
+                int((_uploaded_tokens - _context_budget) * 100 / _uploaded_tokens)
+                if _uploaded_tokens
+                else 0
+            )
             logger.warning(
-                "Context for assay %s was truncated to fit within the "
-                "%d-token context budget. "
-                "Consider uploading fewer or shorter documents.",
+                "Context for assay %s truncated: %d tokens uploaded, budget %d "
+                "(%d%% dropped).",
                 assay_id,
+                _uploaded_tokens,
                 _context_budget,
+                _dropped_pct,
+            )
+            # A token count means nothing to a toxicologist. Say how much of
+            # their own material was left out, and name a model that would
+            # hold it if one is available to them.
+            _model_name = _metadata.model_id if _metadata is not None else "this model"
+            _roomier = None
+            if user_id is not None:
+                try:
+                    _roomier = model_with_room_for(
+                        Person.objects.filter(pk=user_id).first(), _uploaded_tokens
+                    )
+                except Exception:
+                    logger.exception("Could not look for a roomier model")
+            _advice = (
+                f"{_roomier} can take more, and you can switch in Settings, or "
+                "upload fewer or shorter documents."
+                if _roomier and _roomier != _model_name
+                else (
+                    "Upload fewer or shorter documents, or split them across "
+                    "separate ToxTemps."
+                )
             )
             add_user_alert(
                 assay,
                 (
-                    "Uploaded documents exceeded the available context-window budget "
-                    f"({_context_budget:,} tokens). "
-                    "The context was automatically truncated; some document "
-                    "content may not have been used when generating answers. "
-                    "Consider uploading fewer or shorter files."
+                    f"Your documents are larger than {_model_name} can read at "
+                    f"once, so roughly {_dropped_pct}% of them was left out of "
+                    f"this draft. {_advice}"
                 ),
                 level="warning",
             )
             assay.save()
         # ------------------------------------------------------------------
+
+        # Measured once: the pool would otherwise re-encode a 250k-token string
+        # for every question.
+        _context_tokens = estimate_token_count(full_pdf_context)
 
         all_answers = list(
             assay.answers.select_related("question__subsection__section__question_set")
@@ -1882,7 +1944,7 @@ def process_llm_async(
                 futures = {
                     pool.submit(
                         generate_answer, a, full_pdf_context, assay, chatopenai,
-                        base_prompt,
+                        base_prompt, _context_budget, _context_tokens,
                     ): a
                     for a in round_answers
                 }
@@ -3123,7 +3185,10 @@ def assay_feedback(request: HttpRequest, assay_id: int) -> JsonResponse:
 # Re-exported here so that existing imports (for example, urls.py)
 # that reference toxtempass.views continue to work.
 # ---------------------------------------------------------------------------
-from toxtempass.workspace import (  # noqa: E402
+# noqa: F401 is load-bearing, not tidiness: urls.py routes to these through
+# `views.<name>`, so ruff sees them as unused and `ruff check --fix` will
+# happily delete them -- which breaks every workspace URL at import time.
+from toxtempass.workspace import (  # noqa: E402, F401
     add_workspace_assay,
     add_workspace_member,
     add_workspace_member_by_email,
