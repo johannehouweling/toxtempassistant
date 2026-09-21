@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.57.0 (2026-09-21)
+
+### Features
+
+- **llm**: Cap answer length and stop trusting a truncated generation
+  ([`18941c0`](https://github.com/johannehouweling/toxtempassistant/commit/18941c0baeef337be66b4f640b1f1d24b29f39ba))
+
+
 ## v3.56.0 (2026-09-20)
 
 ### Features
