@@ -192,6 +192,50 @@ def current_llm_key(user) -> str | None:
     return env_default_key()
 
 
+def model_with_room_for(user: object, required_tokens: int) -> str | None:
+    """Return a model the user may pick whose input ceiling fits ``required_tokens``.
+
+    Used when documents had to be truncated, so the alert can name a way out
+    instead of only reporting the loss. Returns ``None`` when the user has no
+    choice to make -- the admin ticked nothing, so everyone gets the default --
+    or when nothing available is big enough, in which case suggesting a switch
+    would waste their time.
+
+    The smallest sufficient model is returned rather than the largest: it is
+    the cheapest one that solves their problem.
+    """
+    from toxtempass import model_metadata
+    from toxtempass.azure_registry import get_registry
+    from toxtempass.models import LLMConfig
+
+    try:
+        cfg = LLMConfig.load()
+    except Exception:
+        return None
+    allowed = set(cfg.allowed_models or [])
+    is_superuser = bool(getattr(user, "is_superuser", False))
+    if not allowed and not is_superuser:
+        return None
+
+    candidates: list[tuple[int, str]] = []
+    for endpoint in get_registry():
+        for entry in endpoint.models:
+            if entry.retirement_status == "retired":
+                continue
+            if f"{endpoint.index}:{entry.tag}" not in allowed and not is_superuser:
+                continue
+            ceiling = model_metadata.lookup(
+                entry.model_id,
+                tier=entry.tags.get("tier"),
+                residency=entry.tags.get("residency"),
+            ).max_input_tokens
+            if ceiling and ceiling >= required_tokens:
+                candidates.append((ceiling, entry.model_id))
+    if not candidates:
+        return None
+    return min(candidates)[1]
+
+
 def resolve_user_llm(user, temperature: float | int = 0):
     """Return ``(llm, source, replaced)`` for a given user.
 

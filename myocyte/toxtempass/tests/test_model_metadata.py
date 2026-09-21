@@ -187,3 +187,85 @@ def test_regional_tier_is_flagged_because_upstream_has_no_row_for_it():
     _seed({"azure/m": {"input_cost_per_token": 7.5e-07}})
     found = mm.lookup("m", tier="regional", residency="eu")
     assert found.price_is_approximate
+
+
+def _fake_registry(*models):
+    """Build a one-endpoint registry from (tag, model_id) pairs."""
+    from types import SimpleNamespace
+
+    entries = [
+        SimpleNamespace(
+            tag=tag, model_id=model_id, tags={"tier": "global"},
+            retirement_status="active",
+        )
+        for tag, model_id in models
+    ]
+    return [SimpleNamespace(index=1, models=entries)]
+
+
+def _allow(*keys):
+    from toxtempass.models import LLMConfig
+
+    cfg = LLMConfig.load()
+    cfg.allowed_models = list(keys)
+    cfg.save()
+
+
+@pytest.mark.django_db
+def test_suggests_the_smallest_model_that_fits():
+    """Cheapest that solves the problem, not the biggest available."""
+    from toxtempass.llm import model_with_room_for
+
+    _seed({
+        "azure/small": {"max_input_tokens": 100_000},
+        "azure/medium": {"max_input_tokens": 300_000},
+        "azure/huge": {"max_input_tokens": 1_000_000},
+    })
+    _allow("1:SMALL", "1:MEDIUM", "1:HUGE")
+    registry = _fake_registry(("SMALL", "small"), ("MEDIUM", "medium"), ("HUGE", "huge"))
+
+    with patch("toxtempass.azure_registry.get_registry", return_value=registry):
+        assert model_with_room_for(None, 250_000) == "medium"
+
+
+@pytest.mark.django_db
+def test_suggests_nothing_when_the_user_has_no_choice():
+    """An empty allowlist means everyone gets the default; a switch is not offered."""
+    from toxtempass.llm import model_with_room_for
+
+    _seed({"azure/huge": {"max_input_tokens": 1_000_000}})
+    _allow()
+    registry = _fake_registry(("HUGE", "huge"))
+
+    with patch("toxtempass.azure_registry.get_registry", return_value=registry):
+        assert model_with_room_for(None, 250_000) is None
+
+
+@pytest.mark.django_db
+def test_suggests_nothing_when_nothing_is_big_enough():
+    """Suggesting a switch that would not help wastes the user's time."""
+    from toxtempass.llm import model_with_room_for
+
+    _seed({"azure/small": {"max_input_tokens": 100_000}})
+    _allow("1:SMALL")
+    registry = _fake_registry(("SMALL", "small"))
+
+    with patch("toxtempass.azure_registry.get_registry", return_value=registry):
+        assert model_with_room_for(None, 900_000) is None
+
+
+@pytest.mark.django_db
+def test_a_retired_model_is_never_suggested():
+    from types import SimpleNamespace
+
+    from toxtempass.llm import model_with_room_for
+
+    _seed({"azure/huge": {"max_input_tokens": 1_000_000}})
+    _allow("1:HUGE")
+    retired = [SimpleNamespace(index=1, models=[SimpleNamespace(
+        tag="HUGE", model_id="huge", tags={"tier": "global"},
+        retirement_status="retired",
+    )])]
+
+    with patch("toxtempass.azure_registry.get_registry", return_value=retired):
+        assert model_with_room_for(None, 250_000) is None

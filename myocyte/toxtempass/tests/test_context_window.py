@@ -152,8 +152,9 @@ def test_process_llm_async_warns_when_context_truncated():
 
     assert assay.user_alerts, "user_alerts should not be empty after truncation"
     alert_text = " ".join(a.get("message", "") for a in assay.user_alerts).lower()
-    assert "truncated" in alert_text, (
-        "user_alerts should mention truncation; got: " + repr(assay.user_alerts)
+    assert "left out of this draft" in alert_text, (
+        "the alert should say how much was dropped; got: "
+        + repr(assay.user_alerts)
     )
 
 
@@ -198,7 +199,7 @@ def test_process_llm_async_no_warning_when_context_fits():
     # user_alerts should be empty (no truncation notice)
     alerts = assay.user_alerts or []
     alert_text = " ".join(a.get("message", "") for a in alerts).lower()
-    assert "truncated" not in alert_text, (
+    assert "left out of this draft" not in alert_text, (
         "Unexpected truncation alert in user_alerts: " + repr(alerts)
     )
 
@@ -266,7 +267,7 @@ def test_budget_comes_from_the_catalogue_input_ceiling_not_a_tag():
     assay.refresh_from_db()
     # Budget was 150 - 50 = 100 tokens; the text is ~500 → truncated.
     alert_text = " ".join(a.get("message", "") for a in assay.user_alerts).lower()
-    assert "truncated" in alert_text
+    assert "left out of this draft" in alert_text
 
 
 @pytest.mark.django_db

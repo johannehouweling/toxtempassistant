@@ -83,6 +83,7 @@ from toxtempass.llm import (
     current_llm_key,
     get_llm,
     get_llm_for_endpoint,
+    model_with_room_for,
     resolve_user_llm,
 )
 from toxtempass.models import (
@@ -1831,25 +1832,53 @@ def process_llm_async(
             assay.save()
             return
 
+        # Measured before truncating, so the alert can say how much was lost
+        # rather than only that something was.
+        _uploaded_tokens = estimate_token_count(full_pdf_context)
         full_pdf_context, context_was_truncated = truncate_context_to_token_limit(
             full_pdf_context, _context_budget
         )
         if context_was_truncated:
+            _dropped_pct = (
+                int((_uploaded_tokens - _context_budget) * 100 / _uploaded_tokens)
+                if _uploaded_tokens
+                else 0
+            )
             logger.warning(
-                "Context for assay %s was truncated to fit within the "
-                "%d-token context budget. "
-                "Consider uploading fewer or shorter documents.",
+                "Context for assay %s truncated: %d tokens uploaded, budget %d "
+                "(%d%% dropped).",
                 assay_id,
+                _uploaded_tokens,
                 _context_budget,
+                _dropped_pct,
+            )
+            # A token count means nothing to a toxicologist. Say how much of
+            # their own material was left out, and name a model that would
+            # hold it if one is available to them.
+            _model_name = _metadata.model_id if _metadata is not None else "this model"
+            _roomier = None
+            if user_id is not None:
+                try:
+                    _roomier = model_with_room_for(
+                        Person.objects.filter(pk=user_id).first(), _uploaded_tokens
+                    )
+                except Exception:
+                    logger.exception("Could not look for a roomier model")
+            _advice = (
+                f"{_roomier} can take more, and you can switch in Settings, or "
+                "upload fewer or shorter documents."
+                if _roomier and _roomier != _model_name
+                else (
+                    "Upload fewer or shorter documents, or split them across "
+                    "separate ToxTemps."
+                )
             )
             add_user_alert(
                 assay,
                 (
-                    "Uploaded documents exceeded the available context-window budget "
-                    f"({_context_budget:,} tokens). "
-                    "The context was automatically truncated; some document "
-                    "content may not have been used when generating answers. "
-                    "Consider uploading fewer or shorter files."
+                    f"Your documents are larger than {_model_name} can read at "
+                    f"once, so roughly {_dropped_pct}% of them was left out of "
+                    f"this draft. {_advice}"
                 ),
                 level="warning",
             )
@@ -3156,7 +3185,10 @@ def assay_feedback(request: HttpRequest, assay_id: int) -> JsonResponse:
 # Re-exported here so that existing imports (for example, urls.py)
 # that reference toxtempass.views continue to work.
 # ---------------------------------------------------------------------------
-from toxtempass.workspace import (  # noqa: E402
+# noqa: F401 is load-bearing, not tidiness: urls.py routes to these through
+# `views.<name>`, so ruff sees them as unused and `ruff check --fix` will
+# happily delete them -- which breaks every workspace URL at import time.
+from toxtempass.workspace import (  # noqa: E402, F401
     add_workspace_assay,
     add_workspace_member,
     add_workspace_member_by_email,
