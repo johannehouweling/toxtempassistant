@@ -7,6 +7,8 @@ to queryset `.update()` that stopped the drafts reaching simple-history.
 only the accepted ones.
 """
 
+from unittest.mock import patch
+
 import pytest
 
 from toxtempass.evaluation.gold_standard import audit
@@ -17,6 +19,22 @@ from toxtempass.tests.fixtures.factories import (
     QuestionFactory,
     SubsectionFactory,
 )
+
+
+@pytest.fixture(autouse=True)
+def _ignore_production_exclusions():
+    """Neutralise EXCLUDED_ASSAY_IDS, which names rows in the production database.
+
+    The audit drops a hardcoded set of real scratch assays. Test databases number
+    their rows from 1, and Postgres does not roll sequences back between tests, so
+    once enough assays have been created earlier in a run one of this module's
+    assays lands on an excluded id and is silently dropped -- turning an assertion
+    about this test's own data into an assertion about how many assays every
+    preceding test happened to create. Adding any test anywhere that creates an
+    Assay can move it.
+    """
+    with patch.object(audit, "EXCLUDED_ASSAY_IDS", frozenset()):
+        yield
 
 
 @pytest.mark.django_db
