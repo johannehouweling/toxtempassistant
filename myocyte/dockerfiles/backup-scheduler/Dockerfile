@@ -26,7 +26,11 @@ ENV SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/download/v0.
     SUPERCRONIC_SHA1SUM=f97b92132b61a8f827c3faf67106dc0e4467ccf2 \
     SUPERCRONIC=supercronic-linux-amd64
 
-RUN curl -fsSLO "$SUPERCRONIC_URL" \
+# --retry: a 504 from GitHub's release CDN once failed the whole image build,
+# which left a tagged release with no image behind it and silently skipped a
+# deploy. --retry-all-errors covers HTTP 5xx, which plain --retry does not.
+# The SHA1 check below is unaffected: a corrupt or partial download still fails.
+RUN curl -fsSLO --retry 5 --retry-delay 2 --retry-all-errors "$SUPERCRONIC_URL" \
  && echo "${SUPERCRONIC_SHA1SUM}  ${SUPERCRONIC}" | sha1sum -c - \
  && chmod +x "$SUPERCRONIC" \
  && mv "$SUPERCRONIC" "/usr/local/bin/${SUPERCRONIC}" \
