@@ -29,6 +29,7 @@ fi
 repos=(
   ghcr.io/johannehouweling/toxtempassistant
   ghcr.io/johannehouweling/toxtempassistant-backup
+  ghcr.io/johannehouweling/toxtempassistant-minio
   ghcr.io/johannehouweling/toxtempassistant-minio-init
 )
 

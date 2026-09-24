@@ -31,8 +31,18 @@ services:
   # MinIO
   minio:
     profiles: ["prod","test"]
-    # quay.io: MinIO removed its images from Docker Hub.
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # Built from source: MinIO stopped publishing public images. See
+    # myocyte/dockerfiles/minio/Dockerfile.
+    image: ghcr.io/johannehouweling/toxtempassistant-minio:${GIT_TAG:-latest}
+    build:
+      context: .
+      dockerfile: myocyte/dockerfiles/minio/Dockerfile
+      target: server
+      # Compiling MinIO from source is slow; reuse layers across CI runs.
+      cache_from:
+        - type=gha,scope=minio-server
+      cache_to:
+        - type=gha,mode=max,scope=minio-server
     container_name: minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -58,6 +68,12 @@ services:
     build:
       context: .
       dockerfile: myocyte/dockerfiles/minio/Dockerfile
+      target: init
+      # Compiling MinIO from source is slow; reuse layers across CI runs.
+      cache_from:
+        - type=gha,scope=minio-init
+      cache_to:
+        - type=gha,mode=max,scope=minio-init
     container_name: minio_init
     depends_on:
       - minio
