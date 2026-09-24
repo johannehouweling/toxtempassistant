@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.58.0 (2026-09-24)
+
+### Features
+
+- **llm**: Price cached input tokens and show costs in money units
+  ([`edc68b6`](https://github.com/johannehouweling/toxtempassistant/commit/edc68b6b13f84c6972e6a7a0502b021dc689552d))
+
+
 ## v3.57.2 (2026-09-21)
 
 ### Bug Fixes
