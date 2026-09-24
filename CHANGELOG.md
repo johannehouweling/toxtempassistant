@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v3.58.1 (2026-09-24)
+
+### Bug Fixes
+
+- **costs**: Show amounts below one cent as <€0.01
+  ([`bc4c23d`](https://github.com/johannehouweling/toxtempassistant/commit/bc4c23d94302956dc70b9e826813650410ce8293))
+
+- **docker**: Build MinIO server and mc from source
+  ([`ca3001b`](https://github.com/johannehouweling/toxtempassistant/commit/ca3001b50e051c0af03c4d8f9b4aa2d6eb9d361f))
+
+
 ## v3.58.0 (2026-09-24)
 
 ### Features
