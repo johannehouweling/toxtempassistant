@@ -9,7 +9,6 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from decimal import Decimal
 from functools import cached_property
 from itertools import product
 
@@ -58,6 +57,7 @@ from myocyte import settings
 from toxtempass import config, model_metadata, notifications, ror
 from toxtempass import utilities as beta_util
 from toxtempass.azure_registry import get_model as get_azure_model
+from toxtempass.costs import CostRates, TokenUsage, llm_cost_rates
 from toxtempass.export import export_assay_to_file
 from toxtempass.filehandling import (
     collect_source_documents,
@@ -1146,12 +1146,11 @@ def generate_answer(
     base_prompt: str | None = None,
     context_budget: int | None = None,
     context_tokens: int = 0,
-) -> tuple[int, str, int, int]:
+) -> tuple[int, str, TokenUsage]:
     """Generate an answer for a single Answer instance.
 
-    Returns a 4-tuple of ``(answer_id, answer_text, input_tokens, output_tokens)``.
-    ``input_tokens`` and ``output_tokens`` are 0 when the LLM response does not
-    include usage metadata.
+    Returns ``(answer_id, answer_text, usage)``. The usage counts are 0 when the
+    LLM response does not include usage metadata.
     """
     ## some variables for logging and deadline handling
     # compute a soft deadline based on Django‑Q timeout (90% of it)
@@ -1294,10 +1293,7 @@ def generate_answer(
 
         try:
             resp = chatopenai.invoke(messages)
-            usage = getattr(resp, "usage_metadata", None) or {}
-            # `or 0` guards against providers that explicitly return None for these keys.
-            input_tokens = usage.get("input_tokens", 0) or 0
-            output_tokens = usage.get("output_tokens", 0) or 0
+            usage = TokenUsage.from_response(resp)
             # A generation that ran out of output budget is reported as a
             # *successful* response whose content is truncated -- or, on a
             # reasoning model whose budget went entirely on invisible reasoning
@@ -1311,9 +1307,9 @@ def generate_answer(
                 raise AnswerGenerationError(
                     ans.id,
                     f"generation hit the output cap (finish_reason={finish!r}, "
-                    f"{output_tokens} output tokens)",
+                    f"{usage.output} output tokens)",
                 )
-            return ans.id, (resp.content or ""), input_tokens, output_tokens
+            return ans.id, (resp.content or ""), usage
 
         except AnswerGenerationError:
             # Already the right failure; don't re-wrap it as an unexpected error.
@@ -1407,88 +1403,6 @@ def generate_answer(
             ) from exc
 
 
-def _llm_cost_rates(
-    model_key: str,
-) -> tuple[str, Decimal | None, Decimal | None, str, Decimal | None]:
-    """Return ``(model_id, input price, output price, cost unit, fx rate)``.
-
-    Prices are per million tokens. They come from the model catalogue, which is
-    published in USD, converted with the rate Azure itself bills at (see
-    :mod:`toxtempass.fx`). The rate is returned so the caller can record it:
-    that is what keeps a stored cost reproducible once the monthly rate moves.
-
-    Without a known rate the USD figures are stored as-is and the unit says so,
-    rather than silently presenting dollars as euros.
-    """
-    from toxtempass.azure_registry import get_model as get_azure_model_entry
-    from toxtempass.models import AzureFxRate
-
-    model_id = ""
-    tier = residency = None
-    try:
-        idx_s, tag = model_key.split(":", 1)
-        result = get_azure_model_entry(int(idx_s), tag)
-        if result is not None:
-            _ep, entry = result
-            model_id = entry.model_id
-            tier = entry.tags.get("tier")
-            residency = entry.tags.get("residency")
-    except Exception as exc:
-        logger.warning("Could not resolve deployment %r: %s", model_key, exc)
-        return model_id, None, None, "", None
-
-    if not model_id:
-        return model_id, None, None, "", None
-
-    metadata = model_metadata.lookup(model_id, tier=tier, residency=residency)
-    if metadata.input_cost_per_1m_tokens is None:
-        return model_id, None, None, "", None
-    if metadata.price_is_approximate:
-        logger.info(
-            "No catalogue row for tier %r; pricing %s at the Global rate, "
-            "which understates it.",
-            tier,
-            model_id,
-        )
-
-    usd_input = Decimal(str(metadata.input_cost_per_1m_tokens))
-    usd_output = (
-        Decimal(str(metadata.output_cost_per_1m_tokens))
-        if metadata.output_cost_per_1m_tokens is not None
-        else None
-    )
-
-    rate_row = AzureFxRate.current()
-    if rate_row is None:
-        logger.warning(
-            "No Azure USD->EUR rate stored yet; recording %s costs in USD.",
-            model_id,
-        )
-        return model_id, usd_input, usd_output, "Usd", None
-    rate = rate_row.rate
-    return (
-        model_id,
-        usd_input * rate,
-        usd_output * rate if usd_output is not None else None,
-        "Eur",
-        rate,
-    )
-
-
-def _token_cost(price_per_1m: Decimal | None, tokens: int) -> Decimal | None:
-    """Return the cost of ``tokens`` at a per-million price, or None without a price."""
-    if price_per_1m is None:
-        return None
-    return price_per_1m * Decimal(tokens) / Decimal("1000000")
-
-
-def _run_cost(cost_input: Decimal | None, cost_output: Decimal | None) -> Decimal | None:
-    """Return input plus output cost, or None when neither is priced."""
-    if cost_input is None and cost_output is None:
-        return None
-    return (cost_input or 0) + (cost_output or 0)
-
-
 def _save_assay_cost(
     assay_id: int,
     model_key: str,
@@ -1497,13 +1411,16 @@ def _save_assay_cost(
     user_id: int | None = None,
     temperature: str = "",
     add_to_existing: bool = False,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
 ) -> None:
     """Persist (or update) an ``AssayCost`` row for a completed LLM run.
 
     Rates come from the model catalogue, converted with the rate Azure bills
-    at; both the converted price and the rate itself are stored, so the figure
-    stays reproducible after the monthly rate moves. Cost fields are left
-    ``None`` when the catalogue has no price for the model.
+    at; both the converted prices and the rate itself are stored, so the figure
+    stays reproducible after the monthly rate moves. Cached input tokens are
+    priced at the catalogue's cache prices (see :mod:`toxtempass.costs`). Cost
+    fields are left ``None`` when the catalogue has no price for the model.
 
     Also appends an ``LLMRun``: ``AssayCost`` is overwritten by the next run,
     the run log is what the daily cost alert sums.
@@ -1513,62 +1430,72 @@ def _save_assay_cost(
     few answers no longer erases what the full run cost. The ``LLMRun`` row
     always records THIS run alone — that log is what the spend alert sums.
     """
-    (
-        model_id,
-        cost_input_per_1m,
-        cost_output_per_1m,
-        cost_unit,
-        fx_rate,
-    ) = _llm_cost_rates(model_key)
-    cost_input = _token_cost(cost_input_per_1m, input_tokens)
-    cost_output = _token_cost(cost_output_per_1m, output_tokens)
+    rates = llm_cost_rates(model_key)
+    usage = TokenUsage(
+        input=input_tokens,
+        output=output_tokens,
+        cache_read=cache_read_tokens,
+        cache_write=cache_write_tokens,
+    )
 
     LLMRun.objects.create(
         assay_id=assay_id,
         user_id=user_id,
         status=LLMRun.Status.DONE,
         model_key=model_key,
-        model_id=model_id,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cost=_run_cost(cost_input, cost_output),
-        cost_unit=cost_unit,
-        fx_rate=fx_rate,
+        model_id=rates.model_id,
+        input_tokens=usage.input,
+        output_tokens=usage.output,
+        cache_read_tokens=usage.cache_read,
+        cache_write_tokens=usage.cache_write,
+        cost=rates.total_cost(usage),
+        cost_unit=rates.unit,
+        fx_rate=rates.fx_rate,
     )
     if add_to_existing:
         prev = AssayCost.objects.filter(assay_id=assay_id, model_key=model_key).first()
         if prev:
-            input_tokens += prev.input_tokens
-            output_tokens += prev.output_tokens
             # Recompute from the running totals, so the row's cost matches its tokens.
-            cost_input = _token_cost(cost_input_per_1m, input_tokens)
-            cost_output = _token_cost(cost_output_per_1m, output_tokens)
+            usage += TokenUsage(
+                input=prev.input_tokens,
+                output=prev.output_tokens,
+                cache_read=prev.cache_read_tokens,
+                cache_write=prev.cache_write_tokens,
+            )
+    cost_input = rates.input_cost(usage)
+    cost_output = rates.output_cost(usage)
     AssayCost.objects.update_or_create(
         assay_id=assay_id,
         model_key=model_key,
         defaults=dict(
-            model_id=model_id,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            cost_input_per_1m=cost_input_per_1m,
-            cost_output_per_1m=cost_output_per_1m,
+            model_id=rates.model_id,
+            input_tokens=usage.input,
+            output_tokens=usage.output,
+            cache_read_tokens=usage.cache_read,
+            cache_write_tokens=usage.cache_write,
+            cost_input_per_1m=rates.input,
+            cost_output_per_1m=rates.output,
+            cost_cache_read_per_1m=rates.cache_read,
+            cost_cache_write_per_1m=rates.cache_write,
             cost_input=cost_input,
             cost_output=cost_output,
-            cost_unit=cost_unit,
+            cost_unit=rates.unit,
             temperature=temperature,
-            fx_rate=fx_rate,
+            fx_rate=rates.fx_rate,
         ),
     )
     logger.info(
-        "AssayCost saved: assay=%s model=%s input_tok=%d output_tok=%d "
-        "cost_input=%s cost_output=%s cost_unit=%r",
+        "AssayCost saved: assay=%s model=%s input_tok=%d (cache read %d, write %d) "
+        "output_tok=%d cost_input=%s cost_output=%s cost_unit=%r",
         assay_id,
         model_key,
-        input_tokens,
-        output_tokens,
+        usage.input,
+        usage.cache_read,
+        usage.cache_write,
+        usage.output,
         cost_input,
         cost_output,
-        cost_unit,
+        rates.unit,
     )
 
 
@@ -1576,8 +1503,7 @@ def _record_failed_llm_run(
     assay_id: int,
     user_id: int | None,
     model_key: str,
-    input_tokens: int,
-    output_tokens: int,
+    usage: TokenUsage,
     error: str,
 ) -> None:
     """Append an ``LLMRun`` for a run that ended in an error.
@@ -1585,33 +1511,21 @@ def _record_failed_llm_run(
     Feeds the maintainers' failure alert, and counts towards the daily spend:
     tokens used before the error are paid for too.
     """
-    cost = None
-    model_id, cost_unit = "", ""
-    fx_rate = None
-    if ":" in model_key:
-        (
-            model_id,
-            cost_input_per_1m,
-            cost_output_per_1m,
-            cost_unit,
-            fx_rate,
-        ) = _llm_cost_rates(model_key)
-        cost = _run_cost(
-            _token_cost(cost_input_per_1m, input_tokens),
-            _token_cost(cost_output_per_1m, output_tokens),
-        )
+    rates = llm_cost_rates(model_key) if ":" in model_key else CostRates()
     LLMRun.objects.create(
         # The run may have failed because the assay was deleted.
         assay_id=assay_id if Assay.objects.filter(pk=assay_id).exists() else None,
         user_id=user_id,
         status=LLMRun.Status.ERROR,
         model_key=model_key,
-        model_id=model_id,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cost=cost,
-        cost_unit=cost_unit,
-        fx_rate=fx_rate,
+        model_id=rates.model_id,
+        input_tokens=usage.input,
+        output_tokens=usage.output,
+        cache_read_tokens=usage.cache_read,
+        cache_write_tokens=usage.cache_write,
+        cost=rates.total_cost(usage),
+        cost_unit=rates.unit,
+        fx_rate=rates.fx_rate,
         error=error[:2000],
     )
 
@@ -1642,8 +1556,7 @@ def process_llm_async(
     """
     pool_workers = max_workers or config.max_workers_threading
     # Set before the try, so a fatal error can still record what the run used.
-    total_input_tokens = 0
-    total_output_tokens = 0
+    total_usage = TokenUsage()
     try:
         try:
             assay = Assay.objects.get(pk=assay_id)
@@ -1913,8 +1826,7 @@ def process_llm_async(
             return Assay.objects.filter(pk=assay_id).exists()
 
         # Accumulate token usage across all rounds.
-        total_input_tokens = 0
-        total_output_tokens = 0
+        total_usage = TokenUsage()
         # Reasons for answers that never came back, for the post-run report.
         failed_answers: list[str] = []
 
@@ -1955,11 +1867,10 @@ def process_llm_async(
                 ) as pbar:
                     for future in as_completed(futures):
                         try:
-                            aid, text, in_tok, out_tok = (
+                            aid, text, usage = (
                                 future.result()
                             )  # optionally: future.result(timeout=...)
-                            total_input_tokens += in_tok
-                            total_output_tokens += out_tok
+                            total_usage += usage
                         except TimeoutError as te:
                             logger.error(str(te))
                             failed_answers.append(
@@ -2074,7 +1985,7 @@ def process_llm_async(
         # Only persist when we actually received token counts from the LLM API.
         # Zero-token runs (e.g. test fakes with no usage_metadata) are skipped
         # to avoid creating spurious cost rows with no data.
-        if llm_model and ":" in llm_model and (total_input_tokens or total_output_tokens):
+        if llm_model and ":" in llm_model and total_usage:
             try:
                 # The client's temperature is what was sent; None means it was
                 # omitted and the provider applied its default.
@@ -2082,8 +1993,10 @@ def process_llm_async(
                 _save_assay_cost(
                     assay_id=assay_id,
                     model_key=llm_model,
-                    input_tokens=total_input_tokens,
-                    output_tokens=total_output_tokens,
+                    input_tokens=total_usage.input,
+                    output_tokens=total_usage.output,
+                    cache_read_tokens=total_usage.cache_read,
+                    cache_write_tokens=total_usage.cache_write,
                     user_id=user_id,
                     temperature="provider default" if _temp is None else f"{_temp:g}",
                     # answer_ids set = a re-run of selected questions, so its tokens
@@ -2105,8 +2018,7 @@ def process_llm_async(
                 assay_id,
                 user_id,
                 llm_model or "",
-                total_input_tokens,
-                total_output_tokens,
+                total_usage,
                 f"{type(e).__name__}: {e}",
             )
         except Exception:

@@ -1295,9 +1295,9 @@ class AssayCost(models.Model):
     """Records the token usage and estimated cost for one LLM generation run on an assay.
 
     One row is created (or updated) per (assay, model_key) combination each time
-    ``process_llm_async`` completes.  Cost fields are derived from the
-    ``cost-input-1mtoken`` / ``cost-output-1mtoken`` tags on the model at the time
-    the run executes; they stay ``None`` when those tags are absent.
+    ``process_llm_async`` completes.  Prices come from the model catalogue at
+    the time the run executes (see :mod:`toxtempass.costs`); cost fields stay
+    ``None`` when the catalogue has no price for the model.
     """
 
     assay = models.ForeignKey(
@@ -1324,6 +1324,14 @@ class AssayCost(models.Model):
         default=0,
         help_text="Total completion tokens produced across all questions in this run.",
     )
+    cache_read_tokens = models.PositiveBigIntegerField(
+        default=0,
+        help_text="Part of the input tokens served from the provider's prompt cache.",
+    )
+    cache_write_tokens = models.PositiveBigIntegerField(
+        default=0,
+        help_text="Part of the input tokens written to the prompt cache (Anthropic).",
+    )
     cost_input_per_1m = models.DecimalField(
         max_digits=12,
         decimal_places=6,
@@ -1338,12 +1346,32 @@ class AssayCost(models.Model):
         blank=True,
         help_text="Snapshot of output price (EUR / 1 M tokens) at run time.",
     )
+    cost_cache_read_per_1m = models.DecimalField(
+        max_digits=12,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text=(
+            "Snapshot of the cached-input price (EUR / 1 M tokens) at run time; "
+            "empty when the catalogue has none and the input price applied."
+        ),
+    )
+    cost_cache_write_per_1m = models.DecimalField(
+        max_digits=12,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text=(
+            "Snapshot of the cache-write price (EUR / 1 M tokens) at run time; "
+            "empty when the catalogue has none and the input price applied."
+        ),
+    )
     cost_input = models.DecimalField(
         max_digits=12,
         decimal_places=6,
         null=True,
         blank=True,
-        help_text="Calculated input cost in EUR for this run.",
+        help_text="Calculated input cost in EUR for this run, cached tokens included.",
     )
     cost_output = models.DecimalField(
         max_digits=12,
@@ -1388,10 +1416,14 @@ class AssayCost(models.Model):
         ordering = ["-updated_at"]
 
     def __str__(self) -> str:
+        from toxtempass.costs import format_cost
+
         total = self.total_cost
-        sym = self.cost_unit_symbol
         if total is not None:
-            return f"AssayCost assay={self.assay_id} model={self.model_key} total={sym}{total:.6f}"
+            return (
+                f"AssayCost assay={self.assay_id} model={self.model_key} "
+                f"total={format_cost(total, self.cost_unit)}"
+            )
         return f"AssayCost assay={self.assay_id} model={self.model_key}"
 
     @property
@@ -1443,6 +1475,12 @@ class LLMRun(models.Model):
     model_id = models.CharField(max_length=128, blank=True, default="")
     input_tokens = models.PositiveBigIntegerField(default=0)
     output_tokens = models.PositiveBigIntegerField(default=0)
+    cache_read_tokens = models.PositiveBigIntegerField(
+        default=0, help_text="Part of the input tokens served from the prompt cache."
+    )
+    cache_write_tokens = models.PositiveBigIntegerField(
+        default=0, help_text="Part of the input tokens written to the prompt cache."
+    )
     cost = models.DecimalField(
         max_digits=12,
         decimal_places=6,

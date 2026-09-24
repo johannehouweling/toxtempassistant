@@ -18,6 +18,7 @@ from toxtempass.azure_registry import (
     endpoint_choices,
     get_registry,
 )
+from toxtempass.costs import format_cost, llm_cost_rates
 from toxtempass.filehandling import download_assay_files_as_zip
 from toxtempass.models import (
     Answer,
@@ -355,29 +356,42 @@ def _render_deployments_table(
             # Cost per 1M tokens display. Prices come from the model
             # catalogue and the stored Azure FX rate -- the same source the
             # runs are billed from -- so this never disagrees with AssayCost.
-            from toxtempass.azure_registry import cost_unit_symbol as _sym
-            from toxtempass.views import _llm_cost_rates
-            _, cip, cop, cost_unit, _fx = _llm_cost_rates(key)
-            cost_sym = _sym(cost_unit)
-            if cip is not None and cop is not None:
-                cost_html = format_html(
-                    '<span style="color:#198754;font-family:monospace">'
-                    'in&nbsp;{sym}{cip}/1M&nbsp;·&nbsp;out&nbsp;{sym}{cop}/1M</span>',
-                    sym=cost_sym, cip=cip, cop=cop,
+            rates = llm_cost_rates(key)
+            cip = format_cost(rates.input, rates.unit)
+            cop = format_cost(rates.output, rates.unit)
+            if rates.cache_read is not None or rates.cache_write is not None:
+                cache_html = format_html(
+                    '<br><span style="color:#666;font-family:monospace">'
+                    "cache&nbsp;read&nbsp;{}{}</span>",
+                    format_cost(rates.cache_read, rates.unit)
+                    if rates.cache_read is not None else "= in",
+                    format_html(
+                        "&nbsp;·&nbsp;write&nbsp;{}",
+                        format_cost(rates.cache_write, rates.unit),
+                    ) if rates.cache_write is not None else "",
                 )
-            elif cip is not None:
+            else:
+                cache_html = mark_safe("")
+            if rates.input is not None and rates.output is not None:
                 cost_html = format_html(
                     '<span style="color:#198754;font-family:monospace">'
-                    'in&nbsp;{sym}{cip}/1M</span>'
-                    '<span style="color:#a75d00" title="Catalogue has no output price for this model"> ⚠️</span>',
-                    sym=cost_sym, cip=cip,
+                    'in&nbsp;{cip}/1M&nbsp;·&nbsp;out&nbsp;{cop}/1M</span>{cache}',
+                    cip=cip, cop=cop, cache=cache_html,
                 )
-            elif cop is not None:
+            elif rates.input is not None:
                 cost_html = format_html(
                     '<span style="color:#198754;font-family:monospace">'
-                    'out&nbsp;{sym}{cop}/1M</span>'
+                    'in&nbsp;{cip}/1M</span>'
+                    '<span style="color:#a75d00" title="Catalogue has no output price'
+                    ' for this model"> ⚠️</span>{cache}',
+                    cip=cip, cache=cache_html,
+                )
+            elif rates.output is not None:
+                cost_html = format_html(
+                    '<span style="color:#198754;font-family:monospace">'
+                    'out&nbsp;{cop}/1M</span>'
                     '<span style="color:#a75d00" title="Catalogue has no input price for this model"> ⚠️</span>',
-                    sym=cost_sym, cop=cop,
+                    cop=cop,
                 )
             else:
                 cost_html = mark_safe(
@@ -635,16 +649,14 @@ class LLMConfigAdmin(admin.ModelAdmin):
 
     def pricing_summary(self, obj):
         """Show how many models the catalogue has a price for."""
-        from toxtempass.views import _llm_cost_rates
-
         registry = get_registry()
         all_models = [(ep, m) for ep in registry for m in ep.models]
         if not all_models:
             return "—"
         with_pricing = 0
         for ep, m in all_models:
-            _, cip, cop, _unit, _fx = _llm_cost_rates(f"{ep.index}:{m.tag}")
-            if cip is not None and cop is not None:
+            rates = llm_cost_rates(f"{ep.index}:{m.tag}")
+            if rates.input is not None and rates.output is not None:
                 with_pricing += 1
         total = len(all_models)
         if with_pricing == total:
@@ -731,6 +743,8 @@ class AssayCostAdmin(admin.ModelAdmin):
         "model_key",
         "model_id",
         "input_tokens",
+        "cache_read_tokens",
+        "cache_write_tokens",
         "output_tokens",
         "cost_input_display",
         "cost_output_display",
@@ -745,8 +759,12 @@ class AssayCostAdmin(admin.ModelAdmin):
         "model_key",
         "model_id",
         "input_tokens",
+        "cache_read_tokens",
+        "cache_write_tokens",
         "output_tokens",
         "cost_input_per_1m",
+        "cost_cache_read_per_1m",
+        "cost_cache_write_per_1m",
         "cost_output_per_1m",
         "cost_input",
         "cost_output",
@@ -763,20 +781,20 @@ class AssayCostAdmin(admin.ModelAdmin):
     def cost_input_display(self, obj):
         if obj.cost_input is None:
             return mark_safe('<span style="color:#888">—</span>')
-        return f"{obj.cost_unit_symbol}{obj.cost_input:.6f}"
+        return format_cost(obj.cost_input, obj.cost_unit)
     cost_input_display.short_description = "Input cost"
 
     def cost_output_display(self, obj):
         if obj.cost_output is None:
             return mark_safe('<span style="color:#888">—</span>')
-        return f"{obj.cost_unit_symbol}{obj.cost_output:.6f}"
+        return format_cost(obj.cost_output, obj.cost_unit)
     cost_output_display.short_description = "Output cost"
 
     def total_cost_display(self, obj):
         total = obj.total_cost
         if total is None:
             return mark_safe('<span style="color:#888">—</span>')
-        return format_html('<b>{sym}{total}</b>', sym=obj.cost_unit_symbol, total=f"{total:.6f}")
+        return format_html("<b>{}</b>", format_cost(total, obj.cost_unit))
     total_cost_display.short_description = "Total cost"
 
 
@@ -1039,9 +1057,9 @@ class LLMRunAdmin(admin.ModelAdmin):
         "user",
         "model_key",
         "input_tokens",
+        "cache_read_tokens",
         "output_tokens",
-        "cost",
-        "cost_unit",
+        "cost_display",
     )
     list_filter = ("status", "model_key")
     search_fields = ("user__email", "model_key", "model_id")
@@ -1050,3 +1068,8 @@ class LLMRunAdmin(admin.ModelAdmin):
     def has_add_permission(self, request: HttpRequest) -> bool:
         """Refuse adding runs by hand; only the app records them."""
         return False
+
+    @admin.display(description="Cost", ordering="cost")
+    def cost_display(self, obj: LLMRun) -> str:
+        """Show the run's cost in whole cents, or finer below a cent."""
+        return format_cost(obj.cost, obj.cost_unit)
