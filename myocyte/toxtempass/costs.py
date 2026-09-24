@@ -199,22 +199,17 @@ def llm_cost_rates(model_key: str) -> CostRates:
 
 
 def format_cost(amount: Any, unit: str = "") -> str:  # noqa: ANN401 - Decimal/float/None
-    """Format a money amount for display, e.g. ``€1.23`` or ``€0.0042``.
+    """Format a money amount for display in whole cents, e.g. ``€1.23``.
 
-    Whole cents from one cent up; below that, two significant digits so a cheap
-    run does not read as free. Trailing zeros past the cents are dropped.
+    A positive amount below one cent shows as ``<€0.01`` so a cheap run does
+    not read as free.
     """
     if amount is None:
         return "—"
     value = Decimal(str(amount))
-    sign = "-" if value < 0 else ""
-    value = abs(value)
-    places = 2
+    symbol = cost_unit_symbol(unit)
     if 0 < value < Decimal("0.01"):
-        # adjusted() is the exponent of the leading digit: 0.0042 -> -3.
-        places = -value.adjusted() + 1
-    value = value.quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
-    text = f"{value:,.{places}f}"
-    if places > 2:
-        text = text.rstrip("0")
-    return f"{sign}{cost_unit_symbol(unit)}{text}"
+        return f"<{symbol}0.01"
+    sign = "-" if value < 0 else ""
+    value = abs(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return f"{sign}{symbol}{value:,.2f}"

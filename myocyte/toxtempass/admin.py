@@ -1071,5 +1071,5 @@ class LLMRunAdmin(admin.ModelAdmin):
 
     @admin.display(description="Cost", ordering="cost")
     def cost_display(self, obj: LLMRun) -> str:
-        """Show the run's cost in whole cents, or finer below a cent."""
+        """Show the run's cost in whole cents, or ``<€0.01`` below a cent."""
         return format_cost(obj.cost, obj.cost_unit)

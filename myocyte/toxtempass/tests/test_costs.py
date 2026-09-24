@@ -91,9 +91,9 @@ def test_missing_cache_prices_fall_back_to_the_input_price():
         (Decimal("12.3456"), "€12.35"),
         (Decimal("1234.5"), "€1,234.50"),
         (Decimal("0.065"), "€0.07"),
-        (Decimal("0.0042"), "€0.0042"),
-        (Decimal("0.004000"), "€0.004"),
-        (Decimal("0.000123456"), "€0.00012"),
+        (Decimal("0.0042"), "<€0.01"),
+        (Decimal("0.000123456"), "<€0.01"),
+        (Decimal("0.01"), "€0.01"),
         (Decimal("-0.5"), "-€0.50"),
     ],
 )
