@@ -59,6 +59,7 @@ KEEP_FIELDS = (
     "input_cost_per_token",
     "output_cost_per_token",
     "cache_read_input_token_cost",
+    "cache_creation_input_token_cost",
     "deprecation_date",
 )
 # A healthy trim yields ~430 chat models. Anything far below that means a
@@ -82,6 +83,7 @@ _COST_FIELDS = {
     "input_cost_per_token": "input_cost_per_1m_tokens",
     "output_cost_per_token": "output_cost_per_1m_tokens",
     "cache_read_input_token_cost": "cache_read_cost_per_1m_tokens",
+    "cache_creation_input_token_cost": "cache_write_cost_per_1m_tokens",
 }
 _LIMIT_FIELDS = ("max_input_tokens", "max_output_tokens")
 
@@ -108,6 +110,9 @@ class ModelMetadata:
     input_cost_per_1m_tokens: float | None = None
     output_cost_per_1m_tokens: float | None = None
     cache_read_cost_per_1m_tokens: float | None = None
+    # Anthropic charges extra to write the prompt cache; OpenAI and Azure do not,
+    # so their rows have no such price.
+    cache_write_cost_per_1m_tokens: float | None = None
     deprecation_date: date | None = None
     # True when the deployment's tier has no upstream row, so the price shown is
     # the Global one and understates what Azure actually charges.
@@ -208,7 +213,12 @@ def refresh(now: datetime | None = None, force: bool = False) -> dict[str, Any]:
         and now - catalogue.checked_at < CHECK_INTERVAL
     ):
         return {"changed": False, "reason": "checked recently"}
-    payload, etag, url = _fetch(catalogue.etag)
+    # A stored copy trimmed before a field joined KEEP_FIELDS lacks it
+    # everywhere, and a 304 would keep it that way; fetch the full file instead.
+    stored = catalogue.models_json or {}
+    existing_fields = {f for entry in stored.values() for f in entry}
+    stale_fields = not set(KEEP_FIELDS) <= existing_fields
+    payload, etag, url = _fetch("" if stale_fields else catalogue.etag)
     catalogue.checked_at = now
 
     if payload is None:

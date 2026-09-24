@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize extras %}
 
 {% comment %}
 Staff-only usage stats.
@@ -437,6 +437,7 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
               <tr>
                 <th scope="col">Model</th>
                 <th scope="col" class="text-end text-nowrap">Tokens read</th>
+                <th scope="col" class="text-end text-nowrap">Of which cached <i class="bi bi-info-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" aria-label="About cached tokens" title="Prompt tokens served from the provider's cache, billed at the lower cache price. Counted since cache tracking began."></i></th>
                 <th scope="col" class="text-end text-nowrap">Tokens written</th>
                 <th scope="col" class="text-end text-nowrap">Total cost <i class="bi bi-info-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" aria-label="About missing costs" title="A model showing tokens but no cost is missing its price tag in the deployment config."></i></th>
               </tr>
@@ -446,8 +447,9 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
               <tr>
                 <td class="text-break">{{ row.model }}</td>
                 <td class="text-end text-nowrap text-body-secondary">{{ row.input_tokens|intcomma }}</td>
+                <td class="text-end text-nowrap text-body-secondary">{{ row.cache_read_tokens|intcomma }}</td>
                 <td class="text-end text-nowrap text-body-secondary">{{ row.output_tokens|intcomma }}</td>
-                <td class="text-end text-nowrap fw-semibold">{{ stats.llm.currency }}{{ row.cost_total|floatformat:2 }}</td>
+                <td class="text-end text-nowrap fw-semibold">{{ row.cost_total|cost:stats.llm.currency }}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -458,8 +460,9 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
                    runs. The ToxTemp count is what the rows can actually tell. {% endcomment %}
                 <td>All models, {{ stats.llm.assays|intcomma }} ToxTemp{{ stats.llm.assays|pluralize }} drafted</td>
                 <td class="text-end text-nowrap">{{ stats.llm.input_tokens|intcomma }}</td>
+                <td class="text-end text-nowrap">{{ stats.llm.cache_read_tokens|intcomma }}</td>
                 <td class="text-end text-nowrap">{{ stats.llm.output_tokens|intcomma }}</td>
-                <td class="text-end text-nowrap">{{ stats.llm.currency }}{{ stats.llm.cost_total|floatformat:2 }}</td>
+                <td class="text-end text-nowrap">{{ stats.llm.cost_total|cost:stats.llm.currency }}</td>
               </tr>
             </tfoot>
           </table>
@@ -473,7 +476,7 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
            is not already there. {% endcomment %}
         <div class="panel-bd">
           <div class="mb-4">
-            <div class="fig fig-lg">{{ stats.llm.currency }}{{ stats.llm.cost_per_assay|floatformat:3|default:"0.000" }}</div>
+            <div class="fig fig-lg">{{ stats.llm.cost_per_assay|default:0|cost:stats.llm.currency }}</div>
             <div class="unit">per ToxTemp drafted</div>
           </div>
           <div>

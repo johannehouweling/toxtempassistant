@@ -83,6 +83,7 @@ class TestAssayTableCostColumn:
             model_key="4:GPT4OMINI",
             model_id="gpt-4o-mini",
             input_tokens=813_838,
+            cache_read_tokens=700_000,
             output_tokens=9_142,
             cost_input_per_1m="0.150000",
             cost_output_per_1m="0.600000",
@@ -114,7 +115,11 @@ class TestAssayTableCostColumn:
         assert "4:GPT4O" in rendered
         assert "gpt-4o-mini" in rendered
         assert "gpt-4o" in rendered
-        assert "€0.1413" in rendered
+        # Whole cents: rows cost 0.127561 and 0.01375, together 0.141311.
+        assert ">€0.14</span>" in rendered
+        assert "€0.13" in rendered
+        assert "€0.01&lt;" in rendered
+        assert "700,000&amp;nbsp;cached" in rendered
 
 
 @pytest.mark.django_db

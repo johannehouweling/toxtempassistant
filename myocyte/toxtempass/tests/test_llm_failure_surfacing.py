@@ -279,5 +279,5 @@ def test_a_normal_stop_is_not_mistaken_for_truncation():
     answer = _seed_one_question(assay)
 
     llm = _TruncatedFakeLLM(content="A complete answer.", value="stop")
-    _aid, text, _in, _out = generate_answer(answer, "context", assay, llm)
+    _aid, text, _usage = generate_answer(answer, "context", assay, llm)
     assert text == "A complete answer."

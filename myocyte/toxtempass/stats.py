@@ -840,6 +840,7 @@ def llm_usage(rng: StatsRange) -> dict[str, Any]:
     qs = _scoped(_real_costs(), "created_at", rng)
     totals = qs.aggregate(
         input_tokens=Sum("input_tokens"),
+        cache_read_tokens=Sum("cache_read_tokens"),
         output_tokens=Sum("output_tokens"),
         cost_input=Sum("cost_input"),
         cost_output=Sum("cost_output"),
@@ -851,6 +852,7 @@ def llm_usage(rng: StatsRange) -> dict[str, Any]:
             "model": row["model_id"] or row["model_key"],
             "runs": row["runs"],
             "input_tokens": row["input_tokens"] or 0,
+            "cache_read_tokens": row["cache_read_tokens"] or 0,
             "output_tokens": row["output_tokens"] or 0,
             "cost_total": round(
                 (_f(row["cost_input"]) or 0.0) + (_f(row["cost_output"]) or 0.0), 6
@@ -860,6 +862,7 @@ def llm_usage(rng: StatsRange) -> dict[str, Any]:
         .annotate(
             runs=Count("pk"),
             input_tokens=Sum("input_tokens"),
+            cache_read_tokens=Sum("cache_read_tokens"),
             output_tokens=Sum("output_tokens"),
             cost_input=Sum("cost_input"),
             cost_output=Sum("cost_output"),
@@ -874,6 +877,7 @@ def llm_usage(rng: StatsRange) -> dict[str, Any]:
         "runs": totals["runs"] or 0,
         "assays": n_assays,
         "input_tokens": totals["input_tokens"] or 0,
+        "cache_read_tokens": totals["cache_read_tokens"] or 0,
         "output_tokens": totals["output_tokens"] or 0,
         "cost_total": cost_total,
         "cost_per_assay": round(cost_total / n_assays, 4) if n_assays else None,

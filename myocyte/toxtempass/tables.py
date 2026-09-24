@@ -5,6 +5,7 @@ from django.utils.safestring import SafeText, mark_safe
 
 from django.urls import reverse
 
+from toxtempass.costs import format_cost
 from toxtempass.models import Answer, Assay, AssayCost, LLMStatus, AssayView, Person
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import localtime
@@ -264,14 +265,22 @@ class AssayTable(tables.Table):
         breakdown_rows = []
         for r in cost_rows:
             row_total = r.total_cost
-            sym = r.cost_unit_symbol
-            cost_str = f"{sym}{row_total:.4f}" if row_total is not None else "no pricing data"
-            in_str = f"{r.input_tokens:,}" if r.input_tokens else "0"
-            out_str = f"{r.output_tokens:,}" if r.output_tokens else "0"
+            cost_str = (
+                format_cost(row_total, r.cost_unit)
+                if row_total is not None
+                else "no pricing data"
+            )
+            in_str = f"{r.input_tokens:,}"
+            cached = r.cache_read_tokens + r.cache_write_tokens
+            if cached:
+                in_str += f"&nbsp;in<br><span class='text-muted'>{cached:,}&nbsp;cached</span>"
+            else:
+                in_str += "&nbsp;in"
+            out_str = f"{r.output_tokens:,}"
             breakdown_rows.append(
                 f"<tr><td class='pe-2 text-break'><code>{escape(r.model_key)}</code></td>"
                 f"<td class='pe-2 text-break'>{escape(r.model_id)}</td>"
-                f"<td class='pe-2 text-nowrap'>{in_str}&nbsp;in</td>"
+                f"<td class='pe-2 text-nowrap'>{in_str}</td>"
                 f"<td class='pe-2 text-nowrap'>{out_str}&nbsp;out</td>"
                 f"<td class='text-nowrap'><b>{cost_str}</b></td></tr>"
             )
@@ -290,9 +299,8 @@ class AssayTable(tables.Table):
         if mixed_currencies:
             total_str = "mixed" if has_any_cost else "—"
         elif has_any_cost:
-            unit_sym = cost_rows[0].cost_unit_symbol
             total = sum((r.total_cost or 0) for r in cost_rows)
-            total_str = f"{unit_sym}{total:.4f}"
+            total_str = format_cost(total, cost_rows[0].cost_unit)
         else:
             total_str = "—"
 

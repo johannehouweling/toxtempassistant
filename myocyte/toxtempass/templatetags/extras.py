@@ -14,6 +14,18 @@ register = template.Library()
 _NE_SPLIT = re.compile(r"(?=Note[:\s]|Examples?[:\s]|Example problem|Example \d)")
 
 
+@register.filter()
+def cost(amount: object, unit: str = "") -> str:
+    """Format a money amount, e.g. ``{{ total|cost:"Eur" }}`` -> ``€1.23``.
+
+    See :func:`toxtempass.costs.format_cost`; ``unit`` may be a currency code
+    or a symbol.
+    """
+    from toxtempass.costs import format_cost
+
+    return format_cost(amount, unit)
+
+
 @register.filter(name="getattr")
 def getattr_custom(obj: object, attr_name: str) -> object:
     """Get an attribute dynamically from an object."""
