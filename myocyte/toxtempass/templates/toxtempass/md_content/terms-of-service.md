@@ -1,6 +1,6 @@
 # TERMS OF SERVICE
 
-Last updated March 12, 2025
+Last updated October 8, 2026
 
 ## AGREEMENT TO OUR LEGAL TERMS
 
@@ -54,6 +54,7 @@ We recommend that you print a copy of these Legal Terms for your records.
   - [20. LIMITATIONS OF LIABILITY](#20-limitations-of-liability)
   - [21. INDEMNIFICATION](#21-indemnification)
   - [22. USER DATA](#22-user-data)
+    - [Workspaces, sharing and API access](#workspaces-sharing-and-api-access)
   - [23. ELECTRONIC COMMUNICATIONS, TRANSACTIONS, AND SIGNATURES](#23-electronic-communications-transactions-and-signatures)
   - [24. CALIFORNIA USERS AND RESIDENTS](#24-california-users-and-residents)
   - [25. MISCELLANEOUS](#25-miscellaneous)
@@ -276,6 +277,22 @@ You agree to defend, indemnify, and hold us harmless, including our subsidiaries
 ## 22. USER DATA
 
 We will maintain certain data that you transmit to the Services for the purpose of managing the performance of the Services, as well as data relating to your use of the Services. Although we perform regular routine backups of data, you are solely responsible for all data that you transmit or that relates to any activity you have undertaken using the Services. You agree that we shall have no liability to you for any loss or corruption of any such data, and you hereby waive any right of action against us arising from any such loss or corruption of such data.
+
+### Workspaces, sharing and API access
+
+Users can share investigations with each other in workspaces ("Workspaces"). The following applies in addition to the rest of these Legal Terms.
+
+**Ownership.** Sharing an investigation into a Workspace does not transfer ownership of it. The investigation stays with its owner, who can stop sharing it at any time. A ToxTemp that you create inside another user's investigation is credited to you as its creator, but you can open it only while that investigation is shared with you.
+
+**Joining.** You join a Workspace only by accepting an invitation. By accepting it you agree to this section and to what the invitation explains.
+
+**API access is chosen by the Workspace owner and administrators.** The owner and the administrators of a Workspace can create API tokens that allow an external system to read, and only read, the investigations shared into that Workspace: their questions, answers, the names of the source documents and the ToxTemp as a PDF. The Workspace owner and administrators alone decide which external system receives access and for how long. We do not select, vet or control these systems or the people who operate them, and the Workspace owner and administrators are responsible for their choice. Every member of the Workspace is told by email when a token is created, and can see the names of the active tokens on the Workspace.
+
+**Attribution.** If you have agreed to be credited by name, then the name, organization and ORCID iD of your account (never your email address) are given to these external systems as an author of the ToxTemps that you created or edited, so that they can cite or publish your contribution. Those systems handle this information under their own terms and privacy practices, over which we have no control, and we cannot recall information once it has been received. You agree to be credited when you accept an invitation. You can withdraw that agreement at any time on the Workspace or by leaving the Workspace; it then applies to every later request. Without your agreement you appear as "Contributor (not named)".
+
+**Your content.** Titles, answers and file names that you enter are passed on as you wrote them. Do not enter personal data of other people that you are not permitted to share in this way.
+
+Our responsibility for what external systems do with the information they receive is limited as set out in these Legal Terms, including section 20.
 
 ## 23. ELECTRONIC COMMUNICATIONS, TRANSACTIONS, AND SIGNATURES
 
