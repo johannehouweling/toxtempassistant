@@ -2,6 +2,89 @@
 
 <!-- version list -->
 
+## v3.59.0 (2026-10-08)
+
+### Bug Fixes
+
+- **export**: Let long source file names wrap in the PDF
+  ([`3589929`](https://github.com/johannehouweling/toxtempassistant/commit/3589929c6f82471555996667ba31bf11f753a2e4))
+
+- **export**: Stop a hung pandoc build and tidy model strings
+  ([`edae84f`](https://github.com/johannehouweling/toxtempassistant/commit/edae84f48035c42e7a39411b11e00cb0a09c7b44))
+
+- **history**: Keep the template comment on one line so it isn't rendered
+  ([`8560722`](https://github.com/johannehouweling/toxtempassistant/commit/8560722b669fbf045bd6da4ba122d5d1389ac48b))
+
+### Build System
+
+- **deps**: Bump pyjwt from 2.13.0 to 2.15.0
+  ([`801631a`](https://github.com/johannehouweling/toxtempassistant/commit/801631a4d891d566536715f6bbd6bb42bf82169a))
+
+### Continuous Integration
+
+- **api**: Fail pull requests that break a frozen API contract
+  ([`e04da04`](https://github.com/johannehouweling/toxtempassistant/commit/e04da04e9d5ae53e7d0b5a0d09e71ff54a061797))
+
+### Documentation
+
+- Split the API document and consent notes in CLAUDE.md
+  ([`966112a`](https://github.com/johannehouweling/toxtempassistant/commit/966112ae0227f88c619d57548813a18ca6fb52a5))
+
+- **terms**: Describe workspace sharing, API access and attribution
+  ([`5016b86`](https://github.com/johannehouweling/toxtempassistant/commit/5016b86a93f99c62c6d391602946db642c769ec5))
+
+### Features
+
+- **api**: Add a rate-limited PDF endpoint that names nobody
+  ([`8129127`](https://github.com/johannehouweling/toxtempassistant/commit/8129127f157b70fc33ae9ee77faaf41328c7c89b))
+
+- **api**: Add provenance to the ToxTemp JSON
+  ([`9201bf2`](https://github.com/johannehouweling/toxtempassistant/commit/9201bf27b47cb1de6afe82353dbb45e2eb52e437))
+
+- **api**: Build PDFs in the task queue and download them from a job
+  ([`5405da3`](https://github.com/johannehouweling/toxtempassistant/commit/5405da36ad299c4cc5e74e726efe700b9340180b))
+
+- **api**: Credit authors by name when they have agreed
+  ([`d1c12e8`](https://github.com/johannehouweling/toxtempassistant/commit/d1c12e8bbe80783ab2ab60fd4f5247d441fac5fa))
+
+- **api**: Document the API with a hand-written OpenAPI contract
+  ([`1390255`](https://github.com/johannehouweling/toxtempassistant/commit/13902551db12a8d3ab637d40459b680f8d2b16fe))
+
+- **api**: Serve the data API under a versioned preview path
+  ([`c2133f7`](https://github.com/johannehouweling/toxtempassistant/commit/c2133f73739ddbd73d7b0a4a5c8f360c4fe72f20))
+
+- **api**: Show each active token by name in the members row
+  ([`8d2899a`](https://github.com/johannehouweling/toxtempassistant/commit/8d2899a4b12803f7e54f03f16160bd0cf5e00629))
+
+- **api**: Show every workspace member when API access is on
+  ([`825c6c2`](https://github.com/johannehouweling/toxtempassistant/commit/825c6c29b08f62f97e32df46a0bc0ceeec593758))
+
+- **api**: Tell every member when the workspace gets an API token
+  ([`06ae971`](https://github.com/johannehouweling/toxtempassistant/commit/06ae97100a8a575cb368afa461fed531b8d5f19e))
+
+- **api**: Tell investigation owners when a token can read their work
+  ([`99ab2b6`](https://github.com/johannehouweling/toxtempassistant/commit/99ab2b693f967e278d37f809e6896f9ebdc6631a))
+
+- **api**: Use the network-drive icon for API token chips
+  ([`83d69b1`](https://github.com/johannehouweling/toxtempassistant/commit/83d69b13003b8471a3d3703d40a4720675c23596))
+
+- **api**: Workspace API tokens for read-only external access
+  ([`1d4bfc9`](https://github.com/johannehouweling/toxtempassistant/commit/1d4bfc9c8879a18c7c53772aad3de1c77a45efdf))
+
+- **workspaces**: Invite members instead of adding them
+  ([`05c6b29`](https://github.com/johannehouweling/toxtempassistant/commit/05c6b29893b410f4335d94c7fa5aa24ec2df3fd7))
+
+### Refactoring
+
+- **export**: One ToxTemp document for the API, the JSON download and every format
+  ([`6152eeb`](https://github.com/johannehouweling/toxtempassistant/commit/6152eeb4e6ec27314947f1be968b6c36b7dc96f7))
+
+### Testing
+
+- **export**: Let the fake pandoc runner accept a timeout
+  ([`9562743`](https://github.com/johannehouweling/toxtempassistant/commit/956274389e1735eea739398fa813ed0f03d0955c))
+
+
 ## v3.58.1 (2026-09-24)
 
 ### Bug Fixes
