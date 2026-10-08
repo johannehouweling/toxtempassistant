@@ -1075,6 +1075,37 @@ class WorkspaceInvestigation(models.Model):
         unique_together = ("workspace", "investigation")
 
 
+class WorkspaceApiToken(models.Model):
+    """Read-only bearer token that lets an external server read a workspace.
+
+    The token belongs to the workspace, not to a person: it reads exactly the
+    investigations shared into that workspace and keeps working when the person
+    who issued it leaves. Only a hash is stored; the plaintext is shown once.
+    """
+
+    workspace = models.ForeignKey(
+        Workspace, on_delete=models.CASCADE, related_name="api_tokens"
+    )
+    name = models.CharField(max_length=100)
+    token_hash = models.CharField(max_length=64, unique=True)
+    prefix = models.CharField(max_length=12)
+    created_by = models.ForeignKey(
+        Person, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.prefix}…)"
+
+    @property
+    def is_active(self) -> bool:
+        """Return True while the token is neither revoked nor expired."""
+        return self.revoked_at is None and self.expires_at > timezone.now()
+
+
 class LLMConfig(models.Model):
     """Singleton admin-managed configuration for Azure AI Foundry LLM endpoints.
 

@@ -17,7 +17,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.views.decorators.http import require_POST
 from guardian.shortcuts import assign_perm, remove_perm
 
-from toxtempass import notifications
+from toxtempass import config, notifications
 from toxtempass.forms import (
     WorkspaceForm,
     WorkspaceInvestigationForm,
@@ -72,6 +72,8 @@ def get_workspace_list(request: HttpRequest) -> dict:
         "owned_workspaces": owned_workspaces,
         "member_workspaces": member_workspaces,
         "accessible_investigations": owned_investigations,
+        "api_token_default_days": config._api_token_default_days,
+        "api_token_max_days": config._api_token_max_days,
     }
 
 

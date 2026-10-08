@@ -708,4 +708,116 @@
       return;
     }
   });
+
+  // API tokens (owner and admins): list, create, revoke. Text goes in via textContent.
+  (function () {
+    const modalEl = document.getElementById("apiTokensModal");
+    if (!modalEl) return;
+    const listEl = document.getElementById("apiTokenList");
+    const errEl = document.getElementById("apiTokenError");
+    const secretBox = document.getElementById("apiTokenSecret");
+    const gid = () => modalEl.getAttribute("data-workspace-id");
+
+    function showError(msg) {
+      errEl.textContent = msg || "";
+      errEl.style.display = msg ? "" : "none";
+    }
+
+    function render(tokens) {
+      listEl.replaceChildren();
+      if (!tokens.length) {
+        const none = document.createElement("div");
+        none.className = "text-muted small";
+        none.textContent = "No active tokens.";
+        listEl.appendChild(none);
+        return;
+      }
+      tokens.forEach((t) => {
+        const row = document.createElement("div");
+        row.className = "d-flex align-items-center justify-content-between border-bottom py-1 small";
+        const info = document.createElement("span");
+        const used = t.last_used_at ? new Date(t.last_used_at).toLocaleDateString() : "never";
+        info.textContent = `${t.name} (${t.prefix}…) · expires ${new Date(t.expires_at).toLocaleDateString()} · last used ${used}`;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn-sm btn-outline-danger";
+        btn.textContent = "Revoke";
+        btn.addEventListener("click", () => {
+          fetch(`/workspace/${gid()}/tokens/${t.id}/revoke/`, {
+            method: "POST",
+            headers: { "X-CSRFToken": csrftoken },
+          }).then(() => load());
+        });
+        row.append(info, btn);
+        listEl.appendChild(row);
+      });
+    }
+
+    function load() {
+      fetch(`/workspace/${gid()}/tokens/`)
+        .then((r) => r.json())
+        .then((d) => render(d.tokens || []))
+        .catch(() => showError("Could not load tokens."));
+    }
+
+    document.addEventListener("click", function (e) {
+      const open = e.target.closest(".btn-api-tokens");
+      if (open) {
+        const workspaceEl = open.closest(".workspace-list");
+        if (!workspaceEl) return;
+        modalEl.setAttribute("data-workspace-id", workspaceEl.getAttribute("data-workspace-id"));
+        document.getElementById("apiTokenName").value = "";
+        secretBox.style.display = "none";
+        showError("");
+        load();
+        showModalFromOffcanvas(modalEl);
+        return;
+      }
+      const copyBtn = e.target.closest("#copyApiToken");
+      if (copyBtn) {
+        const value = document.getElementById("apiTokenSecretValue").textContent;
+        const icon = copyBtn.querySelector("i");
+        const done = (ok) => {
+          icon.className = ok ? "bi bi-check2" : "bi bi-x";
+          setTimeout(() => (icon.className = "bi bi-clipboard"), 1500);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(value).then(() => done(true), () => done(false));
+        } else {
+          // Plain-http or older browsers: select the text so Ctrl+C works.
+          const range = document.createRange();
+          range.selectNodeContents(document.getElementById("apiTokenSecretValue"));
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          done(document.execCommand("copy"));
+        }
+        return;
+      }
+      if (e.target.closest("#createApiToken")) {
+        showError("");
+        const body = new URLSearchParams({
+          name: document.getElementById("apiTokenName").value,
+          expires_days: document.getElementById("apiTokenDays").value,
+        });
+        fetch(`/workspace/${gid()}/tokens/create/`, {
+          method: "POST",
+          headers: { "X-CSRFToken": csrftoken },
+          body,
+        })
+          .then((r) => r.json())
+          .then((d) => {
+            if (!d.success) {
+              showError(d.error || "Could not create the token.");
+              return;
+            }
+            document.getElementById("apiTokenSecretValue").textContent = d.token;
+            secretBox.style.display = "";
+            document.getElementById("apiTokenName").value = "";
+            load();
+          })
+          .catch(() => showError("Could not create the token."));
+      }
+    });
+  })();
 </script>

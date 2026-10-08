@@ -57,3 +57,45 @@
       </div>
     </div>
   </div>
+
+  <!-- Modal: API tokens for reading a workspace from an external server -->
+  <div class="modal fade" id="apiTokensModal" tabindex="-1" aria-hidden="true" style="z-index: 1200;">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Workspace settings</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="text-uppercase fw-semibold mb-2 section-label">API access</div>
+          <p class="small text-muted">
+            A token lets an external server read, and only read, the investigations shared into this workspace.
+            It keeps working if you leave the workspace. Send it as <code>Authorization: Bearer &lt;token&gt;</code>
+            to <code>/api/v1/assays/</code>.
+          </p>
+          <div id="apiTokenList" class="mb-3"></div>
+          <div id="apiTokenSecret" class="alert alert-warning" style="display:none">
+            <div class="small mb-1">Copy this token now. It will not be shown again.</div>
+            <div class="d-flex align-items-center gap-2">
+              <code id="apiTokenSecretValue" class="user-select-all text-break flex-grow-1"></code>
+              <button type="button" id="copyApiToken" class="btn btn-sm btn-outline-secondary flex-shrink-0" title="Copy token" aria-label="Copy token"><i class="bi bi-clipboard"></i></button>
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-7">
+              <input type="text" class="form-control" id="apiTokenName" maxlength="100" placeholder="Name, e.g. reporting server" aria-label="Token name">
+            </div>
+            <div class="col-5">
+              <input type="number" class="form-control" id="apiTokenDays" min="1" max="{{ api_token_max_days }}" value="{{ api_token_default_days }}" aria-label="Lifetime in days">
+              <div class="form-text">days valid</div>
+            </div>
+          </div>
+          <div id="apiTokenError" class="text-danger small mt-2" style="display:none"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" id="createApiToken" class="btn btn-primary">Create token</button>
+        </div>
+      </div>
+    </div>
+  </div>

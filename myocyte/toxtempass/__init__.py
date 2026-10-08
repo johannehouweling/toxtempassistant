@@ -460,7 +460,11 @@ class Config:
         "password_change": (10, 3600),
         "account_export": (10, 3600),
         "account_delete": (10, 3600),
+        "api": (300, 60),
     })
+    # Workspace API tokens (see toxtempass/api.py): default and maximum lifetime.
+    _api_token_default_days: Final[int] = 90
+    _api_token_max_days: Final[int] = 365
     _email_confirmation_required_message: Final[str] = (
         "Please confirm your email address before generating drafts. Use the link "
         "in the email we sent you, or request a new one."

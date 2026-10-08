@@ -5,11 +5,14 @@
   <div class="card-header d-flex align-items-center justify-content-between border-0 workspace-card-header">
     <span class="fw-semibold form-control px-0 border-0 workspace-name{% if ws.current_user_role == 'member' %} text-muted{% endif %}" style="font-size: .95rem;" contenteditable="false">{{ ws.name }}</span>
 
-    {% if ws.owner == request.user %}
+    {% if ws.current_user_role == 'owner' or ws.current_user_role == 'admin' %}
       <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary border-0 btn-api-tokens" title="Workspace settings" aria-label="Workspace settings"><i class="bi bi-gear"></i></button>
+        {% if ws.owner == request.user %}
         <button type="button" class="btn btn-sm btn-outline-danger border-0 workspace-delete-btn" title="Delete workspace" aria-label="Delete workspace {{ ws.name }}">
           <i class="bi bi-trash"></i>
         </button>
+        {% endif %}
       </div>
     {% endif %}
   </div>
@@ -75,5 +78,6 @@
         {% endif %}
       </div>
     </div>
+
   </div>
 </div>

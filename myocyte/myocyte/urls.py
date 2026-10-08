@@ -24,7 +24,7 @@ from django.contrib.auth.views import (
 )
 from django.contrib.sitemaps.views import sitemap
 from django.urls import path
-from toxtempass import account, seo, views
+from toxtempass import account, api, seo, views
 
 from myocyte import settings
 
@@ -273,6 +273,19 @@ urlpatterns += [
         views.remove_workspace_member,
         name="remove_workspace_member",
     ),
+    path("workspace/<int:pk>/tokens/", api.list_tokens, name="workspace_tokens"),
+    path(
+        "workspace/<int:pk>/tokens/create/",
+        api.create_token,
+        name="workspace_token_create",
+    ),
+    path(
+        "workspace/<int:pk>/tokens/<int:token_id>/revoke/",
+        api.revoke_token,
+        name="workspace_token_revoke",
+    ),
+    path("api/v1/assays/", api.api_assay_list, name="api_assay_list"),
+    path("api/v1/assays/<int:assay_id>/", api.api_assay_detail, name="api_assay_detail"),
     path("workspace/<int:pk>/assay/add/", views.add_workspace_assay, name="add_workspace_assay"),
     path(
         "workspace/<int:pk>/assay/<int:assay_id>/remove/",
