@@ -214,6 +214,42 @@ class TestWorkspaceUi:
                 request=request,
             )
             seen[label] = (
-                'aria-label="Workspace settings"' in html  # the button; the JS is shown to all
+                'aria-label="Workspace settings"'
+                in html  # the button; the JS is shown to all
             )
         assert seen == {"owner": True, "admin": True, "member": False}
+
+    def test_every_member_sees_when_api_access_is_on(self):
+        from django.template.loader import render_to_string
+        from django.test import RequestFactory
+
+        from toxtempass import workspace as ws_views
+
+        workspace = WorkspaceFactory()
+        member = PersonFactory()
+        WorkspaceMemberFactory(workspace=workspace, user=member)
+
+        def chip_visible(user) -> bool:
+            request = RequestFactory().get("/")
+            request.user = user
+            html = render_to_string(
+                "toxtempass/base_extras/workspaces/workspace_list_partial.html",
+                ws_views.get_workspace_list(request),
+                request=request,
+            )
+            tag = html.split("api-access-chip", 1)[1].split(">", 1)[0]
+            return "d-none" not in tag
+
+        assert not chip_visible(member)
+        token = WorkspaceApiToken.objects.create(
+            workspace=workspace,
+            name="x",
+            token_hash="h",
+            prefix="ttw_x",
+            expires_at=timezone.now() + timedelta(days=1),
+        )
+        assert chip_visible(member)
+        assert chip_visible(workspace.owner)
+        token.revoked_at = timezone.now()
+        token.save()
+        assert not chip_visible(member)

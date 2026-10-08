@@ -724,6 +724,14 @@
     }
 
     function render(tokens) {
+      // Keep the card's "API access" chip in step with the token list.
+      const chip = document.querySelector(
+        `.workspace-list[data-workspace-id="${gid()}"] .api-access-chip`,
+      );
+      if (chip) {
+        chip.classList.toggle("d-none", tokens.length === 0);
+        chip.title = `${tokens.length} active API token${tokens.length === 1 ? "" : "s"}: external servers can read the investigations shared in this workspace`;
+      }
       listEl.replaceChildren();
       if (!tokens.length) {
         const none = document.createElement("div");
