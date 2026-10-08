@@ -1,0 +1,48 @@
+name: API contract
+
+# A frozen API version (openapi/v<N>.yaml) may only grow. This fails a pull request
+# that would break a client of it. The preview contract may change freely; its
+# changes are listed in the job summary. The contract tests in pytest
+# (tests/test_api_contract.py) hold the code to the file; this holds the file to
+# its released self.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'myocyte/toxtempass/openapi/**'
+      - '.github/scripts/check-api-contract.sh'
+      - '.github/workflows/api-contract.yml'
+
+permissions:
+  contents: read
+
+env:
+  # Pinned, and verified against the release's published checksum below.
+  OASDIFF_VERSION: "1.32.1"
+  OASDIFF_SHA256: "7c8939fc49b75ee11fec66a5b83b37a2fca6aee109fed85013b1ba2ac2a1ee7f"
+
+jobs:
+  oasdiff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install oasdiff
+        run: |
+          file="oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz"
+          curl -sSfL -o "$file" \
+            "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/${file}"
+          echo "${OASDIFF_SHA256}  ${file}" | sha256sum -c -
+          tar xzf "$file" oasdiff
+          ./oasdiff --version
+
+      - name: Frozen versions may only grow
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: |
+          .github/scripts/check-api-contract.sh \
+            "$BASE_REF" myocyte/toxtempass/openapi "$PWD/oasdiff"
