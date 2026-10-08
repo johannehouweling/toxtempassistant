@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v3.60.0 (2026-10-08)
+
+### Bug Fixes
+
+- **workspaces**: Do not count accepted invitations towards the per-person limit
+  ([`23e58ef`](https://github.com/johannehouweling/toxtempassistant/commit/23e58efa9882994fd10bcd72f54de6089166ce90))
+
+### Chores
+
+- **api**: Allow 4 active tokens per workspace
+  ([`e99146a`](https://github.com/johannehouweling/toxtempassistant/commit/e99146a7fc785d499a6860a27c4a803c84e57627))
+
+### Features
+
+- **workspaces**: Let invitation emails be switched off, limit them, restyle token chips
+  ([`d400b7c`](https://github.com/johannehouweling/toxtempassistant/commit/d400b7c218101d9998db5a92a8e247bacc5e90f5))
+
+- **workspaces**: Make crediting by name one setting in the Privacy tab
+  ([`17731e1`](https://github.com/johannehouweling/toxtempassistant/commit/17731e1da1684c95a0bae2f1dc0454e02012546a))
+
+### Refactoring
+
+- **workspaces**: Drop the carry-over of old credit agreements
+  ([`84a3fbc`](https://github.com/johannehouweling/toxtempassistant/commit/84a3fbc680ecf28e5e818546c6935fe6baded735))
+
+
 ## v3.59.0 (2026-10-08)
 
 ### Bug Fixes
