@@ -12,10 +12,15 @@ from toxtempass.models import (
     WorkspaceRole,
 )
 from toxtempass.tests.fixtures.factories import (
+    AnswerFactory,
     AssayFactory,
     InvestigationFactory,
     PersonFactory,
+    QuestionFactory,
+    QuestionSetFactory,
+    SectionFactory,
     StudyFactory,
+    SubsectionFactory,
     WorkspaceFactory,
     WorkspaceMemberFactory,
 )
@@ -117,7 +122,7 @@ class TestReading:
         secret = _issue(client, workspace.owner, workspace).json()["token"]
         client.logout()
         response = client.get(reverse("api_assay_list"), **_bearer(secret))
-        ids = {a["id"] for a in response.json()["assays"]}
+        ids = {a["id"] for a in response.json()["results"]}
         assert ids == {in_ws.pk, outside.pk}
         assert unshared.pk not in ids
 
@@ -258,3 +263,120 @@ class TestWorkspaceUi:
         first.revoked_at = timezone.now()
         first.save()
         assert chips(member)[0] == 1
+
+
+class TestDataApi:
+    def _token(self, client, workspace):
+        secret = _issue(client, workspace.owner, workspace).json()["token"]
+        client.logout()
+        return _bearer(secret)
+
+    def test_every_response_names_the_preview_version(self, client, shared):
+        workspace, in_ws, *_ = shared
+        auth = self._token(client, workspace)
+        for name, args in (
+            ("api_root", []),
+            ("api_assay_list", []),
+            ("api_assay_detail", [in_ws.pk]),
+            ("api_assay_detail", [999999]),
+        ):
+            response = client.get(reverse(name, args=args), **auth)
+            assert response["X-API-Version"] == "preview"
+            assert "no-store" in response["Cache-Control"]
+        assert client.get(reverse("api_root"))["X-API-Version"] == "preview"  # 401 too
+
+    def test_root_identifies_the_workspace(self, client, shared):
+        workspace, *_ = shared
+        body = client.get(reverse("api_root"), **self._token(client, workspace)).json()
+        assert body["api_version"] == "preview" and body["stable"] is False
+        assert body["workspace"] == {"id": workspace.pk, "name": workspace.name}
+
+    def test_detail_is_json_404_for_unshared(self, client, shared):
+        workspace, _, _, unshared = shared
+        response = client.get(
+            reverse("api_assay_detail", args=[unshared.pk]),
+            **self._token(client, workspace),
+        )
+        assert response.status_code == 404
+        assert response.json() == {"error": "Not found"}
+
+    def test_detail_exposes_answers_but_no_internal_fields(self, client, shared):
+        workspace, in_ws, *_ = shared
+        qset = QuestionSetFactory(label="vdetail")
+        question = QuestionFactory(
+            subsection=SubsectionFactory(section=SectionFactory(question_set=qset))
+        )
+        in_ws.question_set = qset
+        in_ws.processing_log = "TRACEBACK secret-internal-detail"
+        in_ws.user_alerts = [{"message": "internal alert"}]
+        in_ws.save()
+        AnswerFactory(
+            assay=in_ws,
+            question=question,
+            answer_text="The cells are HepG2.",
+            accepted=True,
+            answer_documents=["protocol.pdf"],
+        )
+        response = client.get(
+            reverse("api_assay_detail", args=[in_ws.pk]),
+            **self._token(client, workspace),
+        )
+        body = response.json()
+        answer = body["sections"][0]["subsections"][0]["questions"][0]["answer"]
+        assert answer == {
+            "text": "The cells are HepG2.",
+            "accepted": True,
+            "llm_abstained": None,
+            "source_documents": ["protocol.pdf"],
+        }
+        raw = response.content.decode()
+        assert "secret-internal-detail" not in raw
+        assert "internal alert" not in raw
+        assert workspace.owner.email not in raw
+
+    def test_list_paginates(self, client, shared):
+        workspace, *_ = shared
+        study = StudyFactory(investigation=shared[1].study.investigation)
+        for _ in range(3):
+            AssayFactory(study=study)  # 5 shared in total with the fixture
+        auth = self._token(client, workspace)
+        url = reverse("api_assay_list")
+        first = client.get(url, {"limit": 2}, **auth).json()
+        assert first["count"] == 5 and len(first["results"]) == 2
+        assert first["next_offset"] == 2
+        last = client.get(url, {"limit": 2, "offset": 4}, **auth).json()
+        assert len(last["results"]) == 1 and last["next_offset"] is None
+        seen = {
+            r["id"]
+            for off in (0, 2, 4)
+            for r in client.get(url, {"limit": 2, "offset": off}, **auth).json()[
+                "results"
+            ]
+        }
+        assert len(seen) == 5
+
+    @pytest.mark.parametrize("params", [{"limit": "x"}, {"updated_since": "yesterday"}])
+    def test_list_rejects_bad_parameters(self, client, shared, params):
+        workspace, *_ = shared
+        response = client.get(
+            reverse("api_assay_list"), params, **self._token(client, workspace)
+        )
+        assert response.status_code == 400
+
+    def test_updated_since_follows_answer_edits(self, client, shared):
+        workspace, in_ws, outside, _ = shared
+        auth = self._token(client, workspace)
+        url = reverse("api_assay_list")
+        marker = timezone.now().isoformat()
+        assert client.get(url, {"updated_since": marker}, **auth).json()["count"] == 0
+        question = QuestionFactory(
+            subsection=SubsectionFactory(
+                section=SectionFactory(question_set=QuestionSetFactory(label="vedit"))
+            )
+        )
+        AnswerFactory(assay=in_ws, question=question, answer_text="edited")
+        ids = [
+            r["id"]
+            for r in client.get(url, {"updated_since": marker}, **auth).json()["results"]
+        ]
+        assert ids == [in_ws.pk]

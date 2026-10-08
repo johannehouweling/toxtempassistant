@@ -284,8 +284,15 @@ urlpatterns += [
         api.revoke_token,
         name="workspace_token_revoke",
     ),
-    path("api/v1/assays/", api.api_assay_list, name="api_assay_list"),
-    path("api/v1/assays/<int:assay_id>/", api.api_assay_detail, name="api_assay_detail"),
+    # Data API. "preview" has no stability promise until the contract is agreed;
+    # the frozen version will live under api/v1/ (see toxtempass/api.py).
+    path("api/preview/", api.api_root, name="api_root"),
+    path("api/preview/assays/", api.api_assay_list, name="api_assay_list"),
+    path(
+        "api/preview/assays/<int:assay_id>/",
+        api.api_assay_detail,
+        name="api_assay_detail",
+    ),
     path("workspace/<int:pk>/assay/add/", views.add_workspace_assay, name="add_workspace_assay"),
     path(
         "workspace/<int:pk>/assay/<int:assay_id>/remove/",

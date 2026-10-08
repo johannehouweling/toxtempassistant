@@ -9,20 +9,24 @@ import hashlib
 import logging
 import secrets
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import wraps
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import QuerySet
+from django.db.models import F, OuterRef, QuerySet, Subquery
+from django.db.models.functions import Coalesce, Greatest
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET, require_POST
 
 from toxtempass import config, utilities
-from toxtempass.export import generate_json_from_assay
 from toxtempass.models import (
+    Answer,
     Assay,
+    Section,
     Workspace,
     WorkspaceApiToken,
     WorkspaceMember,
@@ -30,6 +34,14 @@ from toxtempass.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# The data API is versioned in the path. "preview" promises nothing: fields and
+# routes may change until the contract is agreed. Once frozen it becomes /api/v1/,
+# which may only grow; a breaking change is /api/v2/, with v1 kept and marked by a
+# Sunset header.
+API_VERSION = "preview"
+PAGE_SIZE_DEFAULT = 50
+PAGE_SIZE_MAX = 200
 
 TOKEN_PREFIX = "ttw_"  # noqa: S105 - a public label, not a secret
 
@@ -134,10 +146,10 @@ def revoke_token(request: HttpRequest, pk: int, token_id: int) -> JsonResponse:
     return JsonResponse({"success": True})
 
 
-def _unauthorized() -> JsonResponse:
+def _unauthorized() -> HttpResponse:
     response = JsonResponse({"error": "Invalid or missing token"}, status=401)
     response["WWW-Authenticate"] = "Bearer"
-    return response
+    return _api_response(response)
 
 
 def token_required(
@@ -148,7 +160,7 @@ def token_required(
     @wraps(view)
     def wrapper(request: HttpRequest, *args, **kwargs) -> HttpResponse:
         if utilities.is_rate_limited(request, "api"):
-            return JsonResponse({"error": config._rate_limited_message}, status=429)
+            return _error(config._rate_limited_message, 429)
         scheme, _, secret = request.headers.get("Authorization", "").partition(" ")
         if scheme.lower() != "bearer" or not secret.strip():
             return _unauthorized()
@@ -165,29 +177,178 @@ def token_required(
     return wrapper
 
 
+def _api_response(response: HttpResponse) -> HttpResponse:
+    """Stamp the API version and keep private data out of shared caches."""
+    response["X-API-Version"] = API_VERSION
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
+def _error(message: str, status: int) -> HttpResponse:
+    return _api_response(JsonResponse({"error": message}, status=status))
+
+
 def _workspace_assays(workspace: Workspace) -> QuerySet[Assay]:
-    return Assay.objects.filter(
-        study__investigation__shared_in_workspaces__workspace=workspace
-    ).distinct()
+    """Assays in the investigations shared into ``workspace``.
+
+    ``last_modified`` is the later of creation and the latest answer edit, taken
+    from the answers' history, because ``Assay`` has no modified timestamp.
+    """
+    latest_answer_edit = (
+        Answer.history.model.objects.filter(assay_id=OuterRef("pk"))
+        .order_by("-history_date")
+        .values("history_date")[:1]
+    )
+    return (
+        Assay.objects.filter(
+            study__investigation__shared_in_workspaces__workspace=workspace
+        )
+        .distinct()
+        .annotate(
+            last_modified=Greatest(
+                F("submission_date"),
+                Coalesce(Subquery(latest_answer_edit), F("submission_date")),
+            )
+        )
+    )
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _assay_summary(assay: Assay) -> dict:
+    return {
+        "id": assay.pk,
+        "title": assay.title,
+        "status": assay.status,
+        "submission_date": _iso(assay.submission_date),
+        "last_modified": _iso(assay.last_modified),
+        "study": {"id": assay.study_id, "title": assay.study.title},
+        "investigation": {
+            "id": assay.study.investigation_id,
+            "title": assay.study.investigation.title,
+        },
+    }
+
+
+def _answer_payload(answer: Answer | None) -> dict:
+    return {
+        "text": answer.answer_text if answer else "",
+        "accepted": answer.accepted if answer else None,
+        "llm_abstained": answer.llm_abstained if answer else None,
+        "source_documents": (answer.answer_documents or []) if answer else [],
+    }
+
+
+def _assay_detail(assay: Assay) -> dict:
+    """Return one ToxTemp as an explicit allowlist of fields.
+
+    Built field by field on purpose: serialising the models would also expose
+    internal ones (``processing_log``, ``user_alerts``, user ids).
+    """
+    answers = {a.question_id: a for a in assay.answers.all()}
+    question_set_id = assay.question_set_id
+    if question_set_id is None and answers:
+        # Assays from before question sets: derive it from the answered questions.
+        question_set_id = (
+            Section.objects.filter(subsections__questions__answers__assay=assay)
+            .values_list("question_set_id", flat=True)
+            .first()
+        )
+    sections = (
+        Section.objects.filter(question_set_id=question_set_id)
+        .prefetch_related("subsections__questions")
+        .order_by("pk")
+    )
+    return {
+        **_assay_summary(assay),
+        "description": assay.description,
+        "question_set": assay.question_set.label if assay.question_set else None,
+        "sections": [
+            {
+                "id": section.pk,
+                "title": section.title,
+                "subsections": [
+                    {
+                        "id": sub.pk,
+                        "title": sub.title,
+                        "questions": [
+                            {
+                                "id": q.pk,
+                                "parent_question_id": q.parent_question_id,
+                                "text": q.question_text,
+                                "answer": _answer_payload(answers.get(q.pk)),
+                            }
+                            for q in sub.questions.all()
+                        ],
+                    }
+                    for sub in section.subsections.all()
+                ],
+            }
+            for section in sections
+        ],
+    }
 
 
 @require_GET
 @token_required
-def api_assay_list(request: HttpRequest, workspace: Workspace) -> JsonResponse:
-    """List the ToxTemps in the investigations shared into the token's workspace."""
+def api_root(request: HttpRequest, workspace: Workspace) -> HttpResponse:
+    """Say which API this is and which workspace the token reads."""
+    return _api_response(
+        JsonResponse(
+            {
+                "api_version": API_VERSION,
+                "stable": False,
+                "workspace": {"id": workspace.pk, "name": workspace.name},
+                "endpoints": {
+                    "assays": reverse("api_assay_list"),
+                    "assay": reverse("api_assay_detail", args=[0]).replace("0", "{id}"),
+                },
+            }
+        )
+    )
+
+
+@require_GET
+@token_required
+def api_assay_list(request: HttpRequest, workspace: Workspace) -> HttpResponse:
+    """List ToxTemps in the shared investigations, newest change first.
+
+    Query: ``limit`` (default 50, max 200), ``offset``, and ``updated_since``
+    (ISO 8601) to fetch only what changed since the last sync.
+    """
+    try:
+        limit = min(
+            max(int(request.GET.get("limit", PAGE_SIZE_DEFAULT)), 1), PAGE_SIZE_MAX
+        )
+        offset = max(int(request.GET.get("offset", 0)), 0)
+    except ValueError:
+        return _error("limit and offset must be integers", 400)
+
     assays = _workspace_assays(workspace).select_related("study__investigation")
-    return JsonResponse(
-        {
-            "assays": [
-                {
-                    "id": a.pk,
-                    "title": a.title,
-                    "study": a.study.title,
-                    "investigation": a.study.investigation.title,
-                }
-                for a in assays.order_by("pk")
-            ]
-        }
+    since = request.GET.get("updated_since")
+    if since:
+        # A "+" in a URL query decodes to a space; restore it for the UTC offset.
+        parsed = parse_datetime(since.strip().replace(" ", "+"))
+        if parsed is None:
+            return _error("updated_since must be an ISO 8601 date-time", 400)
+        if timezone.is_naive(parsed):
+            parsed = timezone.make_aware(parsed, timezone.utc)
+        assays = assays.filter(last_modified__gt=parsed)
+
+    ordered = assays.order_by("-last_modified", "pk")
+    total = ordered.count()
+    page = list(ordered[offset : offset + limit])
+    next_offset = offset + limit if offset + limit < total else None
+    return _api_response(
+        JsonResponse(
+            {
+                "count": total,
+                "next_offset": next_offset,
+                "results": [_assay_summary(a) for a in page],
+            }
+        )
     )
 
 
@@ -195,10 +356,14 @@ def api_assay_list(request: HttpRequest, workspace: Workspace) -> JsonResponse:
 @token_required
 def api_assay_detail(
     request: HttpRequest, workspace: Workspace, assay_id: int
-) -> JsonResponse:
-    """Return one ToxTemp with its answers, in the same shape as the JSON export."""
-    assay = get_object_or_404(_workspace_assays(workspace), pk=assay_id)
-    data = generate_json_from_assay(assay)
-    if data is None:
-        return JsonResponse({"error": "Could not build this ToxTemp"}, status=500)
-    return JsonResponse(data)
+) -> HttpResponse:
+    """Return one ToxTemp with its questionnaire and answers."""
+    assay = (
+        _workspace_assays(workspace)
+        .select_related("study__investigation", "question_set")
+        .filter(pk=assay_id)
+        .first()
+    )
+    if assay is None:
+        return _error("Not found", 404)
+    return _api_response(JsonResponse(_assay_detail(assay)))
