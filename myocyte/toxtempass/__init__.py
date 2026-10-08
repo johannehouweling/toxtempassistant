@@ -493,7 +493,7 @@ class Config:
     _workspace_invites_per_pair_per_month: Final[int] = 3
     # Tokens are announced to every member by email, so a workspace may hold only
     # so many active ones.
-    _api_tokens_max_active: Final[int] = 10
+    _api_tokens_max_active: Final[int] = 4
     _email_confirmation_required_message: Final[str] = (
         "Please confirm your email address before generating drafts. Use the link "
         "in the email we sent you, or request a new one."
