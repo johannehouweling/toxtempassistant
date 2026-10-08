@@ -55,7 +55,7 @@
             {% for t in ws.active_api_tokens %}<span class="d-inline-flex align-items-center member-chip api-access-chip" data-token-name="{{ t.name }}" title="API token &quot;{{ t.name }}&quot;: an external server can read the investigations shared in this workspace"><span class="d-inline-flex align-items-center justify-content-center fw-bold text-white member-avatar"><i class="bi bi-hdd-network-fill"></i></span><span class="member-text">{{ t.name }}</span></span>{% endfor %}
             {% for inv in ws.pending_invitations %}
             <span class="d-inline-flex align-items-center member-chip invite-row text-muted" data-invitation-id="{{ inv.pk }}" title="Invitation sent, not accepted yet">
-                <span class="d-inline-flex align-items-center justify-content-center fw-bold member-avatar"><i class="bi bi-hourglass-split"></i></span>
+                <span class="d-inline-flex align-items-center justify-content-center fw-bold text-white member-avatar"><i class="bi bi-patch-question-fill"></i></span>
                 <span class="member-text">{{ inv.user.email }} (invited)</span>
                 <button type="button" class="btn btn-link p-0 m-0 text-secondary btn-cancel-invitation" aria-label="Cancel invitation for {{ inv.user.email }}" title="Cancel invitation"><i class="bi bi-x"></i></button>
             </span>
