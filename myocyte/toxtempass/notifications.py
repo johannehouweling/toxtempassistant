@@ -894,8 +894,10 @@ def invitation_limit(inviter: Person, invitee: Person) -> str:
     """Return why ``inviter`` may not invite ``invitee`` now, or an empty string.
 
     Every invitation is an email to someone else, so both the total a person can
-    send and how often they can invite the same person are limited. Withdrawn and
-    declined invitations count: the emails went out.
+    send and how often they can invite the same person are limited. Withdrawn,
+    declined and unanswered invitations count: the emails went out. Invitations the
+    person accepted do not count towards the limit for that person, so inviting a
+    colleague to several workspaces is fine as long as they say yes.
     """
     now = timezone.now()
     sent = EmailLog.objects.filter(
@@ -906,10 +908,13 @@ def invitation_limit(inviter: Person, invitee: Person) -> str:
         >= config._workspace_invites_per_user_per_day
     ):
         return "You have sent a lot of invitations today; try again tomorrow"
-    if (
-        sent.filter(user=invitee, created_at__gte=now - timedelta(days=30)).count()
-        >= config._workspace_invites_per_pair_per_month
-    ):
+    joined = WorkspaceMember.objects.filter(user=invitee).values_list(
+        "workspace_id", flat=True
+    )
+    unanswered_or_declined = sent.filter(
+        user=invitee, created_at__gte=now - timedelta(days=30)
+    ).exclude(payload__workspace_id__in=list(joined))
+    if unanswered_or_declined.count() >= config._workspace_invites_per_pair_per_month:
         return "You have invited this person several times recently"
     return ""
 
@@ -925,6 +930,7 @@ def notify_invited(invitation: WorkspaceInvitation) -> None:
         payload={
             "invitation_id": invitation.pk,
             "invited_by_id": invitation.invited_by_id,
+            "workspace_id": invitation.workspace_id,
         },
         dedup_key=f"workspace-invitation:{invitation.pk}",
         send_after=timezone.now() + timedelta(minutes=config._email_cooloff_minutes),

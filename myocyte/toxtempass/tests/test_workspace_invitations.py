@@ -157,6 +157,32 @@ class TestInvitationLimits:
         assert statuses[-1] == 429
         assert "several times" in response.json()["error"]
 
+    def test_inviting_a_colleague_who_says_yes_is_not_limited(
+        self, client, owner, invitee
+    ):
+        """Four workspaces, one colleague who accepts each: nothing to stop."""
+        for _ in range(Config._workspace_invites_per_pair_per_month + 2):
+            workspace = WorkspaceFactory(owner=owner)
+            response = _invite(client, owner, workspace, invitee)
+            assert response.status_code == 200
+            _respond(client, invitee, WorkspaceInvitation.objects.get(), "accept")
+
+    def test_accepted_ones_do_not_hide_a_pile_of_declined_ones(
+        self, client, owner, invitee
+    ):
+        limit = Config._workspace_invites_per_pair_per_month
+        accepted = WorkspaceFactory(owner=owner)
+        _invite(client, owner, accepted, invitee)
+        _respond(client, invitee, WorkspaceInvitation.objects.get(), "accept")
+        statuses = []
+        for _ in range(limit + 1):
+            workspace = WorkspaceFactory(owner=owner)
+            response = _invite(client, owner, workspace, invitee)
+            statuses.append(response.status_code)
+            if response.status_code == 200:
+                _respond(client, invitee, WorkspaceInvitation.objects.get(), "decline")
+        assert statuses == [200] * limit + [429]
+
     def test_the_limit_is_per_person_not_global(self, client, owner, workspace, invitee):
         other = PersonFactory()
         with patch.object(Config, "_workspace_invites_per_pair_per_month", 1):
