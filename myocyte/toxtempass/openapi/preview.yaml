@@ -1,0 +1,328 @@
+openapi: 3.1.0
+info:
+  title: ToxTempAssistant workspace API
+  version: preview
+  summary: Read-only access to the ToxTemps shared into one workspace.
+  description: |
+    **This is a preview.** Routes and fields may change without notice until the
+    contract is agreed. Once it is, it is frozen as `/api/v1/` and may only grow;
+    a breaking change becomes `/api/v2/`.
+
+    ## Authentication
+
+    A workspace owner or admin creates a token in the workspace settings (cogwheel on
+    the workspace card). Send it as `Authorization: Bearer <token>`. A token reads
+    exactly the investigations shared into its workspace, and nothing else. Use the
+    **Authorize** button above to try the endpoints from this page.
+
+    ## What is and is not in the data
+
+    No person is named: authors, organizations, ORCID iDs and email addresses are
+    left out of every response, including the PDF. Free-text answers and source
+    file names are written by users and are returned as they are.
+
+    ## Limits
+
+    Requests are rate limited per client IP. A PDF is built on the spot and costs
+    more, so each token may request one PDF per `limits.pdf_cooldown_seconds`
+    (see `GET /api/preview/`); asking sooner returns `429` with `Retry-After`.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+tags:
+  - name: Workspace
+  - name: ToxTemps
+paths:
+  /api/preview/:
+    get:
+      tags: [Workspace]
+      operationId: getRoot
+      summary: Identify the API version and the workspace the token reads
+      responses:
+        "200":
+          description: The workspace behind the token, the routes, and the limits.
+          headers:
+            X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Root"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /api/preview/assays/:
+    get:
+      tags: [ToxTemps]
+      operationId: listAssays
+      summary: List the ToxTemps in the shared investigations
+      description: |
+        Most recently changed first. A ToxTemp counts as changed when it is created
+        or when any of its answers is edited. Use `updated_since` to fetch only what
+        changed since your last sync, and page through with `next_offset`.
+      parameters:
+        - name: limit
+          in: query
+          description: Page size.
+          schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+        - name: offset
+          in: query
+          description: Number of ToxTemps to skip.
+          schema: {type: integer, minimum: 0, default: 0}
+        - name: updated_since
+          in: query
+          description: Only ToxTemps changed after this moment (ISO 8601).
+          schema: {type: string, format: date-time}
+      responses:
+        "200":
+          description: One page of ToxTemps.
+          headers:
+            X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AssayList"}
+        "400":
+          description: A query parameter is not valid.
+          headers:
+            X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /api/preview/assays/{assay_id}/:
+    get:
+      tags: [ToxTemps]
+      operationId: getAssay
+      summary: Get one ToxTemp with its questionnaire and answers
+      parameters:
+        - {$ref: "#/components/parameters/AssayId"}
+      responses:
+        "200":
+          description: The ToxTemp.
+          headers:
+            X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AssayDetail"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /api/preview/assays/{assay_id}/pdf/:
+    get:
+      tags: [ToxTemps]
+      operationId: getAssayPdf
+      summary: Download a ToxTemp as a PDF
+      description: |
+        Built on the spot and not stored, without any person named. Limited to one
+        per token per `limits.pdf_cooldown_seconds`; a request that fails, or names
+        an unknown ToxTemp, does not use up the cool-down.
+      parameters:
+        - {$ref: "#/components/parameters/AssayId"}
+      responses:
+        "200":
+          description: The PDF.
+          headers:
+            X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+          content:
+            application/pdf:
+              schema: {type: string, format: binary}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "500":
+          description: The PDF could not be built; the message carries a reference.
+          headers:
+            X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: A workspace API token, which starts with `ttw_`.
+  headers:
+    XApiVersion:
+      description: Which API produced the response, e.g. `preview`.
+      schema: {type: string}
+  parameters:
+    AssayId:
+      name: assay_id
+      in: path
+      required: true
+      description: Id of a ToxTemp, as listed by `GET /api/preview/assays/`.
+      schema: {type: integer}
+  responses:
+    Unauthorized:
+      description: The token is missing, invalid, revoked or expired.
+      headers:
+        X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+        WWW-Authenticate:
+          description: Always `Bearer`.
+          schema: {type: string}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    NotFound:
+      description: No such ToxTemp in the investigations shared into the workspace.
+      headers:
+        X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    RateLimited:
+      description: Too many requests, or a PDF asked for within its cool-down.
+      headers:
+        X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+        Retry-After:
+          description: Seconds to wait. Present on the PDF cool-down.
+          schema: {type: integer}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+  schemas:
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: {type: string}
+    IdTitle:
+      type: object
+      additionalProperties: false
+      required: [id, title]
+      properties:
+        id: {type: integer}
+        title: {type: string}
+    Root:
+      type: object
+      additionalProperties: false
+      required: [api_version, stable, workspace, endpoints, limits]
+      properties:
+        api_version: {type: string, examples: [preview]}
+        stable:
+          type: boolean
+          description: False while this is a preview.
+        workspace:
+          type: object
+          additionalProperties: false
+          required: [id, name]
+          properties:
+            id: {type: integer}
+            name: {type: string}
+        endpoints:
+          type: object
+          additionalProperties: false
+          required: [assays, assay, assay_pdf]
+          description: Route templates; `{id}` stands for an assay id.
+          properties:
+            assays: {type: string}
+            assay: {type: string}
+            assay_pdf: {type: string}
+        limits:
+          type: object
+          additionalProperties: false
+          required: [pdf_cooldown_seconds]
+          properties:
+            pdf_cooldown_seconds: {type: integer}
+    AssayFields:
+      description: Fields shared by the list entries and the full ToxTemp.
+      type: object
+      required: [id, title, status, submission_date, last_modified, study, investigation]
+      properties:
+        id: {type: integer}
+        title: {type: string}
+        status:
+          type: string
+          description: State of the AI drafting for this ToxTemp.
+          enum: [none, scheduled, busy, done, error]
+        submission_date: {type: string, format: date-time}
+        last_modified:
+          type: string
+          format: date-time
+          description: The later of creation and the latest answer edit.
+        study: {$ref: "#/components/schemas/IdTitle"}
+        investigation: {$ref: "#/components/schemas/IdTitle"}
+    AssaySummary:
+      allOf:
+        - $ref: "#/components/schemas/AssayFields"
+      unevaluatedProperties: false
+    AssayList:
+      type: object
+      additionalProperties: false
+      required: [count, next_offset, results]
+      properties:
+        count:
+          type: integer
+          description: Total matching ToxTemps, across all pages.
+        next_offset:
+          type: [integer, "null"]
+          description: Pass as `offset` for the next page; null on the last page.
+        results:
+          type: array
+          items: {$ref: "#/components/schemas/AssaySummary"}
+    AssayDetail:
+      allOf:
+        - $ref: "#/components/schemas/AssayFields"
+        - type: object
+          required: [description, question_set, sections]
+          properties:
+            description: {type: string}
+            question_set:
+              type: [string, "null"]
+              description: Label of the questionnaire version the ToxTemp uses.
+            sections:
+              type: array
+              items: {$ref: "#/components/schemas/Section"}
+      unevaluatedProperties: false
+    Section:
+      type: object
+      additionalProperties: false
+      required: [id, title, subsections]
+      properties:
+        id: {type: integer}
+        title: {type: string}
+        subsections:
+          type: array
+          items: {$ref: "#/components/schemas/Subsection"}
+    Subsection:
+      type: object
+      additionalProperties: false
+      required: [id, title, questions]
+      properties:
+        id: {type: integer}
+        title: {type: string}
+        questions:
+          type: array
+          items: {$ref: "#/components/schemas/Question"}
+    Question:
+      type: object
+      additionalProperties: false
+      required: [id, parent_question_id, text, answer]
+      properties:
+        id: {type: integer}
+        parent_question_id:
+          type: [integer, "null"]
+          description: Set for follow-up questions.
+        text: {type: string}
+        answer: {$ref: "#/components/schemas/Answer"}
+    Answer:
+      type: object
+      additionalProperties: false
+      required: [text, accepted, llm_abstained, source_documents]
+      properties:
+        text:
+          type: string
+          description: Empty when the question has no answer yet.
+        accepted:
+          type: [boolean, "null"]
+          description: True once a scientist marked it as the final answer.
+        llm_abstained:
+          type: [boolean, "null"]
+          description: |
+            True if the AI said the information was absent from the documents when
+            it last drafted this answer; null if no run has drafted it.
+        source_documents:
+          type: array
+          description: Names of the files the answer was drafted from.
+          items: {type: string}

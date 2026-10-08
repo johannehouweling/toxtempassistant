@@ -11,13 +11,14 @@ import math
 import secrets
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from functools import wraps
+from functools import lru_cache, wraps
+from pathlib import Path
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import F, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import Coalesce, Greatest
 from django.http import HttpRequest, HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -423,3 +424,29 @@ def api_assay_pdf(
             last_pdf_at=previous
         )
     return _api_response(response)
+
+
+OPENAPI_DIR = Path(__file__).parent / "openapi"
+
+
+@lru_cache(maxsize=1)
+def _openapi_spec() -> dict:
+    """Load the contract. It is a file in the repo, not generated from the views."""
+    import yaml  # noqa: PLC0415
+
+    with (OPENAPI_DIR / f"{API_VERSION}.yaml").open(encoding="utf-8") as spec_file:
+        return yaml.safe_load(spec_file)
+
+
+@require_GET
+def api_openapi(request: HttpRequest) -> HttpResponse:
+    """Serve the OpenAPI document. Public: partners need it before they have a token."""
+    return JsonResponse(_openapi_spec())
+
+
+@require_GET
+def api_docs(request: HttpRequest) -> HttpResponse:
+    """Serve the interactive docs (Swagger UI) for the API."""
+    return render(
+        request, "toxtempass/api_docs.html", {"spec_url": reverse("api_openapi")}
+    )

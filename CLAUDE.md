@@ -215,6 +215,16 @@ Key rules to observe when working in this area:
   into the workspace). Their baseline perm on *their own* investigations is
   protected by the owner check in step 2.
 
+### Workspace API (external read access)
+
+An external server reads a workspace through `/api/preview/` (`toxtempass/api.py`). The contract is the hand-written `toxtempass/openapi/preview.yaml`, served at `/api/preview/openapi.json` with Swagger UI at `/api/preview/docs/` (CDN, pinned with integrity hashes).
+
+* **A token belongs to a workspace, not a person** (`WorkspaceApiToken`). It reads exactly the investigations shared into that workspace, so it survives its issuer leaving and dies with the workspace. Owners and admins issue and revoke it (cogwheel on the workspace card); only a SHA-256 hash is stored and the secret is shown once. Every member sees the token names as chips in the Members row.
+* **No person leaves the system through the API.** Responses are built from an explicit allowlist (never `serialize()` the models: `Assay.processing_log` and `user_alerts` are internal), and the PDF is built with `include_people=False`, which drops author names, organizations, ORCID iDs and emails. Free-text answers and file names are the users' own and are returned as written.
+* **PDFs cost a pandoc run and are not stored**, so each token may request one per `Config._api_pdf_cooldown_seconds`, claimed with one atomic `UPDATE` on `last_pdf_at`. 404s and failed builds give the cool-down back.
+* **Versioning is by path.** `preview` promises nothing. A frozen version is `openapi/v<N>.yaml` and may only grow: `.github/workflows/api-contract.yml` runs `oasdiff breaking --fail-on WARN --flatten-allof` against the base branch (a removed field is only a *warning* at the default level), and a frozen file may not be deleted. A breaking change is a new `v<N+1>`, with the old version kept and marked with a `Sunset` header. To freeze: copy `preview.yaml` to `v1.yaml`, route `api/v1/`, and have the views serve that version.
+* **The contract tests** (`tests/test_api_contract.py`) check that every route is in the spec and every real response validates against it, status, headers and no undocumented fields included. Change the spec and the code together.
+
 ### Async tasks
 
 `django-q2` runs in-process via `manage.py qcluster` (started by `django_startup.sh` unless `TESTING=true`). The cluster uses the Django ORM as its broker (`Q_CLUSTER["orm"] = "default"`). When `DEBUG` or `TESTING` is true, `Q_CLUSTER["sync"] = True` so tasks execute inline. LLM drafting (`process_llm_async`) and ROR lookups run here; emails mostly do not (see below).

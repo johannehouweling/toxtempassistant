@@ -287,6 +287,8 @@ urlpatterns += [
     # Data API. "preview" has no stability promise until the contract is agreed;
     # the frozen version will live under api/v1/ (see toxtempass/api.py).
     path("api/preview/", api.api_root, name="api_root"),
+    path("api/preview/openapi.json", api.api_openapi, name="api_openapi"),
+    path("api/preview/docs/", api.api_docs, name="api_docs"),
     path("api/preview/assays/", api.api_assay_list, name="api_assay_list"),
     path(
         "api/preview/assays/<int:assay_id>/",
