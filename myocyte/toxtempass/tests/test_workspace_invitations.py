@@ -538,6 +538,23 @@ class TestWorkspaceTab:
         assert f"{invitee.email} (invited)" in self._html(owner)
         assert f"{invitee.email} (invited)" not in self._html(member)
 
+    def test_a_pending_invitation_chip_has_a_white_question_icon(
+        self, client, owner, workspace, invitee
+    ):
+        _invite(client, owner, workspace, invitee)
+        html = self._html(owner)
+        start = html.index("invite-row")
+        chip = html[start : html.index("(invited)", start)]
+        assert "bi-patch-question-fill" in chip and "text-white" in chip
+        assert "hourglass" not in html
+        script = (
+            Path(ws_views.__file__).parent
+            / "templates/toxtempass/base_extras/workspaces/workspace_js.html"
+        ).read_text(encoding="utf-8")
+        assert "hourglass" not in script
+        added = script[script.index("invite-row") : script.index("bi-patch-question-fill")]
+        assert "text-white member-avatar" in added
+
     def test_the_invitee_sees_the_invitation_waiting(
         self, client, owner, workspace, invitee
     ):
