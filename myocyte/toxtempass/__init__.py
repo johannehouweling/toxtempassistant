@@ -468,6 +468,9 @@ class Config:
     # A PDF costs a pandoc run and is not stored, so each API token may request one
     # per this many seconds (JSON reads are cheap and not limited this way).
     _api_pdf_cooldown_seconds: Final[int] = 60
+    # A PDF build takes about 15 s. Kill pandoc well past that, so a hung build
+    # cannot hold a web worker for gunicorn's 10-minute timeout.
+    _pandoc_timeout_seconds = 90
     # A workspace invitation can be accepted for this many days.
     _workspace_invitation_days: Final[int] = 14
     _email_confirmation_required_message: Final[str] = (

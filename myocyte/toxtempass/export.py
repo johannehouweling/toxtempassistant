@@ -702,8 +702,10 @@ def export_assay_to_file(
             pandoc_command.extend(["-o", str(file_path)])
 
             try:
-                subprocess.run(pandoc_command, check=True)  # noqa: S603
-            except subprocess.CalledProcessError as e:
+                subprocess.run(  # noqa: S603
+                    pandoc_command, check=True, timeout=Config._pandoc_timeout_seconds
+                )
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
                 corr_id = uuid.uuid4().hex[:8]
                 logger.exception(
                     "Pandoc conversion failed [corr=%s] for assay %s", corr_id, assay.id

@@ -95,3 +95,28 @@ class ExportUnexpectedExceptionTests(SimpleTestCase):
             r"\[[0-9a-f]{8}\]",
             msg="processing_log should contain a correlation id like [abcd1234]",
         )
+
+
+class ExportTimeoutTests(SimpleTestCase):
+    """A hung pandoc is killed after the timeout and reported like any failure."""
+
+    def test_timeout_gives_500_and_is_logged(self):
+        assay = _mock_assay()
+        error = subprocess.TimeoutExpired(cmd="pandoc", timeout=1)
+
+        response = _run_export_with_pandoc_error(assay, error)
+
+        self.assertEqual(response.status_code, 500)
+        self.assertIn(b"Export failed", response.content)
+        self.assertIn("TimeoutExpired", assay.processing_log)
+
+    def test_pandoc_is_started_with_a_timeout(self):
+        seen = {}
+
+        def record(*args, **kwargs):
+            seen.update(kwargs)
+            raise subprocess.TimeoutExpired(cmd="pandoc", timeout=1)
+
+        _run_export_with_pandoc_error(_mock_assay(), record)
+
+        self.assertEqual(seen["timeout"], Config._pandoc_timeout_seconds)

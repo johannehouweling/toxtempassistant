@@ -1104,6 +1104,10 @@ class WorkspaceInvitation(models.Model):
     class Meta:
         unique_together = ("workspace", "user")
 
+    def __str__(self) -> str:
+        """Show who was invited to which workspace."""
+        return f"{self.user} invited to {self.workspace}"
+
     @property
     def is_expired(self) -> bool:
         """Return True once the invitation can no longer be accepted."""
@@ -1151,7 +1155,8 @@ class WorkspaceApiToken(models.Model):
         help_text="When this token last requested a PDF; drives the PDF cool-down.",
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Show the token's name and its public prefix, never the secret."""
         return f"{self.name} ({self.prefix}…)"
 
     @property
