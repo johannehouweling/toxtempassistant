@@ -744,14 +744,22 @@
         const anchor = wrap && wrap.querySelector(".btn-add-member");
         tokens.forEach((t) => {
           if (!wrap) return;
+          // Same pill as a person, with the network icon in the round avatar.
           const chip = document.createElement("span");
           chip.className =
-            "badge text-bg-warning-subtle border border-warning-subtle d-inline-flex align-items-center gap-1 api-access-chip";
+            "d-inline-flex align-items-center member-chip api-access-chip";
           chip.dataset.tokenName = t.name;
           chip.title = `API token "${t.name}": an external server can read the investigations shared in this workspace`;
+          const avatar = document.createElement("span");
+          avatar.className =
+            "d-inline-flex align-items-center justify-content-center fw-bold text-white member-avatar";
           const icon = document.createElement("i");
           icon.className = "bi bi-hdd-network-fill";
-          chip.append(icon, ` ${t.name}`);
+          avatar.appendChild(icon);
+          const label = document.createElement("span");
+          label.className = "member-text";
+          label.textContent = t.name;
+          chip.append(avatar, label);
           wrap.insertBefore(chip, anchor);
         });
       }

@@ -112,6 +112,21 @@ class TestIssuing:
         ).content.decode()
         assert secret not in body
 
+    def test_a_workspace_holds_a_limited_number_of_active_tokens(self, client, shared):
+        workspace, *_ = shared
+        with patch("toxtempass.api.config._api_tokens_max_active", 2):
+            assert _issue(client, workspace.owner, workspace).status_code == 200
+            assert _issue(client, workspace.owner, workspace).status_code == 200
+            blocked = _issue(client, workspace.owner, workspace)
+            assert blocked.status_code == 400
+            assert "revoke one first" in blocked.json()["error"]
+            # Revoking one makes room again.
+            token = workspace.api_tokens.first()
+            client.post(
+                reverse("workspace_token_revoke", args=[workspace.pk, token.pk])
+            )
+            assert _issue(client, workspace.owner, workspace).status_code == 200
+
     def test_admin_can_revoke_owners_token(self, client, shared):
         workspace, *_ = shared
         secret = _issue(client, workspace.owner, workspace).json()["token"]
@@ -250,7 +265,7 @@ class TestWorkspaceUi:
                 ws_views.get_workspace_list(request),
                 request=request,
             )
-            return html.count('class="badge text-bg-warning-subtle'), html
+            return html.count("api-access-chip\" data-token-name="), html
 
         def make(name: str) -> WorkspaceApiToken:
             return WorkspaceApiToken.objects.create(

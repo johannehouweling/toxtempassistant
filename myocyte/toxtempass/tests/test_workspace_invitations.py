@@ -1,6 +1,8 @@
 """Nobody joins a workspace by being added: they are invited and must accept."""
 
 from datetime import timedelta
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from django.core import mail
@@ -126,6 +128,47 @@ class TestInviting:
         WorkspaceInvitation.objects.update(expires_at=timezone.now() - timedelta(days=1))
         assert _invite(client, owner, workspace, invitee).status_code == 200
         assert not WorkspaceInvitation.objects.get().is_expired
+
+
+class TestInvitationLimits:
+    """An invitation is an email to someone else, so sending them is limited."""
+
+    def test_one_person_can_only_send_so_many_a_day(self, client, owner, workspace):
+        with patch.object(Config, "_workspace_invites_per_user_per_day", 2):
+            people = [PersonFactory() for _ in range(3)]
+            statuses = [
+                _invite(client, owner, workspace, person).status_code for person in people
+            ]
+        assert statuses == [200, 200, 429]
+        assert WorkspaceInvitation.objects.count() == 2
+
+    def test_the_same_person_cannot_be_invited_over_and_over(
+        self, client, owner, invitee
+    ):
+        """Declining and being invited again is not a way to keep mailing someone."""
+        statuses = []
+        for _ in range(Config._workspace_invites_per_pair_per_month + 1):
+            workspace = WorkspaceFactory(owner=owner)
+            response = _invite(client, owner, workspace, invitee)
+            statuses.append(response.status_code)
+            if response.status_code == 200:
+                _respond(client, invitee, WorkspaceInvitation.objects.get(), "decline")
+        assert statuses[:-1] == [200] * Config._workspace_invites_per_pair_per_month
+        assert statuses[-1] == 429
+        assert "several times" in response.json()["error"]
+
+    def test_the_limit_is_per_person_not_global(self, client, owner, workspace, invitee):
+        other = PersonFactory()
+        with patch.object(Config, "_workspace_invites_per_pair_per_month", 1):
+            assert _invite(client, owner, workspace, invitee).status_code == 200
+            assert _invite(client, owner, workspace, other).status_code == 200
+
+    def test_another_inviter_is_not_affected(self, client, owner, workspace, invitee):
+        stranger = PersonFactory()
+        other_ws = WorkspaceFactory(owner=stranger)
+        with patch.object(Config, "_workspace_invites_per_user_per_day", 1):
+            assert _invite(client, owner, workspace, invitee).status_code == 200
+            assert _invite(client, stranger, other_ws, PersonFactory()).status_code == 200
 
 
 class TestAnswering:
@@ -275,12 +318,44 @@ class TestInvitationEmail:
         notifications.run_email_jobs(now=_after_cooloff())
         assert "you will get an email if one is created" in mail.outbox[0].body
 
-    def test_it_cannot_be_switched_off(self, client, owner, workspace, invitee):
-        for kind in notifications.OPTIONAL_KINDS:
-            notifications.set_email_enabled(invitee, kind, False)
+    def test_it_can_be_switched_off_and_the_invitation_still_waits_in_the_app(
+        self, client, owner, workspace, invitee
+    ):
+        """Nobody can be mailed by strangers they cannot silence."""
+        notifications.set_email_enabled(
+            invitee, notifications.WORKSPACE_INVITATION, False
+        )
+        assert _invite(client, owner, workspace, invitee).status_code == 200
+        notifications.run_email_jobs(now=_after_cooloff())
+        assert mail.outbox == []
+        # Still there to answer, from the Workspaces tab.
+        invitation = WorkspaceInvitation.objects.get()
+        html = TestWorkspaceTab()._html(invitee)
+        assert "You are invited to" in html
+        assert _respond(client, invitee, invitation, "accept").status_code == 302
+        assert WorkspaceMember.objects.filter(workspace=workspace, user=invitee).exists()
+
+    def test_the_email_carries_an_unsubscribe_link_and_is_in_the_settings(
+        self, client, owner, workspace, invitee
+    ):
         _invite(client, owner, workspace, invitee)
         notifications.run_email_jobs(now=_after_cooloff())
-        assert [m.to for m in mail.outbox] == [[invitee.email]]
+        assert "List-Unsubscribe" in mail.outbox[0].extra_headers
+        kinds = {s["kind"] for s in notifications.email_settings_for(invitee)}
+        assert notifications.WORKSPACE_INVITATION in kinds
+        assert notifications.WORKSPACE_ADDED not in kinds
+
+    def test_the_unsubscribe_link_switches_it_off(self, client, invitee):
+        from toxtempass import utilities
+
+        token = utilities.generate_unsubscribe_token(
+            invitee, notifications.WORKSPACE_INVITATION
+        )
+        assert client.post(reverse("unsubscribe", args=[token])).status_code == 200
+        invitee.refresh_from_db()
+        assert not notifications.is_email_enabled(
+            invitee, notifications.WORKSPACE_INVITATION
+        )
 
     @pytest.mark.parametrize("how", ["cancel", "decline"])
     def test_an_answered_invitation_sends_no_email(
@@ -389,6 +464,44 @@ class TestWorkspaceTab:
             ws_views.get_workspace_list(request),
             request=request,
         )
+
+    def test_the_cards_have_no_credit_switch_any_more(self, client, owner, workspace):
+        html = self._html(owner)
+        assert "Liver models" in html
+        assert "credit-switch" not in html and "Credit me by name" not in html
+        member = PersonFactory()
+        WorkspaceMemberFactory(workspace=workspace, user=member)
+        html = self._html(member)
+        assert "Liver models" in html
+        assert "credit-switch" not in html and "Credit me by name" not in html
+
+    def test_token_chips_are_readable(self, client, owner, workspace):
+        """A chip needs a real background and text colour, or its text is white."""
+        member = PersonFactory()
+        WorkspaceMemberFactory(workspace=workspace, user=member)
+        WorkspaceApiToken.objects.create(
+            workspace=workspace, name="reporting", token_hash="c" * 64,
+            prefix="ttw_abcd", created_by=owner,
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+        for person in (owner, member):
+            html = self._html(person)
+            assert 'data-token-name="reporting"' in html
+            start = html.index("member-chip api-access-chip")
+            chip = html[start : html.index("</span></span>", start) + 14]
+            # Styled like a person: the same pill and round avatar, with the network icon.
+            assert "member-avatar" in chip and "bi-hdd-network-fill" in chip
+            assert '<span class="member-text">reporting</span>' in chip
+            assert "badge" not in chip
+
+    def test_the_chip_script_uses_real_bootstrap_classes(self):
+        script = (
+            Path(ws_views.__file__).parent
+            / "templates/toxtempass/base_extras/workspaces/workspace_js.html"
+        ).read_text(encoding="utf-8")
+        assert "badge" not in script.split("api-access-chip")[1][:400]
+        assert "member-chip api-access-chip" in script
+        assert 'avatar.className' in script and "bi bi-hdd-network-fill" in script
 
     def test_managers_see_who_is_pending_and_members_do_not(
         self, client, owner, workspace, invitee

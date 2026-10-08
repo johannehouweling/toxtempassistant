@@ -121,6 +121,18 @@ def create_token(request: HttpRequest, pk: int) -> JsonResponse:
             },
             status=400,
         )
+    active = sum(1 for t in workspace.api_tokens.all() if t.is_active)
+    if active >= config._api_tokens_max_active:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": (
+                    f"A workspace can have {config._api_tokens_max_active} active "
+                    "tokens; revoke one first"
+                ),
+            },
+            status=400,
+        )
     secret = TOKEN_PREFIX + secrets.token_urlsafe(32)
     with transaction.atomic():
         token = WorkspaceApiToken.objects.create(

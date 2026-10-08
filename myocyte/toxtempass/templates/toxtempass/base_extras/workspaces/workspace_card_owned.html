@@ -52,7 +52,7 @@
             <span class="text-muted small empty-members">No members yet</span>
             {% endfor %}
 
-            {% for t in ws.active_api_tokens %}<span class="badge text-bg-warning-subtle border border-warning-subtle d-inline-flex align-items-center gap-1 api-access-chip" data-token-name="{{ t.name }}" title="API token &quot;{{ t.name }}&quot;: an external server can read the investigations shared in this workspace"><i class="bi bi-hdd-network-fill"></i> {{ t.name }}</span>{% endfor %}
+            {% for t in ws.active_api_tokens %}<span class="d-inline-flex align-items-center member-chip api-access-chip" data-token-name="{{ t.name }}" title="API token &quot;{{ t.name }}&quot;: an external server can read the investigations shared in this workspace"><span class="d-inline-flex align-items-center justify-content-center fw-bold text-white member-avatar"><i class="bi bi-hdd-network-fill"></i></span><span class="member-text">{{ t.name }}</span></span>{% endfor %}
             {% for inv in ws.pending_invitations %}
             <span class="d-inline-flex align-items-center member-chip invite-row text-muted" data-invitation-id="{{ inv.pk }}" title="Invitation sent, not accepted yet">
                 <span class="d-inline-flex align-items-center justify-content-center fw-bold member-avatar"><i class="bi bi-hourglass-split"></i></span>

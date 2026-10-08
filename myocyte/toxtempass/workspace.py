@@ -305,6 +305,8 @@ def _invite(
         return None, JsonResponse(
             {"success": False, "error": "User is already a member"}, status=400
         )
+    if reason := notifications.invitation_limit(request.user, user):
+        return None, JsonResponse({"success": False, "error": reason}, status=429)
     with transaction.atomic():
         existing = WorkspaceInvitation.objects.filter(
             workspace=workspace, user=user

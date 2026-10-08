@@ -487,6 +487,13 @@ class Config:
     _api_pdf_record_hours: Final[int] = 24
     # A workspace invitation can be accepted for this many days.
     _workspace_invitation_days: Final[int] = 14
+    # Invitations are emails to someone else, so one person may send only so many,
+    # and may invite the same person only so often.
+    _workspace_invites_per_user_per_day: Final[int] = 20
+    _workspace_invites_per_pair_per_month: Final[int] = 3
+    # Tokens are announced to every member by email, so a workspace may hold only
+    # so many active ones.
+    _api_tokens_max_active: Final[int] = 10
     _email_confirmation_required_message: Final[str] = (
         "Please confirm your email address before generating drafts. Use the link "
         "in the email we sent you, or request a new one."
