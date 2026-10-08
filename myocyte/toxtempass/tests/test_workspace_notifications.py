@@ -171,13 +171,30 @@ def test_deleting_a_workspace_tells_the_other_members(client, owner, workspace, 
     )
 
 
-def test_switched_off_workspace_emails_are_not_sent(owner, workspace, member):
-    notifications.set_email_enabled(member, notifications.WORKSPACE_ADDED, False)
+def test_switched_off_removal_emails_are_not_sent(client, owner, workspace, member):
+    notifications.set_email_enabled(member, notifications.WORKSPACE_ACCESS_LOST, False)
+    WorkspaceMemberFactory(workspace=workspace, user=member, notified_at=timezone.now())
+
+    _remove(client, owner, workspace, member)
+    notifications.run_email_jobs(now=_after_cooloff())
+
+    assert mail.outbox == []
+
+
+def test_being_added_cannot_be_switched_off(owner, workspace, member):
+    """Joining is answered by an invitation, so no switch may imply it can be refused."""
+    assert not notifications.KINDS[notifications.WORKSPACE_ADDED].optional
+    assert notifications.WORKSPACE_ADDED not in notifications.OPTIONAL_KINDS
+    assert notifications.WORKSPACE_ADDED not in {
+        setting["kind"] for setting in notifications.email_settings_for(member)
+    }
+    with pytest.raises(ValueError):
+        notifications.set_email_enabled(member, notifications.WORKSPACE_ADDED, False)
 
     _admin_add(workspace, member, owner)
     notifications.run_email_jobs(now=_after_cooloff())
 
-    assert mail.outbox == []
+    assert [message.to for message in mail.outbox] == [[member.email]]
 
 
 def test_creating_a_workspace_sends_the_owner_nothing(owner):

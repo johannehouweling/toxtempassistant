@@ -14,6 +14,7 @@ from django.utils import timezone
 from toxtempass import api
 from toxtempass.models import (
     ApiPdfJob,
+    Person,
     WorkspaceApiToken,
     WorkspaceInvestigation,
     WorkspaceRole,
@@ -110,6 +111,21 @@ class TestIssuing:
             reverse("workspace_tokens", args=[workspace.pk])
         ).content.decode()
         assert secret not in body
+
+    def test_a_workspace_holds_a_limited_number_of_active_tokens(self, client, shared):
+        workspace, *_ = shared
+        with patch("toxtempass.api.config._api_tokens_max_active", 2):
+            assert _issue(client, workspace.owner, workspace).status_code == 200
+            assert _issue(client, workspace.owner, workspace).status_code == 200
+            blocked = _issue(client, workspace.owner, workspace)
+            assert blocked.status_code == 400
+            assert "revoke one first" in blocked.json()["error"]
+            # Revoking one makes room again.
+            token = workspace.api_tokens.first()
+            client.post(
+                reverse("workspace_token_revoke", args=[workspace.pk, token.pk])
+            )
+            assert _issue(client, workspace.owner, workspace).status_code == 200
 
     def test_admin_can_revoke_owners_token(self, client, shared):
         workspace, *_ = shared
@@ -249,7 +265,7 @@ class TestWorkspaceUi:
                 ws_views.get_workspace_list(request),
                 request=request,
             )
-            return html.count('class="badge text-bg-warning-subtle'), html
+            return html.count("api-access-chip\" data-token-name="), html
 
         def make(name: str) -> WorkspaceApiToken:
             return WorkspaceApiToken.objects.create(
@@ -728,10 +744,9 @@ class TestAuthorsInTheApi:
         WorkspaceInvestigation.objects.create(
             workspace=workspace, investigation=assay.study.investigation
         )
-        WorkspaceMemberFactory(
-            workspace=workspace,
-            user=assay.created_by,
-            credit_consent_at=timezone.now() if credited else None,
+        WorkspaceMemberFactory(workspace=workspace, user=assay.created_by)
+        Person.objects.filter(pk=assay.created_by_id).update(
+            credit_by_name=True if credited else None
         )
         return workspace
 
@@ -782,11 +797,8 @@ class TestAuthorsInTheApi:
             assert secret not in raw
 
     def test_an_author_outside_the_workspace_is_not_named(self, client, assay):
-        # Agreed in some other workspace, but not a member of this one.
-        other = WorkspaceFactory()
-        WorkspaceMemberFactory(
-            workspace=other, user=assay.created_by, credit_consent_at=timezone.now()
-        )
+        # Agreed to be credited, but is not a member of this workspace.
+        Person.objects.filter(pk=assay.created_by_id).update(credit_by_name=True)
         workspace = WorkspaceFactory()
         WorkspaceInvestigation.objects.create(
             workspace=workspace, investigation=assay.study.investigation
@@ -798,9 +810,7 @@ class TestAuthorsInTheApi:
         workspace = self._workspace(assay, credited=True)
         assert self._authors(client, workspace, assay)[0]["credited"]
         client.force_login(assay.created_by)
-        client.post(
-            reverse("set_workspace_credit", args=[workspace.pk]), {"credit": "off"}
-        )
+        client.post(reverse("account_set_credit"), {"credit": "off"})
         client.logout()
         assert not self._authors(client, workspace, assay)[0]["credited"]
 
@@ -834,9 +844,10 @@ class TestAuthorsInTheApi:
             workspace=workspace, investigation=assay.study.investigation
         )
         for person in (owner, creator, editor):
-            WorkspaceMemberFactory(
-                workspace=workspace, user=person, credit_consent_at=timezone.now()
-            )
+            WorkspaceMemberFactory(workspace=workspace, user=person)
+        Person.objects.filter(pk__in=[owner.pk, creator.pk, editor.pk]).update(
+            credit_by_name=True
+        )
         names = [
             a["name"] for a in self._authors(client, workspace, assay)
         ]

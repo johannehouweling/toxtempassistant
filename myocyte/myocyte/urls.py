@@ -136,6 +136,7 @@ urlpatterns += [
     ),
     path("account/password/", account.change_password, name="account_change_password"),
     path("account/orcid/unlink/", account.unlink_orcid, name="account_unlink_orcid"),
+    path("account/credit/", account.set_credit_by_name, name="account_set_credit"),
     path("account/shared-files/", account.shared_files, name="account_shared_files"),
     path(
         "account/shared-files/stop/", account.stop_sharing, name="account_stop_sharing"
@@ -287,11 +288,6 @@ urlpatterns += [
         "workspace/invitation/<int:pk>/respond/",
         views.respond_workspace_invitation,
         name="respond_workspace_invitation",
-    ),
-    path(
-        "workspace/<int:pk>/credit/",
-        views.set_workspace_credit,
-        name="set_workspace_credit",
     ),
     path("workspace/<int:pk>/tokens/", api.list_tokens, name="workspace_tokens"),
     path(

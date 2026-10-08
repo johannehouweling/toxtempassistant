@@ -64,10 +64,10 @@ def test_dedup_key_sends_an_email_only_once(django_capture_on_commit_callbacks):
 
 def test_switched_off_email_is_recorded_as_skipped():
     user = PersonFactory()
-    notifications.set_email_enabled(user, notifications.WORKSPACE_ADDED, False)
+    notifications.set_email_enabled(user, notifications.WORKSPACE_ACCESS_LOST, False)
 
     log = notifications.queue_email(
-        notifications.WORKSPACE_ADDED,
+        notifications.WORKSPACE_ACCESS_LOST,
         user=user,
         payload={"workspace_id": 1},
         send_after=timezone.now(),
@@ -137,9 +137,14 @@ def test_optional_email_carries_an_unsubscribe_link():
     workspace = WorkspaceFactory(name="Liver models")
     member = WorkspaceMemberFactory(workspace=workspace)
     notifications.queue_email(
-        notifications.WORKSPACE_ADDED,
+        notifications.WORKSPACE_ACCESS_LOST,
         user=member.user,
-        payload={"workspace_id": workspace.pk},
+        payload={
+            "workspace_id": workspace.pk + 1000,  # not a member of it any more
+            "workspace_name": workspace.name,
+            "reason": "removed",
+            "actor_name": "Someone",
+        },
         send_after=timezone.now(),
     )
 
@@ -161,16 +166,18 @@ def test_account_email_has_no_unsubscribe_link(django_capture_on_commit_callback
 
 def test_unsubscribe_link_asks_first_and_then_switches_the_email_off(client):
     user = PersonFactory()
-    token = utilities.generate_unsubscribe_token(user, notifications.WORKSPACE_ADDED)
+    token = utilities.generate_unsubscribe_token(
+        user, notifications.WORKSPACE_ACCESS_LOST
+    )
     url = reverse("unsubscribe", args=[token])
 
     assert client.get(url).status_code == 200
     user.refresh_from_db()
-    assert notifications.is_email_enabled(user, notifications.WORKSPACE_ADDED)
+    assert notifications.is_email_enabled(user, notifications.WORKSPACE_ACCESS_LOST)
 
     assert client.post(url).status_code == 200
     user.refresh_from_db()
-    assert not notifications.is_email_enabled(user, notifications.WORKSPACE_ADDED)
+    assert not notifications.is_email_enabled(user, notifications.WORKSPACE_ACCESS_LOST)
 
 
 def test_unsubscribe_rejects_forged_tokens_and_account_emails(client):

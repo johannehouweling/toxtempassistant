@@ -121,6 +121,18 @@ def create_token(request: HttpRequest, pk: int) -> JsonResponse:
             },
             status=400,
         )
+    active = sum(1 for t in workspace.api_tokens.all() if t.is_active)
+    if active >= config._api_tokens_max_active:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": (
+                    f"A workspace can have {config._api_tokens_max_active} active "
+                    "tokens; revoke one first"
+                ),
+            },
+            status=400,
+        )
     secret = TOKEN_PREFIX + secrets.token_urlsafe(32)
     with transaction.atomic():
         token = WorkspaceApiToken.objects.create(
@@ -247,12 +259,13 @@ def _assay_summary(assay: Assay) -> dict:
 def _credited_ids(workspace: Workspace) -> frozenset[int]:
     """Return who may be named: members of the workspace who agreed to be credited.
 
+    The agreement is the person's own (Privacy tab) and covers every workspace.
     Leaving the workspace, or withdrawing the agreement, takes effect on the very
     next request, because nothing is remembered about who was named before.
     """
     return frozenset(
         WorkspaceMember.objects.filter(
-            workspace=workspace, credit_consent_at__isnull=False
+            workspace=workspace, user__credit_by_name=True
         ).values_list("user_id", flat=True)
     )
 

@@ -293,6 +293,38 @@
         {% endif %}
 
         <div class="tab-pane fade" id="userMenuPrivacy" role="tabpanel" aria-labelledby="userMenuPrivacyTab" tabindex="0">
+            <div class="mb-4">
+                <h5 class="mb-1">Authorship</h5>
+                <p class="mb-2 text-muted">When an owner or admin gives an outside server API access to a workspace you belong to, that server can read the ToxTemps you created or edited there.</p>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="credit-by-name"{% if credit_by_name %} checked{% endif %}>
+                    <label class="form-check-label" for="credit-by-name">Credit me by name (name, organization, ORCID iD)</label>
+                </div>
+                <p class="mb-0 mt-1 text-muted small">Applies to all your workspaces and takes effect at once. Never your email address. Without it you appear as "Contributor (not named)". Accepting a workspace invitation turns this on unless you have switched it off.</p>
+                <div id="credit-by-name-alert" class="alert alert-danger mt-2 py-2 px-3 small" role="alert" hidden></div>
+            </div>
+            <script>
+            (function () {
+              const toggle = document.getElementById('credit-by-name');
+              const alertBox = document.getElementById('credit-by-name-alert');
+              toggle.addEventListener('change', async function () {
+                alertBox.hidden = true;
+                const fd = new FormData();
+                fd.append('credit', toggle.checked ? 'on' : 'off');
+                fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+                try {
+                  const r = await fetch('{% url "account_set_credit" %}', { method: 'POST', body: fd });
+                  const data = await r.json();
+                  if (!data.success) throw new Error();
+                } catch (e) {
+                  toggle.checked = !toggle.checked;
+                  alertBox.textContent = 'Could not save the setting. Please try again.';
+                  alertBox.hidden = false;
+                }
+              });
+            })();
+            </script>
+
             {% if email_settings %}
             <div class="mb-4">
                 <h5 class="mb-1">Email notifications</h5>

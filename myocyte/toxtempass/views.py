@@ -3112,7 +3112,6 @@ from toxtempass.workspace import (  # noqa: E402, F401
     remove_workspace_member,
     remove_workspace_member_by_email,
     respond_workspace_invitation,
-    set_workspace_credit,
     workspace_invitation,
 )
 

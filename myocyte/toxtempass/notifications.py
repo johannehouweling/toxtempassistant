@@ -105,12 +105,14 @@ KINDS: dict[str, EmailKind] = {
         ),
         EmailKind(EMAIL_CHANGE_REQUESTED, "toxtempass/email/email_change_requested"),
         EmailKind(ACCOUNT_DELETED, "toxtempass/email/account_deleted", to_payload="to"),
+        # Not optional: joining a workspace is answered by an invitation (below), so
+        # the only member who is added without one is someone an admin adds directly,
+        # who now has access to other people's work and should be told. A switch for
+        # it would suggest that joining can be turned off.
         EmailKind(
             WORKSPACE_ADDED,
             "toxtempass/email/workspace_added",
-            optional=True,
             grouped=True,
-            label="Someone adds me to a workspace",
         ),
         EmailKind(
             WORKSPACE_ACCESS_LOST,
@@ -119,9 +121,16 @@ KINDS: dict[str, EmailKind] = {
             grouped=True,
             label="I am removed from a workspace, or it is deleted",
         ),
-        # Not optional: an invitation only takes effect when it is answered, and the
-        # answer is the person's agreement to what the email explains.
-        EmailKind(WORKSPACE_INVITATION, "toxtempass/email/workspace_invitation"),
+        # Anyone with a workspace can invite any user, so the invited person can
+        # switch the email off (the invitation still waits on the Workspaces tab,
+        # where it is answered). The agreement to what the email explains is given
+        # by accepting, and the page where that happens shows the same text.
+        EmailKind(
+            WORKSPACE_INVITATION,
+            "toxtempass/email/workspace_invitation",
+            optional=True,
+            label="Someone invites me to a workspace",
+        ),
         # Not optional, unlike the other workspace emails: it tells members that an
         # outside server can now read the workspace, and that they are credited by
         # name in it, which they must not be able to miss by switching a setting off.
@@ -677,7 +686,7 @@ def _build_api_token_created(logs: list[EmailLog]) -> _Built | str:
             "created_by": _display_name(token.created_by),
             "expires_on": token.expires_at.date(),
             "investigations": [_one_line(title) for title in investigations],
-            "credited": membership.credit_consent_at is not None,
+            "credited": user.credit_by_name is True,
             "overview_url": utilities.absolute_url(reverse("overview")),
         },
     )
@@ -881,6 +890,35 @@ def notify_member_added(member: WorkspaceMember, added_by: Person | None) -> Non
     )
 
 
+def invitation_limit(inviter: Person, invitee: Person) -> str:
+    """Return why ``inviter`` may not invite ``invitee`` now, or an empty string.
+
+    Every invitation is an email to someone else, so both the total a person can
+    send and how often they can invite the same person are limited. Withdrawn,
+    declined and unanswered invitations count: the emails went out. Invitations the
+    person accepted do not count towards the limit for that person, so inviting a
+    colleague to several workspaces is fine as long as they say yes.
+    """
+    now = timezone.now()
+    sent = EmailLog.objects.filter(
+        kind=WORKSPACE_INVITATION, payload__invited_by_id=inviter.pk
+    )
+    if (
+        sent.filter(created_at__gte=now - timedelta(days=1)).count()
+        >= config._workspace_invites_per_user_per_day
+    ):
+        return "You have sent a lot of invitations today; try again tomorrow"
+    joined = WorkspaceMember.objects.filter(user=invitee).values_list(
+        "workspace_id", flat=True
+    )
+    unanswered_or_declined = sent.filter(
+        user=invitee, created_at__gte=now - timedelta(days=30)
+    ).exclude(payload__workspace_id__in=list(joined))
+    if unanswered_or_declined.count() >= config._workspace_invites_per_pair_per_month:
+        return "You have invited this person several times recently"
+    return ""
+
+
 def notify_invited(invitation: WorkspaceInvitation) -> None:
     """Queue the invitation email, to go out after the cool-off.
 
@@ -889,7 +927,11 @@ def notify_invited(invitation: WorkspaceInvitation) -> None:
     queue_email(
         WORKSPACE_INVITATION,
         user=invitation.user,
-        payload={"invitation_id": invitation.pk},
+        payload={
+            "invitation_id": invitation.pk,
+            "invited_by_id": invitation.invited_by_id,
+            "workspace_id": invitation.workspace_id,
+        },
         dedup_key=f"workspace-invitation:{invitation.pk}",
         send_after=timezone.now() + timedelta(minutes=config._email_cooloff_minutes),
     )

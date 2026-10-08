@@ -22,7 +22,12 @@ from openapi_spec_validator import validate as validate_openapi
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
-from toxtempass.models import ApiPdfJob, WorkspaceApiToken, WorkspaceInvestigation
+from toxtempass.models import (
+    ApiPdfJob,
+    Person,
+    WorkspaceApiToken,
+    WorkspaceInvestigation,
+)
 from toxtempass.tests.fixtures.factories import (
     AnswerFactory,
     AssayFactory,
@@ -132,9 +137,7 @@ def populated(client):
         workspace=workspace, investigation=investigation
     )
     # The investigation owner is the last author; once they agree they are named.
-    workspace.memberships.filter(user=workspace.owner).update(
-        credit_consent_at=timezone.now()
-    )
+    Person.objects.filter(pk=workspace.owner_id).update(credit_by_name=True)
     client.force_login(workspace.owner)
     secret = client.post(
         reverse("workspace_token_create", args=[workspace.pk]), {"name": "contract"}

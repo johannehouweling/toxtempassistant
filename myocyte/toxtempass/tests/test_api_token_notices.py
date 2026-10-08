@@ -13,6 +13,7 @@ from toxtempass import Config, notifications
 from toxtempass import workspace as ws_views
 from toxtempass.models import (
     EmailLog,
+    Person,
     WorkspaceApiToken,
     WorkspaceInvestigation,
     WorkspaceMember,
@@ -104,15 +105,13 @@ def test_members_without_investigations_are_told_too(client, setup):
 
 
 def test_credit_wording_depends_on_whether_they_agreed(client, setup):
-    WorkspaceMember.objects.filter(user=setup["alice"]).update(
-        credit_consent_at=timezone.now()
-    )
-    WorkspaceMember.objects.filter(user=setup["bob"]).update(credit_consent_at=None)
+    Person.objects.filter(pk=setup["alice"].pk).update(credit_by_name=True)
+    Person.objects.filter(pk=setup["bob"].pk).update(credit_by_name=None)
     _issue(client, setup["admin"], setup["workspace"])
     _after_cooloff()
     alice = next(m for m in mail.outbox if m.to == [setup["alice"].email]).body
     bob = next(m for m in mail.outbox if m.to == [setup["bob"].email]).body
-    assert "You agreed to be credited by name when you joined" in alice
+    assert "You are credited by name" in alice
     assert "Contributor (not named)" not in alice
     assert "Contributor (not named)" in bob
     assert 'switch on "Credit me by name"' in bob
@@ -149,7 +148,9 @@ def test_it_cannot_be_switched_off(client, setup):
         notifications.set_email_enabled(alice, kind, False)
     alice.refresh_from_db()
     # Control: the opt-out really took effect for the optional kinds...
-    assert not notifications.is_email_enabled(alice, notifications.WORKSPACE_ADDED)
+    assert not notifications.is_email_enabled(
+        alice, notifications.WORKSPACE_ACCESS_LOST
+    )
     # ...but this kind is required, and cannot even be switched off.
     assert notifications.is_email_enabled(alice, notifications.API_TOKEN_CREATED)
     with pytest.raises(ValueError):
