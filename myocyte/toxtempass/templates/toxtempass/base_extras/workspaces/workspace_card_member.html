@@ -52,7 +52,7 @@
           <span class="text-muted small empty-members">No members yet</span>
         {% endfor %}
 
-        <span class="badge text-bg-warning-subtle border border-warning-subtle d-inline-flex align-items-center gap-1 api-access-chip{% if not ws.active_api_token_count %} d-none{% endif %}" title="{{ ws.active_api_token_count }} active API token{{ ws.active_api_token_count|pluralize }}: external servers can read the investigations shared in this workspace"><i class="bi bi-plug"></i> API access</span>
+        {% for t in ws.active_api_tokens %}<span class="badge text-bg-warning-subtle border border-warning-subtle d-inline-flex align-items-center gap-1 api-access-chip" title="API token &quot;{{ t.name }}&quot;: an external server can read the investigations shared in this workspace"><i class="bi bi-plug"></i> {{ t.name }}</span>{% endfor %}
         {% if ws.current_user_role == 'owner' or ws.current_user_role == 'admin' %}
           <button type="button" class="btn btn-sm btn-outline-primary btn-add-member round-add-btn" title="Add member" aria-label="Add member"><i class="bi bi-person-plus"></i></button>
         {% endif %}

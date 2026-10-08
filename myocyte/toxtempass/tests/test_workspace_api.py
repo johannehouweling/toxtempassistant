@@ -219,7 +219,7 @@ class TestWorkspaceUi:
             )
         assert seen == {"owner": True, "admin": True, "member": False}
 
-    def test_every_member_sees_when_api_access_is_on(self):
+    def test_every_member_sees_each_token_by_name(self):
         from django.template.loader import render_to_string
         from django.test import RequestFactory
 
@@ -229,7 +229,7 @@ class TestWorkspaceUi:
         member = PersonFactory()
         WorkspaceMemberFactory(workspace=workspace, user=member)
 
-        def chip_visible(user) -> bool:
+        def chips(user) -> int:
             request = RequestFactory().get("/")
             request.user = user
             html = render_to_string(
@@ -237,19 +237,24 @@ class TestWorkspaceUi:
                 ws_views.get_workspace_list(request),
                 request=request,
             )
-            tag = html.split("api-access-chip", 1)[1].split(">", 1)[0]
-            return "d-none" not in tag
+            return html.count('class="badge text-bg-warning-subtle'), html
 
-        assert not chip_visible(member)
-        token = WorkspaceApiToken.objects.create(
-            workspace=workspace,
-            name="x",
-            token_hash="h",
-            prefix="ttw_x",
-            expires_at=timezone.now() + timedelta(days=1),
-        )
-        assert chip_visible(member)
-        assert chip_visible(workspace.owner)
-        token.revoked_at = timezone.now()
-        token.save()
-        assert not chip_visible(member)
+        def make(name: str) -> WorkspaceApiToken:
+            return WorkspaceApiToken.objects.create(
+                workspace=workspace,
+                name=name,
+                token_hash=name,
+                prefix="ttw_x",
+                expires_at=timezone.now() + timedelta(days=1),
+            )
+
+        assert chips(member)[0] == 0
+        first, _ = make("reporting server"), make("dashboard")
+        count, html = chips(member)
+        assert count == 2
+        assert "reporting server" in html and "dashboard" in html
+        assert "ttw_x" not in html  # prefixes are for managers only
+        assert chips(workspace.owner)[0] == 2
+        first.revoked_at = timezone.now()
+        first.save()
+        assert chips(member)[0] == 1

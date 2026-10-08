@@ -11,7 +11,6 @@ import logging
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Count
 from django.http import HttpRequest, HttpResponseRedirect
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
@@ -67,19 +66,16 @@ def get_workspace_list(request: HttpRequest) -> dict:
         setattr(ws, "current_user_role", m.role)
         member_workspaces.append(ws)
 
-    # Every member sees whether external servers can read the workspace.
-    token_counts = dict(
-        WorkspaceApiToken.objects.filter(
-            workspace__in=owned_workspaces + member_workspaces,
-            revoked_at__isnull=True,
-            expires_at__gt=timezone.now(),
-        )
-        .values("workspace_id")
-        .annotate(n=Count("pk"))
-        .values_list("workspace_id", "n")
-    )
+    # Every member sees which external servers can read the workspace, by token name.
+    tokens_by_workspace: dict[int, list[WorkspaceApiToken]] = {}
+    for token in WorkspaceApiToken.objects.filter(
+        workspace__in=owned_workspaces + member_workspaces,
+        revoked_at__isnull=True,
+        expires_at__gt=timezone.now(),
+    ).order_by("created_at"):
+        tokens_by_workspace.setdefault(token.workspace_id, []).append(token)
     for ws in owned_workspaces + member_workspaces:
-        setattr(ws, "active_api_token_count", token_counts.get(ws.pk, 0))
+        setattr(ws, "active_api_tokens", tokens_by_workspace.get(ws.pk, []))
 
     # Only show investigations owned by the current user in the Add modal to avoid allowing
     # users to share investigations they do not own via the UI. Server-side check will also enforce ownership.
