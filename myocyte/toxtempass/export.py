@@ -33,6 +33,15 @@ PANDOC_EXPORT_TYPES = Config.PANDOC_EXPORT_TYPES
 MATH_BLOCK_START = re.compile(r"^\s*(\$\$|\\\[)")
 MATH_BLOCK_END = re.compile(r"(\$\$|\\\])\s*$")
 
+# LaTeX breaks a line after a hyphen but not after an underscore, so the long file
+# names the model cites as sources ("_(Source: my_protocol_v2.pdf)_") ran past the
+# margin. Allow a break after every underscore, and let paragraphs stretch a little
+# rather than overflow.
+LATEX_BREAK_LONG_NAMES = (
+    r"\let\svunderscore\_ \renewcommand{\_}{\svunderscore\allowbreak{}}",
+    r"\emergencystretch=3em",
+)
+
 ExportAuthor = dict[str, str | None]
 ExportInvestigationOwner = dict[str, str | None]
 ExportAuthorMetadata = dict[
@@ -607,6 +616,7 @@ def get_create_meta_data_yaml(
             r"\usepackage{amsmath}",
             font_block,
             r"\usepackage[a4paper, margin=3cm]{geometry}",
+            *LATEX_BREAK_LONG_NAMES,
         ]
     else:
         header_includes = [
@@ -616,6 +626,7 @@ def get_create_meta_data_yaml(
             r"\setmainfont{TeX Gyre Termes}",
             r"\setmathfont{TeX Gyre Termes Math}",
             r"\usepackage[a4paper, margin=3cm]{geometry}",
+            *LATEX_BREAK_LONG_NAMES,
         ]
 
     author_metadata = get_assay_export_author_metadata(assay, credited_ids)

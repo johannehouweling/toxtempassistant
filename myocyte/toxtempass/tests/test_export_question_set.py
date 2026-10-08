@@ -159,3 +159,26 @@ class ExportDocumentShapeTests(TestCase):
         # The in-app export names the owner; a recipient outside the app gets none.
         assert in_app["metadata"]["investigation_owner"] is not None
         assert outside["metadata"]["investigation_owner"] is None
+
+
+class ExportLongSourceNameTests(TestCase):
+    """Long file names cited as sources must be able to wrap in the PDF."""
+
+    def test_pdf_and_tex_headers_allow_breaks_after_underscores(self):
+        import tempfile
+        from pathlib import Path
+
+        import yaml
+        from django.test import RequestFactory
+
+        from toxtempass.export import LATEX_BREAK_LONG_NAMES, get_create_meta_data_yaml
+
+        assay = AssayFactory()
+        with tempfile.TemporaryDirectory() as tmp:
+            for export_type in ("pdf", "tex"):
+                path = get_create_meta_data_yaml(
+                    RequestFactory().get("/"), assay, Path(tmp) / "x.pdf", export_type
+                )
+                header = yaml.safe_load(path.read_text())["header-includes"]
+                for line in LATEX_BREAK_LONG_NAMES:
+                    assert line in header
