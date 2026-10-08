@@ -135,11 +135,8 @@ def revoke_shared_investigations_from_member(workspace: Workspace, user: Person)
 def accept_invitation(invitation: WorkspaceInvitation) -> WorkspaceMember:
     """Turn an invitation into a membership, with the access that comes with it.
 
-    Accepting is the person's agreement to be credited by name, so a person who has
-    not decided yet (``credit_by_name`` is empty) is now credited. An explicit
-    "no" is left alone: they can change it in the Privacy tab. The invitation is
-    used up. Call it inside a transaction that has locked the invitation row, so a
-    double click cannot add the member twice.
+    The invitation is used up. Call it inside a transaction that has locked the
+    invitation row, so a double click cannot add the member twice.
     """
     now = timezone.now()
     with transaction.atomic():
@@ -150,9 +147,6 @@ def accept_invitation(invitation: WorkspaceInvitation) -> WorkspaceMember:
             added_by=invitation.invited_by,
             # They answered the invitation themselves: nothing more to tell them.
             notified_at=now,
-        )
-        Person.objects.filter(pk=invitation.user_id, credit_by_name__isnull=True).update(
-            credit_by_name=True
         )
         grant_shared_investigations_to_member(invitation.workspace, invitation.user)
         invitation.delete()

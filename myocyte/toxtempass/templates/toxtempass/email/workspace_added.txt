@@ -4,6 +4,8 @@
 {% for workspace in workspaces %}
 - {{ workspace.name }}, as {{ workspace.role|lower }}{% if workspace.added_by %}, added by {{ workspace.added_by }}{% endif %}{% endfor %}
 
-Members of a workspace can view and work on the investigations shared into it. You find your workspaces in the user menu of ToxTempAssistant:
+Members of a workspace can view and work on the investigations shared into it. If an owner or admin of a workspace gives an outside server API access, you are credited by name (name, organization and ORCID iD, never your email address) as an author of the ToxTemps you created or edited there. This is on by default; switch off "Credit me by name" under Privacy in the user menu to appear as "Contributor (not named)" instead.
+
+You find your workspaces in the user menu of ToxTempAssistant:
 {{ overview_url }}
 {% endblock %}

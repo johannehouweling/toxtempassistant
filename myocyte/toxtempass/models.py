@@ -165,16 +165,13 @@ class Person(AbstractUser):
     )
 
     credit_by_name = models.BooleanField(
-        null=True,
-        blank=True,
-        default=None,
+        default=True,
         help_text=(
             "Whether the person may be named (name, organization and ORCID iD, "
-            "never email) as an author in what a workspace API token reads. "
-            "Applies to every workspace. Empty means they have not decided: they "
-            "appear as 'Contributor (not named)', and accepting a workspace "
-            "invitation turns it on. False is an explicit choice, which accepting "
-            "an invitation never overrides."
+            "never email) as an author in what a workspace API token reads. On "
+            "unless the person switches it off, in the Privacy tab, and then it "
+            "applies to every workspace. Off means they appear as 'Contributor "
+            "(not named)'."
         ),
     )
 

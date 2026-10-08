@@ -257,7 +257,7 @@ def _assay_summary(assay: Assay) -> dict:
 
 
 def _credited_ids(workspace: Workspace) -> frozenset[int]:
-    """Return who may be named: members of the workspace who agreed to be credited.
+    """Return who may be named: members of the workspace who have not opted out.
 
     The agreement is the person's own (Privacy tab) and covers every workspace.
     Leaving the workspace, or withdrawing the agreement, takes effect on the very
@@ -523,7 +523,7 @@ def build_pdf_job(job_id: str) -> None:
     if job is None:
         return
     try:
-        # Only members who agreed to be credited are named, and never by email.
+        # Only members who have not opted out are named, and never by email.
         response = export_assay_to_file(
             None, job.assay, "pdf", credited_ids=_credited_ids(job.workspace)
         )

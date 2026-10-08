@@ -213,11 +213,11 @@ class TestAnswering:
         assert member.role == WorkspaceRole.ADMIN and member.added_by == owner
         assert member.notified_at is not None
         invitee.refresh_from_db()
-        assert invitee.credit_by_name is True
+        assert invitee.credit_by_name is True  # on by default; accepting changes nothing
         assert "view_investigation" in get_perms(invitee, investigation)
         assert not WorkspaceInvitation.objects.exists()
 
-    def test_accepting_does_not_override_an_explicit_no(
+    def test_accepting_does_not_override_an_opt_out(
         self, client, owner, workspace, invitee
     ):
         Person.objects.filter(pk=invitee.pk).update(credit_by_name=False)
@@ -452,9 +452,7 @@ class TestCredit:
         other = WorkspaceFactory()
         for ws in (workspace, other):
             WorkspaceMemberFactory(workspace=ws, user=person)
-        assert person.pk not in api._credited_ids(workspace)
-
-        Person.objects.filter(pk=person.pk).update(credit_by_name=True)
+        # On by default, in every workspace they belong to.
         assert person.pk in api._credited_ids(workspace)
         assert person.pk in api._credited_ids(other)
 
@@ -470,12 +468,13 @@ class TestCredit:
         assert 'id="credit-by-name"' in page
         assert "credit-switch" not in page
 
-    def test_the_privacy_tab_shows_the_current_choice(self, client):
+    def test_it_is_on_by_default_and_the_privacy_tab_says_so(self, client):
         person = PersonFactory()
-        Person.objects.filter(pk=person.pk).update(credit_by_name=True)
+        assert person.credit_by_name is True
         client.force_login(person)
         on = client.get(reverse("overview")).content.decode()
         assert 'id="credit-by-name" checked' in on
+        assert "On by default" in on
         Person.objects.filter(pk=person.pk).update(credit_by_name=False)
         off = client.get(reverse("overview")).content.decode()
         assert 'id="credit-by-name" checked' not in off
@@ -520,6 +519,51 @@ class TestWorkspaceTab:
             / "templates/toxtempass/base_extras/workspaces/workspace_js.html"
         ).read_text(encoding="utf-8")
         assert 'parent.classList.contains("col") ? parent : workspaceEl' in script
+
+    def _script(self, user) -> str:
+        import re
+
+        html = self._html(user)
+        return max(re.findall(r"<script[^>]*>(.*?)</script>", html, flags=re.S), key=len)
+
+    def test_a_card_built_in_the_browser_matches_the_one_the_server_renders(
+        self, client, owner
+    ):
+        """A new workspace showed no key and no cogwheel until the page was reloaded."""
+        script = self._script(owner)
+        # Django tags run once when the page loads, so none may be left in the script.
+        assert "{%" not in script and "{{" not in script
+        assert f'const CURRENT_USER_ID = "{owner.pk}"' in script
+        chip = script[script.index("const OWNER_CHIP_HTML") :]
+        chip = chip[: chip.index("function settingsButtonHtml")]
+        assert "bi-key-fill" in chip and "bg-success-subtle" in chip
+        assert "member-row member-chip" in chip and ">You<" in chip
+        # Both cards the script builds get the owner chip and the settings cogwheel.
+        assert script.count("${OWNER_CHIP_HTML}") == 2
+        assert "${settingsButtonHtml(true)}" in script  # hidden until it exists
+        assert "${settingsButtonHtml(false)}" in script
+        assert "btn-api-tokens" in script and "Workspace settings" in script
+        inserted = script.split("function insertWorkspaceIntoDOM")[1][:2500]
+        assert "No members yet" not in inserted
+
+    def test_the_cogwheel_of_a_new_workspace_appears_once_it_exists(self, owner):
+        script = self._script(owner)
+        created = script[script.index("function onBlurSave") :][:1800]
+        assert '.btn-api-tokens")?.classList.remove("d-none")' in created
+
+    def test_the_rendered_script_is_valid_javascript(self, owner, tmp_path):
+        import shutil
+        import subprocess
+
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("node is not installed")
+        path = tmp_path / "workspaces.js"
+        path.write_text(self._script(owner), encoding="utf-8")
+        result = subprocess.run(
+            [node, "--check", str(path)], capture_output=True, text=True
+        )
+        assert result.returncode == 0, result.stderr
 
     def test_token_chips_are_readable(self, client, owner, workspace):
         """A chip needs a real background and text colour, or its text is white."""
@@ -572,8 +616,23 @@ class TestWorkspaceTab:
             / "templates/toxtempass/base_extras/workspaces/workspace_js.html"
         ).read_text(encoding="utf-8")
         assert "hourglass" not in script
-        added = script[script.index("invite-row") : script.index("bi-patch-question-fill")]
+        start = script.index("invite-row")
+        added = script[start : script.index("bi-patch-question-fill")]
         assert "text-white member-avatar" in added
+
+    def test_the_invitation_page_and_email_say_credit_is_on_by_default(
+        self, client, owner, workspace, invitee
+    ):
+        _invite(client, owner, workspace, invitee)
+        notifications.run_email_jobs(now=_after_cooloff())
+        invitation = WorkspaceInvitation.objects.get()
+        client.force_login(invitee)
+        page = client.get(reverse("workspace_invitation", args=[invitation.pk])).content
+        for text in (mail.outbox[0].body, page.decode()):
+            flat = " ".join(text.split())
+            assert "Unless you switch it off, you are credited by name" in flat
+            assert "under Privacy in the user menu" in flat
+            assert "agree to be credited" not in flat
 
     def test_the_invitee_sees_the_invitation_waiting(
         self, client, owner, workspace, invitee
