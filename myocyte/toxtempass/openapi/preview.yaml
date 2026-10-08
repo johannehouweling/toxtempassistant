@@ -271,7 +271,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/AssayFields"
         - type: object
-          required: [description, question_set, authors, sections]
+          required: [description, question_set, authors, provenance, sections]
           properties:
             description: {type: string}
             authors:
@@ -284,10 +284,37 @@ components:
             question_set:
               type: [string, "null"]
               description: Label of the questionnaire version the ToxTemp uses.
+            provenance: {$ref: "#/components/schemas/Provenance"}
             sections:
               type: array
               items: {$ref: "#/components/schemas/Section"}
       unevaluatedProperties: false
+    Provenance:
+      type: object
+      additionalProperties: false
+      required: [models_used, app_version, reference_toxtemp, reference_toxtempassistant]
+      properties:
+        models_used:
+          type: array
+          description: |
+            The language models that drafted answers, oldest first. Empty when none
+            was recorded.
+          items:
+            type: object
+            additionalProperties: false
+            required: [model_id, temperature]
+            properties:
+              model_id: {type: [string, "null"]}
+              temperature:
+                type: [string, "null"]
+                description: Null for runs that predate temperature tracking.
+        app_version: {type: [string, "null"]}
+        reference_toxtemp:
+          type: [string, "null"]
+          description: DOI of the ToxTemp template publication.
+        reference_toxtempassistant:
+          type: [string, "null"]
+          description: DOI of the ToxTempAssistant publication.
     Author:
       type: object
       additionalProperties: false

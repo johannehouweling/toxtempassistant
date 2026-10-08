@@ -249,6 +249,23 @@ def _answer_payload(answer: Answer | None) -> dict:
     }
 
 
+def _provenance(assay: Assay) -> dict:
+    """Say how the ToxTemp was drafted, without internal deployment keys or costs."""
+    models = [
+        {
+            "model_id": cost.model_id or None,
+            "temperature": cost.temperature or None,
+        }
+        for cost in assay.costs.order_by("updated_at")
+    ]
+    return {
+        "models_used": models,
+        "app_version": config.version or None,
+        "reference_toxtemp": config.reference_toxtemp,
+        "reference_toxtempassistant": config.reference_toxtempassistant_paper,
+    }
+
+
 def _credited_ids(workspace: Workspace) -> frozenset[int]:
     """Return who may be named: members of the workspace who agreed to be credited.
 
@@ -287,6 +304,7 @@ def _assay_detail(assay: Assay, credited_ids: frozenset[int]) -> dict:
         "description": assay.description,
         "question_set": assay.question_set.label if assay.question_set else None,
         "authors": get_assay_api_authors(assay, credited_ids),
+        "provenance": _provenance(assay),
         "sections": [
             {
                 "id": section.pk,

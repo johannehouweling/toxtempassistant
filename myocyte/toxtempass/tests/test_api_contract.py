@@ -188,6 +188,9 @@ def test_detail(client, populated, which):
     response = client.get(url, **populated["auth"])
     check(response, url)
     assert [a["credited"] for a in response.json()["authors"]] == [True]
+    provenance = response.json()["provenance"]
+    assert isinstance(provenance["models_used"], list)
+    assert not any("model_key" in m or "cost" in m for m in provenance["models_used"])
     if which == "full":
         question = response.json()["sections"][0]["subsections"][0]["questions"]
         assert {q["parent_question_id"] for q in question} == {None, question[0]["id"]}
