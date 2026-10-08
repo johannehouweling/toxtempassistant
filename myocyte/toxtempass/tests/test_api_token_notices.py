@@ -15,6 +15,7 @@ from toxtempass.models import (
     EmailLog,
     WorkspaceApiToken,
     WorkspaceInvestigation,
+    WorkspaceMember,
     WorkspaceRole,
 )
 from toxtempass.tests.fixtures.factories import (
@@ -68,12 +69,13 @@ def _after_cooloff():
     notifications.run_email_jobs(now=timezone.now() + COOLOFF + timedelta(minutes=1))
 
 
-def test_each_owner_gets_one_email_after_the_cooloff(client, setup):
+def test_every_member_but_the_creator_gets_one_email_after_the_cooloff(client, setup):
     _issue(client, setup["admin"], setup["workspace"])
     assert not mail.outbox  # nothing straight away
     _after_cooloff()
     recipients = sorted(m.to[0] for m in mail.outbox)
-    assert recipients == sorted([setup["alice"].email, setup["bob"].email])
+    expected = [setup["workspace"].owner.email, setup["alice"].email, setup["bob"].email]
+    assert recipients == sorted(expected)  # the creator, Ada, is not among them
 
 
 def test_the_email_names_what_is_exposed_and_not_the_secret(client, setup):
@@ -93,9 +95,30 @@ def test_the_email_names_what_is_exposed_and_not_the_secret(client, setup):
     assert "Liver spheroids" in message.alternatives[0][0]
 
 
+def test_members_without_investigations_are_told_too(client, setup):
+    _issue(client, setup["admin"], setup["workspace"])
+    _after_cooloff()
+    message = next(m for m in mail.outbox if m.to == [setup["workspace"].owner.email])
+    assert "This includes your own investigations" not in message.body
+    assert "now has API access" in message.subject
+
+
+def test_credit_wording_depends_on_whether_they_agreed(client, setup):
+    WorkspaceMember.objects.filter(user=setup["alice"]).update(
+        credit_consent_at=timezone.now()
+    )
+    WorkspaceMember.objects.filter(user=setup["bob"]).update(credit_consent_at=None)
+    _issue(client, setup["admin"], setup["workspace"])
+    _after_cooloff()
+    alice = next(m for m in mail.outbox if m.to == [setup["alice"].email]).body
+    bob = next(m for m in mail.outbox if m.to == [setup["bob"].email]).body
+    assert "You agreed to be credited by name when you joined" in alice
+    assert "Contributor (not named)" not in alice
+    assert "Contributor (not named)" in bob
+    assert 'switch on "Credit me by name"' in bob
+
+
 def test_the_creator_is_not_told_about_their_own_token(client, setup):
-    own = InvestigationFactory(owner=setup["admin"], title="Admin model")
-    WorkspaceInvestigation.objects.create(workspace=setup["workspace"], investigation=own)
     _issue(client, setup["admin"], setup["workspace"])
     _after_cooloff()
     assert setup["admin"].email not in {m.to[0] for m in mail.outbox}
@@ -112,11 +135,12 @@ def test_a_token_revoked_during_the_cooloff_sends_nothing(client, setup):
     ).exists()
 
 
-def test_an_owner_who_left_before_the_send_is_not_emailed(client, setup):
+def test_someone_who_left_before_the_send_is_not_emailed(client, setup):
     _issue(client, setup["admin"], setup["workspace"])
-    WorkspaceInvestigation.objects.filter(investigation__owner=setup["bob"]).delete()
+    WorkspaceMember.objects.filter(user=setup["bob"]).delete()
     _after_cooloff()
-    assert [m.to[0] for m in mail.outbox] == [setup["alice"].email]
+    assert setup["bob"].email not in {m.to[0] for m in mail.outbox}
+    assert setup["alice"].email in {m.to[0] for m in mail.outbox}
 
 
 def test_it_cannot_be_switched_off(client, setup):
@@ -135,7 +159,7 @@ def test_it_cannot_be_switched_off(client, setup):
     assert alice.email in {m.to[0] for m in mail.outbox}
 
 
-def test_a_workspace_without_shared_investigations_emails_nobody(client):
+def test_a_workspace_of_one_emails_nobody(client):
     workspace = WorkspaceFactory()
     _issue(client, workspace.owner, workspace)
     _after_cooloff()

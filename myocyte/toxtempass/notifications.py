@@ -44,7 +44,6 @@ from toxtempass.models import (
     LLMRun,
     Person,
     WorkspaceApiToken,
-    WorkspaceInvestigation,
     WorkspaceInvitation,
     WorkspaceMember,
 )
@@ -123,9 +122,9 @@ KINDS: dict[str, EmailKind] = {
         # Not optional: an invitation only takes effect when it is answered, and the
         # answer is the person's agreement to what the email explains.
         EmailKind(WORKSPACE_INVITATION, "toxtempass/email/workspace_invitation"),
-        # Not optional, unlike the other workspace emails: it tells owners that an
-        # outside server can read their investigation, which they must not be able
-        # to miss by switching a setting off.
+        # Not optional, unlike the other workspace emails: it tells members that an
+        # outside server can now read the workspace, and that they are credited by
+        # name in it, which they must not be able to miss by switching a setting off.
         EmailKind(API_TOKEN_CREATED, "toxtempass/email/api_token_created"),
         EmailKind(
             MAINTAINER_BETA_DIGEST,
@@ -644,7 +643,7 @@ def _build_workspace_invitation(logs: list[EmailLog]) -> _Built | str:
 
 
 def _build_api_token_created(logs: list[EmailLog]) -> _Built | str:
-    """Tell an investigation owner that a token can now read their investigation."""
+    """Tell a member that the workspace now has an API token, and what that means."""
     log = logs[0]
     user = log.user
     if user is None:
@@ -656,6 +655,11 @@ def _build_api_token_created(logs: list[EmailLog]) -> _Built | str:
     )
     if token is None or not token.is_active:
         return "The token was revoked or has expired"
+    membership = WorkspaceMember.objects.filter(
+        workspace_id=token.workspace_id, user=user
+    ).first()
+    if membership is None:
+        return "No longer a member of the workspace"
     investigations = list(
         Investigation.objects.filter(
             owner=user, shared_in_workspaces__workspace=token.workspace
@@ -664,17 +668,16 @@ def _build_api_token_created(logs: list[EmailLog]) -> _Built | str:
         .order_by("title")
         .values_list("title", flat=True)
     )
-    if not investigations:
-        return "No investigation of the user is shared in the workspace any more"
     workspace_name = _one_line(token.workspace.name)
     return _Built(
-        subject=f"An API token can now read your investigations in “{workspace_name}”",
+        subject=f"The workspace “{workspace_name}” now has API access",
         context={
             "workspace_name": workspace_name,
             "token_name": _one_line(token.name),
             "created_by": _display_name(token.created_by),
             "expires_on": token.expires_at.date(),
             "investigations": [_one_line(title) for title in investigations],
+            "credited": membership.credit_consent_at is not None,
             "overview_url": utilities.absolute_url(reverse("overview")),
         },
     )
@@ -920,25 +923,22 @@ def cancel_invitation_notice(invitation_id: int) -> None:
 
 
 def notify_api_token_created(token: WorkspaceApiToken, created_by: Person) -> None:
-    """Tell the owners of the shared investigations that a token can read them.
+    """Tell every member of the workspace that it now has an API token.
 
-    Call it once the token is saved. Every other owner gets one email, after the
+    Call it once the token is saved. Members get one email each, after the
     cool-off, so a token revoked straight away sends nothing. Whoever created the
     token is not told about their own action.
     """
-    owner_ids = (
-        WorkspaceInvestigation.objects.filter(workspace_id=token.workspace_id)
-        .exclude(investigation__owner_id=created_by.pk)
-        .values_list("investigation__owner_id", flat=True)
-        .distinct()
-    )
     send_after = timezone.now() + timedelta(minutes=config._email_cooloff_minutes)
-    for owner in Person.objects.filter(pk__in=list(owner_ids)):
+    members = WorkspaceMember.objects.filter(workspace_id=token.workspace_id).exclude(
+        user_id=created_by.pk
+    )
+    for member in members.select_related("user"):
         queue_email(
             API_TOKEN_CREATED,
-            user=owner,
+            user=member.user,
             payload={"token_id": token.pk, "workspace_id": token.workspace_id},
-            dedup_key=f"api-token-created:{token.pk}:{owner.pk}",
+            dedup_key=f"api-token-created:{token.pk}:{member.user_id}",
             send_after=send_after,
         )
 

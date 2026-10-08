@@ -1,11 +1,14 @@
 {% extends "toxtempass/email/base.txt" %}{% block content %}Hi {{ user.get_full_name|default:user.email }},
 
-{{ created_by|default:"A workspace administrator" }} created an API token called "{{ token_name }}" for the workspace "{{ workspace_name }}". It lets an external server read, and only read, the investigations shared into that workspace, including:
+{{ created_by|default:"A workspace administrator" }} created an API token called "{{ token_name }}" for the workspace "{{ workspace_name }}", of which you are a member. It lets an external server read, and only read, the investigations shared into the workspace: the questions, the answers and the ToxTemp as a PDF. The token expires on {{ expires_on|date:"j F Y" }}.
+{% if investigations %}
+This includes your own investigations:
 {% for title in investigations %}
 - {{ title }}{% endfor %}
-
-The server can read the questions and answers, and download the ToxTemp as a PDF. Names, organizations, ORCID iDs and email addresses of users are not included. The token expires on {{ expires_on|date:"j F Y" }}.
-
-If you do not want this, remove the investigation from the workspace in the user menu of ToxTempAssistant, or ask the workspace administrators to revoke the token:
+{% endif %}
+{% if credited %}You agreed to be credited by name when you joined. The server therefore sees your name, organization and ORCID iD (never your email address) as an author of the ToxTemps you created or edited. You can withdraw this on the workspace in the user menu, or by leaving the workspace; it then applies at once.
+{% else %}You joined this workspace before authors could be named, so you appear to the server as "Contributor (not named)". If you want to be credited by name (name, organization and ORCID iD, never your email address), switch on "Credit me by name" on the workspace in the user menu.
+{% endif %}
+If you do not want an outside server to read your work here, leave the workspace or remove your investigations from it, or ask the workspace administrators to revoke the token:
 {{ overview_url }}
 {% endblock %}
