@@ -320,6 +320,16 @@ urlpatterns += [
         api.api_assay_pdf,
         name="api_assay_pdf",
     ),
+    path(
+        "api/preview/pdf-jobs/<uuid:job_id>/",
+        api.api_pdf_job,
+        name="api_pdf_job",
+    ),
+    path(
+        "api/preview/pdf-jobs/<uuid:job_id>/file/",
+        api.api_pdf_job_file,
+        name="api_pdf_job_file",
+    ),
     path("workspace/<int:pk>/assay/add/", views.add_workspace_assay, name="add_workspace_assay"),
     path(
         "workspace/<int:pk>/assay/<int:assay_id>/remove/",

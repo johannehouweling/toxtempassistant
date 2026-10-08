@@ -28,9 +28,18 @@ info:
 
     ## Limits
 
-    Requests are rate limited per client IP. A PDF is built on the spot and costs
-    more, so each token may request one PDF per `limits.pdf_cooldown_seconds`
-    (see `GET /api/preview/`); asking sooner returns `429` with `Retry-After`.
+    Requests are rate limited per client IP. A PDF costs more, so it is built in the
+    background: `POST` the request, poll the job until it is `done`, then download
+    it from the job's `file_url`. Each token may request one PDF per
+    `limits.pdf_cooldown_seconds` and has one unfinished job at a time (see
+    `GET /api/preview/`); asking sooner returns `429` with `Retry-After`. When many
+    PDFs are being built at once the API answers `503` with `Retry-After`. A
+    finished PDF stays available for `limits.pdf_retention_minutes` and can be
+    downloaded as often as needed until then; after that, request it again.
+
+    Currently: one PDF per token every **60 seconds**, and a finished PDF is kept
+    for **60 minutes**. These are starting values and may be adjusted once the API
+    is in use; `GET /api/preview/` always reports the live numbers.
 servers:
   - url: /
 security:
@@ -112,17 +121,72 @@ paths:
         "404": {$ref: "#/components/responses/NotFound"}
         "429": {$ref: "#/components/responses/RateLimited"}
   /api/preview/assays/{assay_id}/pdf/:
-    get:
+    post:
       tags: [ToxTemps]
-      operationId: getAssayPdf
-      summary: Download a ToxTemp as a PDF
+      operationId: requestAssayPdf
+      summary: Ask for a ToxTemp as a PDF
       description: |
-        Built on the spot and not stored. Authors are named under the same rule as
-        in the JSON (see the description of this API). Limited to one
-        per token per `limits.pdf_cooldown_seconds`; a request that fails, or names
-        an unknown ToxTemp, does not use up the cool-down.
+        The PDF is built in the background, so this returns at once with a job.
+        Poll the job at `Location` until it is `done`, then download the file from its
+        `file_url`. Authors are named under the same rule as in the JSON (see the
+        description of this API). Asking again for the same ToxTemp while its job is
+        unfinished returns that job. A request that fails, or names an unknown
+        ToxTemp, does not use up the cool-down.
       parameters:
         - {$ref: "#/components/parameters/AssayId"}
+      responses:
+        "202":
+          description: The PDF is queued, or is already being built.
+          headers:
+            X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+            Location:
+              description: The job's status URL.
+              schema: {type: string}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PdfJob"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "503": {$ref: "#/components/responses/Busy"}
+  /api/preview/pdf-jobs/{job_id}/:
+    get:
+      tags: [ToxTemps]
+      operationId: getPdfJob
+      summary: See how a PDF is coming along
+      description: |
+        Poll every few seconds. `status` is `queued`, `running`, `done`, `failed` or
+        `expired`; only a `done` job has a `file_url`.
+      parameters:
+        - {$ref: "#/components/parameters/JobId"}
+      responses:
+        "200":
+          description: The job.
+          headers:
+            X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PdfJob"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404":
+          description: No such job in this workspace.
+          headers:
+            X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /api/preview/pdf-jobs/{job_id}/file/:
+    get:
+      tags: [ToxTemps]
+      operationId: downloadPdf
+      summary: Download a finished PDF
+      description: |
+        Available until the job's `expires_at` (60 minutes after the build finished,
+        currently), and as often as needed until then. Afterwards the PDF is deleted
+        and this returns `410`; request it again.
+      parameters:
+        - {$ref: "#/components/parameters/JobId"}
       responses:
         "200":
           description: The PDF.
@@ -132,15 +196,28 @@ paths:
             application/pdf:
               schema: {type: string, format: binary}
         "401": {$ref: "#/components/responses/Unauthorized"}
-        "404": {$ref: "#/components/responses/NotFound"}
-        "429": {$ref: "#/components/responses/RateLimited"}
-        "500":
-          description: The PDF could not be built; the message carries a reference.
+        "404":
+          description: No such job in this workspace.
           headers:
             X-API-Version: {$ref: "#/components/headers/XApiVersion"}
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
+        "409":
+          description: The PDF is not ready yet; keep polling the job.
+          headers:
+            X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+        "410":
+          description: The build failed or the PDF has expired; request it again.
+          headers:
+            X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 components:
   securitySchemes:
     bearerAuth:
@@ -152,6 +229,12 @@ components:
       description: Which API produced the response, e.g. `preview`.
       schema: {type: string}
   parameters:
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      description: Id of a PDF job, from the response to `POST .../pdf/`.
+      schema: {type: string, format: uuid}
     AssayId:
       name: assay_id
       in: path
@@ -159,6 +242,16 @@ components:
       description: Id of a ToxTemp, as listed by `GET /api/preview/assays/`.
       schema: {type: integer}
   responses:
+    Busy:
+      description: Many PDFs are being built at once, or the queue is unavailable.
+      headers:
+        X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+        Retry-After:
+          description: Seconds to wait.
+          schema: {type: integer}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
     Unauthorized:
       description: The token is missing, invalid, revoked or expired.
       headers:
@@ -177,11 +270,13 @@ components:
         application/json:
           schema: {$ref: "#/components/schemas/Error"}
     RateLimited:
-      description: Too many requests, or a PDF asked for within its cool-down.
+      description: |
+        Too many requests, a PDF asked for within its cool-down, or a PDF still
+        being built for this token.
       headers:
         X-API-Version: {$ref: "#/components/headers/XApiVersion"}
         Retry-After:
-          description: Seconds to wait. Present on the PDF cool-down.
+          description: Seconds to wait. Present on the PDF cool-down and the unfinished-job limit.
           schema: {type: integer}
       content:
         application/json:
@@ -219,18 +314,45 @@ components:
         endpoints:
           type: object
           additionalProperties: false
-          required: [assays, assay, assay_pdf]
-          description: Route templates; `{id}` stands for an assay id.
+          required: [assays, assay, assay_pdf, pdf_job]
+          description: |
+            Route templates; `{id}` stands for an assay id and `{job_id}` for a PDF job.
           properties:
             assays: {type: string}
             assay: {type: string}
             assay_pdf: {type: string}
+            pdf_job: {type: string}
         limits:
           type: object
           additionalProperties: false
-          required: [pdf_cooldown_seconds]
+          required: [pdf_cooldown_seconds, pdf_retention_minutes]
           properties:
             pdf_cooldown_seconds: {type: integer}
+            pdf_retention_minutes:
+              type: integer
+              description: How long a finished PDF can be downloaded.
+    PdfJob:
+      type: object
+      additionalProperties: false
+      required: [id, status, assay_id, created_at, finished_at, expires_at, error, file_url]
+      properties:
+        id: {type: string, format: uuid}
+        status:
+          type: string
+          enum: [queued, running, done, failed, expired]
+        assay_id: {type: integer}
+        created_at: {type: string, format: date-time}
+        finished_at: {type: [string, "null"], format: date-time}
+        expires_at:
+          type: [string, "null"]
+          format: date-time
+          description: When the finished PDF is deleted.
+        error:
+          type: [string, "null"]
+          description: Why a `failed` job failed.
+        file_url:
+          type: [string, "null"]
+          description: Where to download the PDF; null unless the job is `done`.
     AssayFields:
       description: The fields of a list entry.
       type: object

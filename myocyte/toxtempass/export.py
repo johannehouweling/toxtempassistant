@@ -569,7 +569,7 @@ def generate_markdown_from_assay(
 
 
 def get_create_meta_data_yaml(
-    request: HttpRequest,
+    request: HttpRequest | None,
     assay: Assay,
     file_path: Path,
     export_type: str = "pdf",
@@ -578,7 +578,7 @@ def get_create_meta_data_yaml(
     """Create meta data yaml file for pandoc.
 
     Args:
-        request: The current HTTP request (used for author metadata).
+        request: The current HTTP request, or None when built by the task queue.
         assay: The assay being exported.
         file_path: Destination file path; the YAML file is written alongside it.
         export_type: The export format (e.g. ``"pdf"``, ``"tex"``).  When
@@ -651,7 +651,7 @@ def get_create_meta_data_yaml(
 
 
 def export_assay_to_file(
-    request: HttpRequest,
+    request: HttpRequest | None,
     assay: Assay,
     export_type: str,
     credited_ids: Collection[int] | None = None,

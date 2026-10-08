@@ -1,15 +1,19 @@
 """Tests for workspace API tokens: who may issue them, and what they can read."""
 
 import io
+import os
+import secrets
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.http import FileResponse, JsonResponse
 from django.urls import reverse
 from django.utils import timezone
 
+from toxtempass import api
 from toxtempass.models import (
+    ApiPdfJob,
     WorkspaceApiToken,
     WorkspaceInvestigation,
     WorkspaceRole,
@@ -385,7 +389,17 @@ class TestDataApi:
         assert ids == [in_ws.pk]
 
 
+@pytest.fixture
+def pdf_dir(tmp_path):
+    with patch.object(ApiPdfJob, "directory", staticmethod(lambda: tmp_path)):
+        yield tmp_path
+
+
 class TestPdf:
+    @pytest.fixture(autouse=True)
+    def _dir(self, pdf_dir):
+        self.dir = pdf_dir
+
     @pytest.fixture
     def export(self):
         def fake(request, assay, export_type, credited_ids=None):
@@ -404,22 +418,49 @@ class TestPdf:
         client.logout()
         return _bearer(secret)
 
-    def test_pdf_is_returned(self, client, shared, export):
+    def _request(self, client, assay, auth):
+        return client.post(reverse("api_assay_pdf", args=[assay.pk]), **auth)
+
+    def test_the_pdf_is_built_by_the_queue_and_downloaded_from_the_job(
+        self, client, shared, export
+    ):
         workspace, in_ws, *_ = shared
-        response = client.get(
-            reverse("api_assay_pdf", args=[in_ws.pk]), **self._auth(client, workspace)
-        )
-        assert response.status_code == 200
-        assert response["Content-Type"] == "application/pdf"
-        assert response["X-API-Version"] == "preview"
-        assert b"".join(response.streaming_content) == b"%PDF-fake"
+        auth = self._auth(client, workspace)
+        queued = self._request(client, in_ws, auth)
+        assert queued.status_code == 202
+        assert queued["X-API-Version"] == "preview"
+        job = client.get(queued["Location"], **auth).json()
+        assert job["status"] == "done" and job["assay_id"] == in_ws.pk
+        assert job["error"] is None
+        download = client.get(job["file_url"], **auth)
+        assert download.status_code == 200
+        assert download["Content-Type"] == "application/pdf"
+        assert b"".join(download.streaming_content) == b"%PDF-fake"
+        # The file can be fetched again until it expires.
+        again = client.get(job["file_url"], **auth)
+        assert b"".join(again.streaming_content) == b"%PDF-fake"
+
+    def test_the_build_gets_no_request_and_names_only_agreed_authors(
+        self, client, shared, export
+    ):
+        workspace, in_ws, *_ = shared
+        self._request(client, in_ws, self._auth(client, workspace))
+        args, kwargs = export.call_args
+        assert args[0] is None and args[2] == "pdf"
+        assert isinstance(kwargs["credited_ids"], frozenset)
+
+    def test_a_get_is_not_allowed(self, client, shared, export):
+        workspace, in_ws, *_ = shared
+        auth = self._auth(client, workspace)
+        response = client.get(reverse("api_assay_pdf", args=[in_ws.pk]), **auth)
+        assert response.status_code == 405
+        assert export.call_count == 0
 
     def test_second_request_within_cooldown_is_429(self, client, shared, export):
         workspace, in_ws, *_ = shared
         auth = self._auth(client, workspace)
-        url = reverse("api_assay_pdf", args=[in_ws.pk])
-        assert client.get(url, **auth).status_code == 200
-        again = client.get(url, **auth)
+        assert self._request(client, in_ws, auth).status_code == 202
+        again = self._request(client, in_ws, auth)
         assert again.status_code == 429
         assert 1 <= int(again["Retry-After"]) <= 60
         assert export.call_count == 1  # the second request built nothing
@@ -427,25 +468,23 @@ class TestPdf:
     def test_cooldown_ends(self, client, shared, export):
         workspace, in_ws, *_ = shared
         auth = self._auth(client, workspace)
-        url = reverse("api_assay_pdf", args=[in_ws.pk])
-        client.get(url, **auth)
+        self._request(client, in_ws, auth)
         WorkspaceApiToken.objects.update(
             last_pdf_at=timezone.now() - timedelta(seconds=61)
         )
-        assert client.get(url, **auth).status_code == 200
+        assert self._request(client, in_ws, auth).status_code == 202
 
     def test_cooldown_is_per_token(self, client, shared, export):
         workspace, in_ws, *_ = shared
         one = self._auth(client, workspace, "one")
         two = self._auth(client, workspace, "two")
-        url = reverse("api_assay_pdf", args=[in_ws.pk])
-        assert client.get(url, **one).status_code == 200
-        assert client.get(url, **two).status_code == 200
+        assert self._request(client, in_ws, one).status_code == 202
+        assert self._request(client, in_ws, two).status_code == 202
 
     def test_json_reads_are_not_limited_by_the_pdf_cooldown(self, client, shared, export):
         workspace, in_ws, *_ = shared
         auth = self._auth(client, workspace)
-        client.get(reverse("api_assay_pdf", args=[in_ws.pk]), **auth)
+        self._request(client, in_ws, auth)
         for _ in range(3):
             response = client.get(reverse("api_assay_detail", args=[in_ws.pk]), **auth)
             assert response.status_code == 200
@@ -453,36 +492,209 @@ class TestPdf:
     def test_unknown_assay_does_not_use_the_cooldown(self, client, shared, export):
         workspace, in_ws, _, unshared = shared
         auth = self._auth(client, workspace)
-        missing = client.get(reverse("api_assay_pdf", args=[unshared.pk]), **auth)
-        assert missing.status_code == 404
+        assert self._request(client, unshared, auth).status_code == 404
         assert export.call_count == 0
-        assert (
-            client.get(reverse("api_assay_pdf", args=[in_ws.pk]), **auth).status_code
-            == 200
-        )
+        assert self._request(client, in_ws, auth).status_code == 202
 
-    def test_failed_build_gives_the_cooldown_back(self, client, shared):
+    def test_failed_build_is_reported_and_gives_the_cooldown_back(self, client, shared):
         workspace, in_ws, *_ = shared
         auth = self._auth(client, workspace)
-        url = reverse("api_assay_pdf", args=[in_ws.pk])
         broken = JsonResponse({"error": "Export failed (ref abc)"}, status=500)
         with patch("toxtempass.api.export_assay_to_file", return_value=broken):
-            assert client.get(url, **auth).status_code == 500
+            queued = self._request(client, in_ws, auth)
+        job = client.get(queued["Location"], **auth).json()
+        assert job["status"] == "failed" and job["file_url"] is None
+        assert "request it again" in job["error"]
+        assert "abc" not in job["error"]
         assert WorkspaceApiToken.objects.get().last_pdf_at is None
+        file_response = client.get(
+            reverse("api_pdf_job_file", args=[job["id"]]), **auth
+        )
+        assert file_response.status_code == 410
         ok = FileResponse(io.BytesIO(b"%PDF"), content_type="application/pdf")
         with patch("toxtempass.api.export_assay_to_file", return_value=ok):
-            assert client.get(url, **auth).status_code == 200
+            assert self._request(client, in_ws, auth).status_code == 202
+
+    def test_a_crashing_build_is_reported_and_does_not_raise(self, client, shared):
+        workspace, in_ws, *_ = shared
+        auth = self._auth(client, workspace)
+        with patch("toxtempass.api.export_assay_to_file", side_effect=RuntimeError("x")):
+            queued = self._request(client, in_ws, auth)
+        assert queued.status_code == 202
+        assert client.get(queued["Location"], **auth).json()["status"] == "failed"
 
     def test_pdf_needs_a_token(self, client, shared, export):
         _, in_ws, *_ = shared
-        assert client.get(reverse("api_assay_pdf", args=[in_ws.pk])).status_code == 401
+        url = reverse("api_assay_pdf", args=[in_ws.pk])
+        assert client.post(url).status_code == 401
         assert export.call_count == 0
 
-    def test_root_advertises_the_pdf_endpoint_and_limit(self, client, shared):
+    def test_root_advertises_the_pdf_endpoints_and_limits(self, client, shared):
         workspace, in_ws, *_ = shared
         body = client.get(reverse("api_root"), **self._auth(client, workspace)).json()
         assert body["endpoints"]["assay_pdf"].endswith("/{id}/pdf/")
-        assert body["limits"] == {"pdf_cooldown_seconds": 60}
+        assert body["endpoints"]["pdf_job"].endswith("/pdf-jobs/{job_id}/")
+        assert body["limits"] == {"pdf_cooldown_seconds": 60, "pdf_retention_minutes": 60}
+
+    def _job(self, workspace, assay, **fields):
+        return ApiPdfJob.objects.create(
+            workspace=workspace,
+            token=workspace.api_tokens.first(),
+            assay=assay,
+            **fields,
+        )
+
+    def test_asking_again_for_an_unfinished_pdf_returns_the_same_job(
+        self, client, shared, export
+    ):
+        workspace, in_ws, *_ = shared
+        auth = self._auth(client, workspace)
+        job = self._job(workspace, in_ws)
+        again = self._request(client, in_ws, auth)
+        assert again.status_code == 202
+        assert again.json()["id"] == str(job.pk)
+        assert export.call_count == 0
+
+    def test_one_unfinished_job_per_token(self, client, shared, export):
+        workspace, in_ws, other_in_ws, _ = shared
+        auth = self._auth(client, workspace)
+        self._job(workspace, in_ws)
+        response = self._request(client, other_in_ws, auth)
+        assert response.status_code == 429 and "Retry-After" in response
+        assert export.call_count == 0
+
+    def test_too_many_unfinished_jobs_overall_is_503(self, client, shared, export):
+        workspace, in_ws, other_in_ws, _ = shared
+        auth = self._auth(client, workspace)
+        other = WorkspaceFactory()
+        token = WorkspaceApiToken.objects.create(
+            workspace=other, name="x", token_hash="h" * 64, prefix="ttw_x",
+            created_by=other.owner,
+            expires_at=timezone.now() + timedelta(days=1),
+        )
+        ApiPdfJob.objects.create(workspace=other, token=token, assay=other_in_ws)
+        with patch("toxtempass.api.config._api_pdf_max_active_jobs", 1):
+            response = self._request(client, in_ws, auth)
+        assert response.status_code == 503 and "Retry-After" in response
+        assert export.call_count == 0
+        assert WorkspaceApiToken.objects.get(workspace=workspace).last_pdf_at is None
+
+    def test_a_job_is_private_to_its_workspace(self, client, shared, export):
+        workspace, in_ws, *_ = shared
+        job_url = self._request(client, in_ws, self._auth(client, workspace))["Location"]
+        other = WorkspaceFactory()
+        theirs = _bearer(_issue(client, other.owner, other).json()["token"])
+        client.logout()
+        assert client.get(job_url, **theirs).status_code == 404
+        assert client.get(job_url + "file/", **theirs).status_code == 404
+
+    def test_the_file_is_not_served_before_it_is_ready(self, client, shared):
+        workspace, in_ws, *_ = shared
+        auth = self._auth(client, workspace)
+        job = self._job(workspace, in_ws)
+        response = client.get(reverse("api_pdf_job_file", args=[job.pk]), **auth)
+        assert response.status_code == 409
+
+    def test_an_expired_pdf_reads_expired_and_is_gone(self, client, shared, export):
+        workspace, in_ws, *_ = shared
+        auth = self._auth(client, workspace)
+        queued = self._request(client, in_ws, auth)
+        job = ApiPdfJob.objects.get()
+        job.expires_at = timezone.now() - timedelta(seconds=1)
+        job.save()
+        body = client.get(queued["Location"], **auth).json()
+        assert body["status"] == "expired" and body["file_url"] is None
+        assert client.get(
+            reverse("api_pdf_job_file", args=[job.pk]), **auth
+        ).status_code == 410
+
+
+class TestPdfCleanup:
+    NOW = timezone.now()
+
+    def _job(self, **fields):
+        workspace = WorkspaceFactory()
+        token = WorkspaceApiToken.objects.create(
+            workspace=workspace, name="t", token_hash=secrets.token_hex(32),
+            prefix="ttw_t", created_by=workspace.owner,
+            expires_at=timezone.now() + timedelta(days=1),
+        )
+        return ApiPdfJob.objects.create(
+            workspace=workspace, token=token, assay=AssayFactory(), **fields
+        )
+
+    def _file(self, job, age_seconds=0):
+        job.file_path.write_bytes(b"%PDF")
+        stamp = timezone.now().timestamp() - age_seconds
+        os.utime(job.file_path, (stamp, stamp))
+
+    def test_expired_files_go_and_live_ones_stay(self, pdf_dir):
+        gone = self._job(
+            status="done", expires_at=timezone.now() - timedelta(minutes=1)
+        )
+        kept = self._job(status="done", expires_at=timezone.now() + timedelta(minutes=30))
+        self._file(gone, 7200)
+        self._file(kept, 7200)
+
+        api.cleanup_pdf_jobs()
+
+        assert not gone.file_path.exists()
+        assert kept.file_path.exists()
+
+    def test_a_job_that_lost_its_worker_is_failed_and_frees_the_cooldown(self, pdf_dir):
+        job = self._job(created_at=timezone.now() - timedelta(minutes=45))
+        WorkspaceApiToken.objects.filter(pk=job.token_id).update(
+            last_pdf_at=job.created_at
+        )
+
+        api.cleanup_pdf_jobs()
+
+        job.refresh_from_db()
+        assert job.status == "failed" and "interrupted" in job.error
+        assert WorkspaceApiToken.objects.get(pk=job.token_id).last_pdf_at is None
+
+    def test_a_fresh_queued_job_is_left_alone(self, pdf_dir):
+        job = self._job()
+        api.cleanup_pdf_jobs()
+        job.refresh_from_db()
+        assert job.status == "queued"
+
+    def test_old_records_and_their_files_are_deleted(self, pdf_dir):
+        old = self._job(
+            status="done",
+            created_at=timezone.now() - timedelta(hours=30),
+            expires_at=timezone.now() - timedelta(hours=29),
+        )
+        self._file(old, 7200)
+        api.cleanup_pdf_jobs()
+        assert not ApiPdfJob.objects.filter(pk=old.pk).exists()
+        assert not old.file_path.exists()
+
+    def test_stray_files_go_but_one_being_written_stays(self, pdf_dir):
+        stray = pdf_dir / "left-behind.pdf"
+        stray.write_bytes(b"x")
+        old = timezone.now().timestamp() - 7200
+        os.utime(stray, (old, old))
+        writing = pdf_dir / "being-written.pdf.part"
+        writing.write_bytes(b"x")
+
+        api.cleanup_pdf_jobs()
+
+        assert not stray.exists()
+        assert writing.exists()
+
+    def test_it_runs_with_the_periodic_jobs(self):
+        from toxtempass import jobs
+
+        with patch("toxtempass.jobs.api.cleanup_pdf_jobs") as cleanup, patch.multiple(
+            "toxtempass.jobs",
+            notifications=MagicMock(),
+            privacy=MagicMock(),
+            model_metadata=MagicMock(),
+            fx=MagicMock(),
+        ):
+            jobs.run_periodic_jobs()
+        cleanup.assert_called_once()
 
 
 class TestAuthorsInTheApi:
@@ -630,7 +842,9 @@ class TestAuthorsInTheApi:
         ]
         assert names == ["Carl Creator", "Edith Editor", "Olga Owner"]
 
-    def test_the_pdf_is_built_with_exactly_the_agreed_members(self, client, assay):
+    def test_the_pdf_is_built_with_exactly_the_agreed_members(
+        self, client, assay, pdf_dir
+    ):
         workspace = self._workspace(assay, credited=True)
         client.force_login(workspace.owner)
         secret = client.post(
@@ -639,7 +853,7 @@ class TestAuthorsInTheApi:
         client.logout()
         ok = FileResponse(io.BytesIO(b"%PDF"), content_type="application/pdf")
         with patch("toxtempass.api.export_assay_to_file", return_value=ok) as export:
-            client.get(reverse("api_assay_pdf", args=[assay.pk]), **_bearer(secret))
+            client.post(reverse("api_assay_pdf", args=[assay.pk]), **_bearer(secret))
         assert export.call_args.kwargs == {
             "credited_ids": frozenset({assay.created_by_id})
         }

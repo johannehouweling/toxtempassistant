@@ -7,13 +7,13 @@ import logging
 
 from django.utils import timezone
 
-from toxtempass import fx, model_metadata, notifications, privacy
+from toxtempass import api, fx, model_metadata, notifications, privacy
 
 logger = logging.getLogger(__name__)
 
 
 def run_periodic_jobs() -> None:
-    """Send due emails, delete expired files, and refresh externally-sourced data.
+    """Send due emails, delete expired files and API PDFs, and refresh outside data.
 
     Each part is safe to repeat, and one failing does not stop the others. The
     two refreshes throttle themselves -- this job ticks every couple of minutes
@@ -24,6 +24,7 @@ def run_periodic_jobs() -> None:
     for job in (
         notifications.run_email_jobs,
         privacy.delete_withdrawn_files,
+        api.cleanup_pdf_jobs,
         model_metadata.refresh,
         fx.refresh_fx_rate,
     ):

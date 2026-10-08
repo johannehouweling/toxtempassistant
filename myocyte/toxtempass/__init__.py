@@ -1,6 +1,8 @@
 # ruff: noqa: W293, W291, E501
 import logging
 import os
+import tempfile
+from pathlib import Path
 from types import MappingProxyType
 from typing import Final, Mapping
 
@@ -469,8 +471,20 @@ class Config:
     # per this many seconds (JSON reads are cheap and not limited this way).
     _api_pdf_cooldown_seconds: Final[int] = 60
     # A PDF build takes about 15 s. Kill pandoc well past that, so a hung build
-    # cannot hold a web worker for gunicorn's 10-minute timeout.
+    # cannot hold a worker for long.
     _pandoc_timeout_seconds = 90
+    # API PDFs are built by the task queue and kept briefly for download. They are
+    # generated on demand, so they live in a temp directory: no volume, no backup,
+    # and a restart simply loses them. (The web and queue processes must share it;
+    # they do while both run in the djangoapp container.)
+    _api_pdf_dir: Final[Path] = Path(tempfile.gettempdir()) / "toxtemp-api-pdf"
+    _api_pdf_retention_minutes: Final[int] = 60
+    # PDF jobs queued or running, across all tokens; beyond this the API says 503.
+    _api_pdf_max_active_jobs: Final[int] = 10
+    # A job still unfinished after this long lost its worker (e.g. a restart).
+    _api_pdf_stale_minutes: Final[int] = 30
+    # Finished job records are kept this long, so a client can still read the outcome.
+    _api_pdf_record_hours: Final[int] = 24
     # A workspace invitation can be accepted for this many days.
     _workspace_invitation_days: Final[int] = 14
     _email_confirmation_required_message: Final[str] = (

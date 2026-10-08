@@ -13,22 +13,26 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import lru_cache, wraps
 from pathlib import Path
+from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import F, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import Coalesce, Greatest
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import FileResponse, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
+from django_q.tasks import async_task
 
 from toxtempass import config, notifications, utilities
 from toxtempass.export import export_assay_to_file, generate_json_from_assay
 from toxtempass.models import (
     Answer,
+    ApiPdfJob,
     Assay,
     Workspace,
     WorkspaceApiToken,
@@ -46,6 +50,7 @@ API_VERSION = "preview"
 PAGE_SIZE_DEFAULT = 50
 PAGE_SIZE_MAX = 200
 
+NIL_UUID = UUID(int=0)  # stands in for a job id when building route templates
 TOKEN_PREFIX = "ttw_"  # noqa: S105 - a public label, not a secret
 
 
@@ -266,8 +271,14 @@ def api_root(request: HttpRequest, workspace: Workspace) -> HttpResponse:
                     "assays": reverse("api_assay_list"),
                     "assay": reverse("api_assay_detail", args=[0]).replace("0", "{id}"),
                     "assay_pdf": reverse("api_assay_pdf", args=[0]).replace("0", "{id}"),
+                    "pdf_job": reverse("api_pdf_job", args=[NIL_UUID]).replace(
+                        str(NIL_UUID), "{job_id}"
+                    ),
                 },
-                "limits": {"pdf_cooldown_seconds": config._api_pdf_cooldown_seconds},
+                "limits": {
+                    "pdf_cooldown_seconds": config._api_pdf_cooldown_seconds,
+                    "pdf_retention_minutes": config._api_pdf_retention_minutes,
+                },
             }
         )
     )
@@ -334,17 +345,48 @@ def api_assay_detail(
     )
 
 
-@require_GET
+def _pdf_job_payload(job: ApiPdfJob) -> dict:
+    """Describe a job. A finished PDF that has been cleaned away reads "expired"."""
+    expired = job.is_expired
+    ready = job.status == ApiPdfJob.Status.DONE and not expired
+    return {
+        "id": str(job.pk),
+        "status": "expired" if expired else job.status,
+        "assay_id": job.assay_id,
+        "created_at": _iso(job.created_at),
+        "finished_at": _iso(job.finished_at),
+        "expires_at": _iso(job.expires_at),
+        "error": job.error or None,
+        "file_url": reverse("api_pdf_job_file", args=[job.pk]) if ready else None,
+    }
+
+
+def _pdf_job_response(job: ApiPdfJob, status: int) -> HttpResponse:
+    response = _api_response(JsonResponse(_pdf_job_payload(job), status=status))
+    response["Location"] = reverse("api_pdf_job", args=[job.pk])
+    return response
+
+
+def _busy(message: str, status: int, retry_after: int) -> HttpResponse:
+    response = _error(message, status)
+    response["Retry-After"] = str(retry_after)
+    return response
+
+
+@csrf_exempt
+@require_POST
 @token_required
 def api_assay_pdf(
     request: HttpRequest, workspace: Workspace, assay_id: int
 ) -> HttpResponse:
-    """Return a ToxTemp as a PDF, built on the spot and not stored.
+    """Ask for a ToxTemp as a PDF. It is built by the task queue, not in this request.
 
-    A PDF costs a pandoc run, so each token may ask for one per cool-down period
-    (``Config._api_pdf_cooldown_seconds``); asking sooner gets a 429 with
-    ``Retry-After``. Requests that fail, or name an unknown assay, do not use up
-    the cool-down.
+    Answers ``202`` with a job to poll (``Location``), then download from its
+    ``file_url``. A PDF costs a pandoc run, so each token may ask for one per
+    ``Config._api_pdf_cooldown_seconds`` and has one unfinished job at a time;
+    asking sooner gets a 429 with ``Retry-After``. Beyond
+    ``Config._api_pdf_max_active_jobs`` jobs across all tokens the API says 503.
+    Requests that fail, or name an unknown assay, do not use up the cool-down.
     """
     assay = (
         _workspace_assays(workspace)
@@ -356,9 +398,21 @@ def api_assay_pdf(
         return _error("Not found", 404)
 
     token: WorkspaceApiToken = request.api_token
+    unfinished = ApiPdfJob.objects.filter(
+        token=token, status__in=ApiPdfJob.ACTIVE
+    ).first()
+    if unfinished is not None:
+        if unfinished.assay_id == assay.pk:
+            return _pdf_job_response(unfinished, 202)  # asking again is harmless
+        return _busy("A PDF for this token is still being built", 429, 10)
+    if (
+        ApiPdfJob.objects.filter(status__in=ApiPdfJob.ACTIVE).count()
+        >= config._api_pdf_max_active_jobs
+    ):
+        return _busy("PDF builds are busy; retry shortly", 503, 30)
+
     now = timezone.now()
     cooldown = timedelta(seconds=config._api_pdf_cooldown_seconds)
-    previous = token.last_pdf_at
     # One conditional UPDATE decides the winner, so concurrent requests with the
     # same token cannot both start a build.
     claimed = (
@@ -371,20 +425,155 @@ def api_assay_pdf(
             pk=token.pk
         )
         wait = max(1, math.ceil((last + cooldown - now).total_seconds())) if last else 1
-        response = _error(f"PDF export is limited; retry in {wait} s", 429)
-        response["Retry-After"] = str(wait)
-        return response
+        return _busy(f"PDF export is limited; retry in {wait} s", 429, wait)
 
-    # Only members who agreed to be credited are named, and never by email address.
-    response = export_assay_to_file(
-        request, assay, "pdf", credited_ids=_credited_ids(workspace)
+    job = ApiPdfJob.objects.create(
+        workspace=workspace, token=token, assay=assay, created_at=now
     )
-    if response.status_code >= 400:
-        # Give the cool-down back, unless another request has taken it since.
-        WorkspaceApiToken.objects.filter(pk=token.pk, last_pdf_at=now).update(
-            last_pdf_at=previous
+    try:
+        async_task("toxtempass.api.build_pdf_job", str(job.pk), group="api-pdf")
+    except Exception:
+        logger.exception("Could not queue PDF job %s", job.pk)
+        _fail_pdf_job(job, "The PDF could not be queued; try again later.")
+        return _busy("PDF builds are unavailable; retry shortly", 503, 30)
+    job.refresh_from_db()  # already finished when the queue runs inline
+    return _pdf_job_response(job, 202)
+
+
+@require_GET
+@token_required
+def api_pdf_job(request: HttpRequest, workspace: Workspace, job_id: UUID) -> HttpResponse:
+    """Say how a PDF job is doing; poll this until it is done."""
+    job = ApiPdfJob.objects.filter(pk=job_id, workspace=workspace).first()
+    if job is None:
+        return _error("Not found", 404)
+    return _api_response(JsonResponse(_pdf_job_payload(job)))
+
+
+@require_GET
+@token_required
+def api_pdf_job_file(
+    request: HttpRequest, workspace: Workspace, job_id: UUID
+) -> HttpResponse:
+    """Download the finished PDF, for a limited time."""
+    job = ApiPdfJob.objects.filter(pk=job_id, workspace=workspace).first()
+    if job is None:
+        return _error("Not found", 404)
+    if job.is_active:
+        return _error("The PDF is not ready yet", 409)
+    if job.status == ApiPdfJob.Status.FAILED:
+        return _error("The PDF could not be built; request it again", 410)
+    if job.is_expired:
+        return _error("The PDF has expired; request it again", 410)
+    try:
+        handle = job.file_path.open("rb")
+    except OSError:
+        return _error("The PDF has expired; request it again", 410)
+    return _api_response(
+        FileResponse(
+            handle,
+            as_attachment=True,
+            filename=job.file_name or "toxtemp.pdf",
+            content_type="application/pdf",
         )
-    return _api_response(response)
+    )
+
+
+def _fail_pdf_job(job: ApiPdfJob, message: str) -> None:
+    """Mark a job failed and hand the token its cool-down back."""
+    ApiPdfJob.objects.filter(pk=job.pk).update(
+        status=ApiPdfJob.Status.FAILED, error=message, finished_at=timezone.now()
+    )
+    WorkspaceApiToken.objects.filter(pk=job.token_id, last_pdf_at=job.created_at).update(
+        last_pdf_at=None
+    )
+
+
+def build_pdf_job(job_id: str) -> None:
+    """Build one job's PDF (runs in the task queue).
+
+    Never raises: the queue would retry a failed task, and a failed build is
+    reported on the job instead.
+    """
+    claimed = ApiPdfJob.objects.filter(
+        pk=job_id, status=ApiPdfJob.Status.QUEUED
+    ).update(status=ApiPdfJob.Status.RUNNING)
+    if not claimed:
+        return  # gone, or already taken by an earlier delivery
+    job = (
+        ApiPdfJob.objects.select_related(
+            "workspace", "assay__study__investigation", "assay__question_set"
+        )
+        .filter(pk=job_id)
+        .first()
+    )
+    if job is None:
+        return
+    try:
+        # Only members who agreed to be credited are named, and never by email.
+        response = export_assay_to_file(
+            None, job.assay, "pdf", credited_ids=_credited_ids(job.workspace)
+        )
+        if response.status_code != 200:
+            raise RuntimeError(f"export returned {response.status_code}")
+        content = b"".join(response.streaming_content)
+        directory = ApiPdfJob.directory()
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        partial = job.file_path.with_suffix(".pdf.part")
+        partial.write_bytes(content)
+        partial.replace(job.file_path)  # a reader never sees half a file
+        finished = timezone.now()
+        ApiPdfJob.objects.filter(pk=job.pk).update(
+            status=ApiPdfJob.Status.DONE,
+            finished_at=finished,
+            expires_at=finished
+            + timedelta(minutes=config._api_pdf_retention_minutes),
+            file_name=f"toxtemp_{job.assay_id}.pdf",
+        )
+    except Exception:
+        logger.exception("PDF job %s failed", job_id)
+        _fail_pdf_job(job, "The PDF could not be built; request it again.")
+
+
+def cleanup_pdf_jobs(now: datetime | None = None) -> None:
+    """Delete expired PDFs and old job records, and fail jobs that lost their worker.
+
+    Run by the periodic job. Safe to repeat; the files are disposable.
+    """
+    now = now or timezone.now()
+    directory = ApiPdfJob.directory()
+
+    stale = ApiPdfJob.objects.filter(
+        status__in=ApiPdfJob.ACTIVE,
+        created_at__lt=now - timedelta(minutes=config._api_pdf_stale_minutes),
+    )
+    for job in stale:
+        _fail_pdf_job(job, "The PDF build was interrupted; request it again.")
+
+    for job in ApiPdfJob.objects.filter(
+        status=ApiPdfJob.Status.DONE, expires_at__lte=now
+    ):
+        job.file_path.unlink(missing_ok=True)
+
+    old = ApiPdfJob.objects.filter(
+        created_at__lt=now - timedelta(hours=config._api_pdf_record_hours)
+    )
+    for job in old:
+        job.file_path.unlink(missing_ok=True)
+    old.delete()
+
+    # Anything left in the directory that no live job owns, e.g. after a crash.
+    if directory.is_dir():
+        keep = {
+            f"{pk}.pdf"
+            for pk in ApiPdfJob.objects.filter(
+                status=ApiPdfJob.Status.DONE, expires_at__gt=now
+            ).values_list("pk", flat=True)
+        }
+        recent = now.timestamp() - 600  # leave a file that is being written
+        for path in directory.iterdir():
+            if path.name not in keep and path.stat().st_mtime < recent:
+                path.unlink(missing_ok=True)
 
 
 OPENAPI_DIR = Path(__file__).parent / "openapi"

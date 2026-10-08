@@ -8,13 +8,13 @@ version are caught separately in CI (``oasdiff``, .github/workflows/api-contract
 """
 
 import io
-from datetime import timedelta
+import uuid
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 import yaml
-from django.http import FileResponse, JsonResponse
+from django.http import FileResponse
 from django.urls import get_resolver, resolve, reverse
 from django.utils import timezone
 from jsonschema import Draft202012Validator
@@ -22,7 +22,7 @@ from openapi_spec_validator import validate as validate_openapi
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
-from toxtempass.models import WorkspaceApiToken, WorkspaceInvestigation
+from toxtempass.models import ApiPdfJob, WorkspaceApiToken, WorkspaceInvestigation
 from toxtempass.tests.fixtures.factories import (
     AnswerFactory,
     AssayFactory,
@@ -62,12 +62,13 @@ def _spec_path(url_path: str) -> str:
     out = route
     for kwarg in resolve(url_path).kwargs:
         out = out.replace(f"<int:{kwarg}>", f"{{{kwarg}}}")
+        out = out.replace(f"<uuid:{kwarg}>", f"{{{kwarg}}}")
     return out
 
 
-def check(response, url_path: str) -> None:
+def check(response, url_path: str, method: str = "get") -> None:
     """Assert a response is one the contract describes, in status, headers and body."""
-    operation = SPEC["paths"][_spec_path(url_path)]["get"]
+    operation = SPEC["paths"][_spec_path(url_path)][method]
     declared = operation["responses"]
     assert str(response.status_code) in declared, (
         f"{url_path} returned {response.status_code}, which the spec does not declare"
@@ -156,15 +157,21 @@ def test_every_route_is_in_the_spec_and_the_other_way_round():
     for pattern in get_resolver().url_patterns:
         route = str(pattern.pattern)
         if route.startswith("api/preview/") and pattern.name not in NOT_IN_CONTRACT:
-            routes.add("/" + route.replace("<int:assay_id>", "{assay_id}"))
+            routes.add(
+                "/"
+                + route.replace("<int:assay_id>", "{assay_id}").replace(
+                    "<uuid:job_id>", "{job_id}"
+                )
+            )
     assert routes == set(SPEC["paths"])
 
 
 def test_every_documented_response_is_defined():
     """Every status a path declares has a description (no empty promises)."""
     for path, item in SPEC["paths"].items():
-        for status, response in item["get"]["responses"].items():
-            assert _resolve_ref(response).get("description"), f"{path} {status}"
+        for operation in item.values():
+            for status, response in operation["responses"].items():
+                assert _resolve_ref(response).get("description"), f"{path} {status}"
 
 
 def test_root(client, populated):
@@ -195,47 +202,129 @@ def test_detail(client, populated, which):
         assert {q["parent_question_id"] for q in question} == {None, question[0]["id"]}
 
 
-def test_pdf(client, populated):
-    url = reverse("api_assay_pdf", args=[populated["full"].pk])
-    ok = FileResponse(io.BytesIO(b"%PDF"), content_type="application/pdf")
-    ok["X-API-Version"] = "preview"
-    with patch("toxtempass.api.export_assay_to_file", return_value=ok):
-        check(client.get(url, **populated["auth"]), url)
+@pytest.fixture(autouse=True)
+def _pdf_dir(tmp_path):
+    with patch.object(ApiPdfJob, "directory", staticmethod(lambda: tmp_path)):
+        yield tmp_path
 
 
-def test_pdf_cooldown_and_failure_are_documented(client, populated):
+@pytest.fixture
+def fake_pdf():
+    def build(request, assay, export_type, credited_ids=None):
+        return FileResponse(io.BytesIO(b"%PDF"), content_type="application/pdf")
+
+    with patch("toxtempass.api.export_assay_to_file", side_effect=build) as mocked:
+        yield mocked
+
+
+def test_pdf_request_poll_and_download(client, populated, fake_pdf):
     url = reverse("api_assay_pdf", args=[populated["full"].pk])
-    ok = FileResponse(io.BytesIO(b"%PDF"), content_type="application/pdf")
-    with patch("toxtempass.api.export_assay_to_file", return_value=ok):
-        client.get(url, **populated["auth"])
-        limited = client.get(url, **populated["auth"])
+    queued = client.post(url, **populated["auth"])
+    assert queued.status_code == 202
+    check(queued, url, "post")
+    job_url = queued["Location"]
+    # The queue runs inline in tests, so the job is already finished.
+    job = client.get(job_url, **populated["auth"])
+    check(job, job_url)
+    assert job.json()["status"] == "done"
+    file_url = job.json()["file_url"]
+    download = client.get(file_url, **populated["auth"])
+    check(download, file_url)
+    assert b"".join(download.streaming_content) == b"%PDF"
+
+
+def test_the_documented_limits_match_the_configuration():
+    from toxtempass import config
+
+    def flat(text: str) -> str:
+        return " ".join(text.split())
+
+    text = flat(SPEC["info"]["description"])
+    assert f"every **{config._api_pdf_cooldown_seconds} seconds**" in text
+    assert f"kept for **{config._api_pdf_retention_minutes} minutes**" in text
+    download = SPEC["paths"]["/api/preview/pdf-jobs/{job_id}/file/"]["get"]
+    assert (
+        f"{config._api_pdf_retention_minutes} minutes after"
+        in flat(download["description"])
+    )
+
+
+def test_pdf_cooldown_is_documented(client, populated, fake_pdf):
+    url = reverse("api_assay_pdf", args=[populated["full"].pk])
+    client.post(url, **populated["auth"])
+    limited = client.post(url, **populated["auth"])
     assert limited.status_code == 429
-    check(limited, url)
-    WorkspaceApiToken.objects.update(last_pdf_at=timezone.now() - timedelta(minutes=5))
-    broken = JsonResponse({"error": "Export failed (ref abc)"}, status=500)
-    with patch("toxtempass.api.export_assay_to_file", return_value=broken):
-        failed = client.get(url, **populated["auth"])
-    assert failed.status_code == 500
-    check(failed, url)
+    check(limited, url, "post")
 
 
-@pytest.mark.parametrize(
-    "name", ["api_root", "api_assay_list", "api_assay_detail", "api_assay_pdf"]
-)
+def test_pdf_busy_is_documented(client, populated, fake_pdf):
+    url = reverse("api_assay_pdf", args=[populated["full"].pk])
+    with patch("toxtempass.api.config._api_pdf_max_active_jobs", 0):
+        busy = client.post(url, **populated["auth"])
+    assert busy.status_code == 503
+    check(busy, url, "post")
+
+
+def test_job_states_are_documented(client, populated):
+    token = WorkspaceApiToken.objects.get()
+    job = ApiPdfJob.objects.create(
+        workspace=populated["workspace"], token=token, assay=populated["full"]
+    )
+    job_url = reverse("api_pdf_job", args=[job.pk])
+    file_url = reverse("api_pdf_job_file", args=[job.pk])
+    queued = client.get(job_url, **populated["auth"])
+    check(queued, job_url)
+    assert queued.json()["status"] == "queued"
+    not_ready = client.get(file_url, **populated["auth"])
+    assert not_ready.status_code == 409
+    check(not_ready, file_url)
+    job.status = ApiPdfJob.Status.FAILED
+    job.error = "The PDF could not be built; request it again."
+    job.save()
+    failed = client.get(file_url, **populated["auth"])
+    assert failed.status_code == 410
+    check(failed, file_url)
+    check(client.get(job_url, **populated["auth"]), job_url)
+    missing = reverse("api_pdf_job", args=[uuid.uuid4()])
+    check(client.get(missing, **populated["auth"]), missing)
+    missing_file = reverse("api_pdf_job_file", args=[uuid.uuid4()])
+    check(client.get(missing_file, **populated["auth"]), missing_file)
+
+
+def test_pdf_routes_need_a_token(client, populated):
+    job_id = uuid.uuid4()
+    for name, method, args in (
+        ("api_assay_pdf", "post", [populated["full"].pk]),
+        ("api_pdf_job", "get", [job_id]),
+        ("api_pdf_job_file", "get", [job_id]),
+    ):
+        url = reverse(name, args=args)
+        response = getattr(client, method)(url)
+        assert response.status_code == 401
+        check(response, url, method)
+
+
+@pytest.mark.parametrize("name", ["api_root", "api_assay_list", "api_assay_detail"])
 def test_unauthorized(client, populated, name):
-    args = [populated["full"].pk] if name in {"api_assay_detail", "api_assay_pdf"} else []
+    args = [populated["full"].pk] if name == "api_assay_detail" else []
     url = reverse(name, args=args)
     response = client.get(url)
     assert response.status_code == 401
     check(response, url)
 
 
-@pytest.mark.parametrize("name", ["api_assay_detail", "api_assay_pdf"])
-def test_not_found(client, populated, name):
-    url = reverse(name, args=[999999])
+def test_not_found(client, populated):
+    url = reverse("api_assay_detail", args=[999999])
     response = client.get(url, **populated["auth"])
     assert response.status_code == 404
     check(response, url)
+
+
+def test_pdf_of_an_unknown_assay_is_not_found(client, populated):
+    url = reverse("api_assay_pdf", args=[999999])
+    response = client.post(url, **populated["auth"])
+    assert response.status_code == 404
+    check(response, url, "post")
 
 
 def test_bad_query_is_documented(client, populated):

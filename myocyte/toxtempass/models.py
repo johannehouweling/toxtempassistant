@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.exceptions import ValidationError
@@ -1163,6 +1164,77 @@ class WorkspaceApiToken(models.Model):
     def is_active(self) -> bool:
         """Return True while the token is neither revoked nor expired."""
         return self.revoked_at is None and self.expires_at > timezone.now()
+
+
+class ApiPdfJob(models.Model):
+    """One PDF requested through the workspace API.
+
+    The task queue builds it, so no web worker is held for the build. The file
+    lives in a temp directory (``Config._api_pdf_dir``) for a short time and is
+    never backed up: it is generated on demand and can simply be requested again.
+    """
+
+    class Status(models.TextChoices):
+        QUEUED = "queued"
+        RUNNING = "running"
+        DONE = "done"
+        FAILED = "failed"
+
+    ACTIVE = (Status.QUEUED, Status.RUNNING)
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(
+        Workspace, on_delete=models.CASCADE, related_name="pdf_jobs"
+    )
+    token = models.ForeignKey(
+        WorkspaceApiToken, on_delete=models.CASCADE, related_name="pdf_jobs"
+    )
+    assay = models.ForeignKey(
+        "Assay", on_delete=models.CASCADE, related_name="api_pdf_jobs"
+    )
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.QUEUED
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(
+        null=True, blank=True, help_text="When the file is deleted."
+    )
+    file_name = models.CharField(max_length=255, blank=True)
+    error = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["status", "created_at"])]
+
+    def __str__(self) -> str:
+        """Show the job's status and its ToxTemp."""
+        return f"PDF {self.status} for assay {self.assay_id}"
+
+    @staticmethod
+    def directory() -> Path:
+        """Return the directory holding the built PDFs."""
+        return Path(config._api_pdf_dir)
+
+    @property
+    def file_path(self) -> Path:
+        """Return where this job's PDF is stored while it exists."""
+        return self.directory() / f"{self.id}.pdf"
+
+    @property
+    def is_active(self) -> bool:
+        """Return True while the job is queued or running."""
+        return self.status in self.ACTIVE
+
+    @property
+    def is_expired(self) -> bool:
+        """Return True once a finished PDF is past its time or its file is gone."""
+        if self.status != self.Status.DONE:
+            return False
+        return (
+            self.expires_at is None
+            or self.expires_at <= timezone.now()
+            or not self.file_path.exists()
+        )
 
 
 class LLMConfig(models.Model):
