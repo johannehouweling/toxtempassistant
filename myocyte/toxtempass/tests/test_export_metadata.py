@@ -110,24 +110,28 @@ class ExportMetadataAuthorTests(TestCase):
             metadata["authors"],
             [
                 {
+                    "credited": True,
                     "name": "Creator Author",
                     "organization": "Creator Lab",
                     "orcid_id": "0000-0000-0000-0002",
                     "email": "creator@test.com",
                 },
                 {
+                    "credited": True,
                     "name": "Alice Editor",
                     "organization": "Alice Org",
                     "orcid_id": "0000-0000-0000-0003",
                     "email": "alice@test.com",
                 },
                 {
+                    "credited": True,
                     "name": "Bob Reviewer",
                     "organization": "Bob Center",
                     "orcid_id": "0000-0000-0000-0004",
                     "email": "bob@test.com",
                 },
                 {
+                    "credited": True,
                     "name": "Owner Person",
                     "organization": "Owner Institute",
                     "orcid_id": "0000-0000-0000-0001",
@@ -181,12 +185,14 @@ class ExportMetadataAuthorTests(TestCase):
             metadata["authors"],
             [
                 {
+                    "credited": True,
                     "name": "Owner Creator",
                     "organization": None,
                     "orcid_id": "0000-0000-0000-0010",
                     "email": "ownercreator@test.com",
                 },
                 {
+                    "credited": True,
                     "name": "Middle Editor",
                     "organization": None,
                     "orcid_id": "0000-0000-0000-0011",
@@ -232,18 +238,21 @@ class ExportMetadataAuthorTests(TestCase):
             export_data["metadata"]["authors"],
             [
                 {
+                    "credited": True,
                     "name": "Creator Author",
                     "organization": "Creator Lab",
                     "orcid_id": "0000-0000-0000-0002",
                     "email": "creator@test.com",
                 },
                 {
+                    "credited": True,
                     "name": "Alice Editor",
                     "organization": "Alice Org",
                     "orcid_id": "0000-0000-0000-0003",
                     "email": "alice@test.com",
                 },
                 {
+                    "credited": True,
                     "name": "Owner Person",
                     "organization": "Owner Institute",
                     "orcid_id": "0000-0000-0000-0001",

@@ -537,22 +537,33 @@ class TestAuthorsInTheApi:
         markdown = generate_markdown_from_assay(assay)
         assert "Grace Hopper" in markdown and "grace@navy.example" in markdown
 
+    def _authors(self, client, workspace, assay):
+        return self._detail(client, workspace, assay).json()["metadata"]["authors"]
+
     def test_an_author_who_agreed_is_named_without_email(self, client, assay):
         response = self._detail(client, self._workspace(assay, credited=True), assay)
-        assert response.json()["authors"] == [
+        assert response.json()["metadata"]["authors"] == [
             {
                 "credited": True,
                 "name": "Grace Hopper",
                 "organization": "Navy Lab",
                 "orcid_id": "0000-0002-1825-0097",
+                "email": None,
             }
         ]
+        assert response.json()["metadata"]["investigation_owner"] is None
         assert "grace@navy.example" not in response.content.decode()
 
     def test_an_author_who_has_not_agreed_keeps_their_place_unnamed(self, client, assay):
         response = self._detail(client, self._workspace(assay, credited=False), assay)
-        assert response.json()["authors"] == [
-            {"credited": False, "name": None, "organization": None, "orcid_id": None}
+        assert response.json()["metadata"]["authors"] == [
+            {
+                "credited": False,
+                "name": "Contributor (not named)",
+                "organization": None,
+                "orcid_id": None,
+                "email": None,
+            }
         ]
         raw = response.content.decode()
         for secret in ("Grace", "Hopper", *self.SECRETS):
@@ -568,25 +579,25 @@ class TestAuthorsInTheApi:
         WorkspaceInvestigation.objects.create(
             workspace=workspace, investigation=assay.study.investigation
         )
-        authors = self._detail(client, workspace, assay).json()["authors"]
+        authors = self._authors(client, workspace, assay)
         assert authors[0]["credited"] is False
 
     def test_withdrawing_applies_on_the_next_request(self, client, assay):
         workspace = self._workspace(assay, credited=True)
-        assert self._detail(client, workspace, assay).json()["authors"][0]["credited"]
+        assert self._authors(client, workspace, assay)[0]["credited"]
         client.force_login(assay.created_by)
         client.post(
             reverse("set_workspace_credit", args=[workspace.pk]), {"credit": "off"}
         )
         client.logout()
-        assert not self._detail(client, workspace, assay).json()["authors"][0]["credited"]
+        assert not self._authors(client, workspace, assay)[0]["credited"]
 
     def test_an_account_without_a_name_is_not_named_by_its_email(self, client, assay):
         assay.created_by.first_name = assay.created_by.last_name = ""
         assay.created_by.save()
         workspace = self._workspace(assay, credited=True)
         response = self._detail(client, workspace, assay)
-        assert response.json()["authors"][0]["credited"] is False
+        assert response.json()["metadata"]["authors"][0]["credited"] is False
         assert "grace@navy.example" not in response.content.decode()
 
     def test_the_order_is_creator_then_editors_then_owner(self, client):
@@ -615,7 +626,7 @@ class TestAuthorsInTheApi:
                 workspace=workspace, user=person, credit_consent_at=timezone.now()
             )
         names = [
-            a["name"] for a in self._detail(client, workspace, assay).json()["authors"]
+            a["name"] for a in self._authors(client, workspace, assay)
         ]
         assert names == ["Carl Creator", "Edith Editor", "Olga Owner"]
 

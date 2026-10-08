@@ -187,12 +187,11 @@ def test_detail(client, populated, which):
     url = reverse("api_assay_detail", args=[populated[which].pk])
     response = client.get(url, **populated["auth"])
     check(response, url)
-    assert [a["credited"] for a in response.json()["authors"]] == [True]
-    provenance = response.json()["provenance"]
-    assert isinstance(provenance["models_used"], list)
-    assert not any("model_key" in m or "cost" in m for m in provenance["models_used"])
+    body = response.json()
+    assert [a["credited"] for a in body["metadata"]["authors"]] == [True]
+    assert body["format_version"] == 1
     if which == "full":
-        question = response.json()["sections"][0]["subsections"][0]["questions"]
+        question = body["sections"][0]["subsections"][0]["questions"]
         assert {q["parent_question_id"] for q in question} == {None, question[0]["id"]}
 
 

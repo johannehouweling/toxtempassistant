@@ -6,17 +6,18 @@ import subprocess
 import tempfile
 import uuid
 from collections.abc import Collection
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import yaml
-from django.core.serializers import serialize
 from django.db.models import Count, Min
 from django.http import FileResponse, HttpRequest, JsonResponse
 from django.utils import timezone  # Import timezone utilities
 from django.utils.text import slugify
 
 from toxtempass import Config
-from toxtempass.models import Assay, Person, Section
+from toxtempass.models import Answer, Assay, Person, Section
 from toxtempass.utilities import log_processing_event
 
 logger = logging.getLogger(__name__)
@@ -95,6 +96,7 @@ def _person_export_author_entry(person: Person | None) -> ExportAuthor | None:
     if author_name is None:
         return None
     return {
+        "credited": True,
         "name": author_name,
         "organization": _export_optional_value(person.organization),
         "orcid_id": _export_optional_value(person.orcid_id),
@@ -110,9 +112,10 @@ def _person_export_owner_entry(
     if author_entry is None:
         return None
     return {
-        **author_entry,
-        "email": _export_optional_value(person.email),
-        "orcid_id": _export_optional_value(person.orcid_id),
+        "name": author_entry["name"],
+        "organization": author_entry["organization"],
+        "orcid_id": author_entry["orcid_id"],
+        "email": author_entry["email"],
     }
 
 
@@ -232,6 +235,7 @@ def get_assay_export_author_metadata(
     if credited_ids is not None:
         authors = [
             {
+                "credited": a["credited"],
                 "name": a["name"] or ANONYMOUS_AUTHOR,
                 "organization": a["organization"],
                 "orcid_id": a["orcid_id"],
@@ -255,18 +259,56 @@ def get_assay_export_author_metadata(
     }
 
 
+FORMAT_VERSION = 1
+
+# Real Amsterdam time, summer time included. (get_fixed_timezone takes minutes.)
+AMSTERDAM_TZ = ZoneInfo("Europe/Amsterdam")
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def assay_last_modified(assay: Assay) -> datetime | None:
+    """Return the later of creation and the latest answer edit.
+
+    ``Assay`` has no modified timestamp and nothing is version-stamped, so changes
+    are read from the answers' history. Edits to the title, description or status
+    of the assay, study or investigation are not recorded there.
+    """
+    annotated = getattr(assay, "last_modified", None)
+    if annotated is not None:
+        return annotated
+    latest = (
+        assay.answers.model.history.model.objects.filter(assay_id=assay.pk)
+        .order_by("-history_date")
+        .values_list("history_date", flat=True)
+        .first()
+    )
+    return max((d for d in (assay.submission_date, latest) if d), default=None)
+
+
+def _answer_payload(answer: Answer | None) -> dict:
+    return {
+        "text": answer.answer_text if answer else "",
+        "accepted": answer.accepted if answer else None,
+        "llm_abstained": answer.llm_abstained if answer else None,
+        "source_documents": (answer.answer_documents or []) if answer else [],
+    }
+
+
 def generate_json_from_assay(
     assay: Assay, credited_ids: Collection[int] | None = None
 ) -> dict | None:
-    """Generate Json from assay (credited_ids: see get_assay_export_author_metadata)."""
+    """Return one ToxTemp as a document, the single source of every export format.
+
+    It is built field by field from an allowlist, never by serialising the models:
+    ``Assay.processing_log`` and ``user_alerts`` are server internals and user ids
+    are personal data. Everything else about the ToxTemp is published as is.
+    ``credited_ids``: see ``get_assay_export_author_metadata``.
+    """
     try:
-        # Set the timezone to Amsterdam
-        amsterdam_tz = timezone.get_fixed_timezone(
-            1
-        )  # UTC+1 for Amsterdam (standard time)
-        current_time = timezone.now().astimezone(
-            amsterdam_tz
-        )  # Current time in Amsterdam timezone
+        current_time = timezone.now().astimezone(AMSTERDAM_TZ)
 
         # Source the model identity from AssayCost (the source of truth recorded
         # by process_llm_async), not Config.model — Config.model is the import-time
@@ -313,15 +355,67 @@ def generate_json_from_assay(
             model_summary = "Not recorded"
             model_info_url_value = ""
 
-        # Prepare the data structure
-        author_metadata = get_assay_export_author_metadata(assay, credited_ids)
-        export_data = {
+        study = assay.study
+        investigation = study.investigation
+        answers_by_question_id = {a.question_id: a for a in assay.answers.all()}
+        question_set_id = assay.question_set_id
+        if question_set_id is None:
+            # Legacy assays predate the question_set FK; derive it from the
+            # questions their answers point to.
+            question_set_id = assay.answers.values_list(
+                "question__subsection__section__question_set_id", flat=True
+            ).first()
+
+        # Only walk the sections of this assay's questionnaire version —
+        # Section.objects.all() would also include every other QuestionSet in
+        # the DB, whose questions can never match this assay's answers and so
+        # would all render as "Answer not found in documents."
+        sections = [
+            {
+                "id": section.pk,
+                "title": section.title,
+                "subsections": [
+                    {
+                        "id": subsection.pk,
+                        "title": subsection.title,
+                        "questions": [
+                            {
+                                "id": q.pk,
+                                "parent_question_id": q.parent_question_id,
+                                "question_text": q.question_text,
+                                "answering_round": q.answering_round,
+                                "additional_llm_instruction": (
+                                    q.additional_llm_instruction
+                                ),
+                                "only_additional_llm_instruction": (
+                                    q.only_additional_llm_instruction
+                                ),
+                                "only_subsections_for_context": (
+                                    q.only_subsections_for_context
+                                ),
+                                "riskhunt3r_db_label": q.riskhunt3r_db_label,
+                                "answer": _answer_payload(
+                                    answers_by_question_id.get(q.pk)
+                                ),
+                            }
+                            for q in subsection.questions.all()
+                        ],
+                    }
+                    for subsection in section.subsections.all()
+                ],
+            }
+            for section in Section.objects.filter(question_set_id=question_set_id)
+            .prefetch_related("subsections__questions")
+            .order_by("pk")
+        ]
+
+        return {
+            "format_version": FORMAT_VERSION,
             "metadata": {
                 # Current date and time in ISO format
                 "creation_date": current_time.isoformat(),
                 # Filename for the export
                 "filename": f"toxtemp_{slugify(assay.title)}",
-                # Replace with your actual website name
                 "reference_toxtemp": getattr(Config, "reference_toxtemp", None),
                 "website": "toxtempassistant.vhp4safety.nl",
                 # Structured per-run LLM identities (machine-readable companion to
@@ -346,74 +440,33 @@ def generate_json_from_assay(
                     "git_hash": getattr(Config, "git_hash", None),
                     "license_url": getattr(Config, "license_url", None),
                 },
-                **author_metadata,
+                **get_assay_export_author_metadata(assay, credited_ids),
             },
-            "investigation": json.loads(serialize("json", [assay.study.investigation]))[
-                0
-            ],
-            "study": json.loads(serialize("json", [assay.study]))[0],
-            "assay": json.loads(serialize("json", [assay]))[0],
-            "answers": json.loads(serialize("json", assay.answers.all())),
+            "investigation": {
+                "id": investigation.pk,
+                "title": investigation.title,
+                "description": investigation.description,
+                "submission_date": _iso(investigation.submission_date),
+                "public_release_date": _iso(investigation.public_release_date),
+            },
+            "study": {
+                "id": study.pk,
+                "title": study.title,
+                "description": study.description,
+                "submission_date": _iso(study.submission_date),
+            },
+            "assay": {
+                "id": assay.pk,
+                "title": assay.title,
+                "description": assay.description,
+                "status": assay.status,
+                "submission_date": _iso(assay.submission_date),
+                "last_modified": _iso(assay_last_modified(assay)),
+                "question_set": assay.question_set.label if assay.question_set else None,
+                "completion_time_seconds": assay.completion_time_seconds,
+            },
+            "sections": sections,
         }
-
-        # Add questions and their corresponding answers
-        questions_with_answers = []
-        for answer in assay.answers.all():
-            question_data = json.loads(serialize("json", [answer.question]))[0]
-            questions_with_answers.append(
-                {
-                    "question": question_data,
-                    "answer": answer.answer_text,
-                    "source": answer.answer_documents,
-                }
-            )
-        export_data["questions_with_answers"] = questions_with_answers
-
-        # Add sections and subsections with questions and answers.
-        # Only walk the sections of this assay's questionnaire version —
-        # Section.objects.all() would also include every other QuestionSet in
-        # the DB, whose questions can never match this assay's answers and so
-        # would all render as "Answer not found in documents."
-        question_set_id = assay.question_set_id
-        if question_set_id is None:
-            # Legacy assays predate the question_set FK; derive it from the
-            # questions their answers point to.
-            question_set_id = assay.answers.values_list(
-                "question__subsection__section__question_set_id", flat=True
-            ).first()
-        answers_by_question_id = {
-            answer.question_id: answer for answer in assay.answers.all()
-        }
-        sections = []
-        for section in Section.objects.filter(
-            question_set_id=question_set_id
-        ).prefetch_related("subsections__questions"):
-            section_data = {
-                "section": json.loads(serialize("json", [section]))[0],
-                "subsections": [],
-            }
-            for subsection in section.subsections.all():
-                subsection_data = {
-                    "subsection": json.loads(serialize("json", [subsection]))[0],
-                    "questions_with_answers": [],
-                }
-                # Add questions and answers for this subsection
-                for question in subsection.questions.all():
-                    # Find the corresponding answer, if any
-                    answer = answers_by_question_id.get(question.id)
-                    answer_text = answer.answer_text if answer else ""
-                    subsection_data["questions_with_answers"].append(
-                        {
-                            "question": json.loads(serialize("json", [question]))[0],
-                            "answer": answer_text,
-                        }
-                    )
-
-                section_data["subsections"].append(subsection_data)
-            sections.append(section_data)
-
-        export_data["sections"] = sections
-        return export_data
 
     except Assay.DoesNotExist:
         return None
@@ -456,23 +509,23 @@ def generate_markdown_from_assay(
     markdown.append("\n")
 
     # Include investigation details
-    investigation_title = export_data["investigation"]["fields"]["title"]
-    investigation_description = export_data["investigation"]["fields"]["description"]
+    investigation_title = export_data["investigation"]["title"]
+    investigation_description = export_data["investigation"]["description"]
     markdown.append("# Investigation\n")
     markdown.append(f"- **Title:** {investigation_title}\n")
     markdown.append(f"- **Description:** {investigation_description}\n")
     markdown.append("\n")
 
     # Include study details
-    study_title = export_data["study"]["fields"]["title"]
-    study_description = export_data["study"]["fields"]["description"]
+    study_title = export_data["study"]["title"]
+    study_description = export_data["study"]["description"]
     markdown.append("# Study\n")
     markdown.append(f"- **Title:** {study_title}\n")
     markdown.append(f"- **Description:** {study_description}\n")
     markdown.append("\n")
 
     # Include assay details
-    assay_title = export_data["assay"]["fields"]["title"]
+    assay_title = export_data["assay"]["title"]
     markdown.append("# Assay\n")
     markdown.append(f"- **Title:** {assay_title}\n")
     markdown.append("\n")
@@ -483,24 +536,18 @@ def generate_markdown_from_assay(
     # Add sections and subsections to Markdown
     for section in sections:
         # Add section title
-        section_title = section["section"]["fields"][
-            "title"
-        ]  # Adjust based on your model's field names
+        section_title = section["title"]
         markdown.append(f"# {section_title}\n")  # Section title
 
         for subsection in section["subsections"]:
             # Add subsection title
-            subsection_title = subsection["subsection"]["fields"][
-                "title"
-            ]  # Adjust based on your model's field names
+            subsection_title = subsection["title"]
             markdown.append(f"## {subsection_title}\n")  # Subsection title
 
-            for qa in subsection["questions_with_answers"]:
-                question_text = qa["question"]["fields"][
-                    "question_text"
-                ]  # Adjust based on your model's field names
+            for question in subsection["questions"]:
+                question_text = question["question_text"]
                 answer_text = (
-                    qa["answer"] if qa["answer"] else "Answer not found in documents."
+                    question["answer"]["text"] or "Answer not found in documents."
                 )
 
                 # Add question and answer in a list format
@@ -534,12 +581,7 @@ def get_create_meta_data_yaml(
             are named, and never by email address.
 
     """
-    # get date:
-    # Define the Amsterdam timezone (UTC+1)
-    amsterdam_tz = timezone.get_fixed_timezone(1)  # 1 means UTC+1
-
-    # Get the current time in UTC and convert it to Amsterdam time
-    current_time = timezone.now().astimezone(amsterdam_tz)
+    current_time = timezone.now().astimezone(AMSTERDAM_TZ)
 
     # Optionally, you can extract the date from the current_time if needed
     current_date = current_time.date()

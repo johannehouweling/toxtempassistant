@@ -26,11 +26,10 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET, require_POST
 
 from toxtempass import config, notifications, utilities
-from toxtempass.export import export_assay_to_file, get_assay_api_authors
+from toxtempass.export import export_assay_to_file, generate_json_from_assay
 from toxtempass.models import (
     Answer,
     Assay,
-    Section,
     Workspace,
     WorkspaceApiToken,
     WorkspaceMember,
@@ -240,32 +239,6 @@ def _assay_summary(assay: Assay) -> dict:
     }
 
 
-def _answer_payload(answer: Answer | None) -> dict:
-    return {
-        "text": answer.answer_text if answer else "",
-        "accepted": answer.accepted if answer else None,
-        "llm_abstained": answer.llm_abstained if answer else None,
-        "source_documents": (answer.answer_documents or []) if answer else [],
-    }
-
-
-def _provenance(assay: Assay) -> dict:
-    """Say how the ToxTemp was drafted, without internal deployment keys or costs."""
-    models = [
-        {
-            "model_id": cost.model_id or None,
-            "temperature": cost.temperature or None,
-        }
-        for cost in assay.costs.order_by("updated_at")
-    ]
-    return {
-        "models_used": models,
-        "app_version": config.version or None,
-        "reference_toxtemp": config.reference_toxtemp,
-        "reference_toxtempassistant": config.reference_toxtempassistant_paper,
-    }
-
-
 def _credited_ids(workspace: Workspace) -> frozenset[int]:
     """Return who may be named: members of the workspace who agreed to be credited.
 
@@ -277,58 +250,6 @@ def _credited_ids(workspace: Workspace) -> frozenset[int]:
             workspace=workspace, credit_consent_at__isnull=False
         ).values_list("user_id", flat=True)
     )
-
-
-def _assay_detail(assay: Assay, credited_ids: frozenset[int]) -> dict:
-    """Return one ToxTemp as an explicit allowlist of fields.
-
-    Built field by field on purpose: serialising the models would also expose
-    internal ones (``processing_log``, ``user_alerts``, user ids).
-    """
-    answers = {a.question_id: a for a in assay.answers.all()}
-    question_set_id = assay.question_set_id
-    if question_set_id is None and answers:
-        # Assays from before question sets: derive it from the answered questions.
-        question_set_id = (
-            Section.objects.filter(subsections__questions__answers__assay=assay)
-            .values_list("question_set_id", flat=True)
-            .first()
-        )
-    sections = (
-        Section.objects.filter(question_set_id=question_set_id)
-        .prefetch_related("subsections__questions")
-        .order_by("pk")
-    )
-    return {
-        **_assay_summary(assay),
-        "description": assay.description,
-        "question_set": assay.question_set.label if assay.question_set else None,
-        "authors": get_assay_api_authors(assay, credited_ids),
-        "provenance": _provenance(assay),
-        "sections": [
-            {
-                "id": section.pk,
-                "title": section.title,
-                "subsections": [
-                    {
-                        "id": sub.pk,
-                        "title": sub.title,
-                        "questions": [
-                            {
-                                "id": q.pk,
-                                "parent_question_id": q.parent_question_id,
-                                "text": q.question_text,
-                                "answer": _answer_payload(answers.get(q.pk)),
-                            }
-                            for q in sub.questions.all()
-                        ],
-                    }
-                    for sub in section.subsections.all()
-                ],
-            }
-            for section in sections
-        ],
-    }
 
 
 @require_GET
@@ -408,7 +329,9 @@ def api_assay_detail(
     )
     if assay is None:
         return _error("Not found", 404)
-    return _api_response(JsonResponse(_assay_detail(assay, _credited_ids(workspace))))
+    return _api_response(
+        JsonResponse(generate_json_from_assay(assay, _credited_ids(workspace)))
+    )
 
 
 @require_GET

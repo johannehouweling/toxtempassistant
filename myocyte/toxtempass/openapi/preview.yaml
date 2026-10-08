@@ -232,7 +232,7 @@ components:
           properties:
             pdf_cooldown_seconds: {type: integer}
     AssayFields:
-      description: Fields shared by the list entries and the full ToxTemp.
+      description: The fields of a list entry.
       type: object
       required: [id, title, status, submission_date, last_modified, study, investigation]
       properties:
@@ -268,32 +268,49 @@ components:
           type: array
           items: {$ref: "#/components/schemas/AssaySummary"}
     AssayDetail:
-      allOf:
-        - $ref: "#/components/schemas/AssayFields"
-        - type: object
-          required: [description, question_set, authors, provenance, sections]
-          properties:
-            description: {type: string}
-            authors:
-              type: array
-              description: |
-                In author order: the creator first, then the people who edited the
-                answers (most edits first), and the investigation owner last. An
-                unnamed contributor keeps its place.
-              items: {$ref: "#/components/schemas/Author"}
-            question_set:
-              type: [string, "null"]
-              description: Label of the questionnaire version the ToxTemp uses.
-            provenance: {$ref: "#/components/schemas/Provenance"}
-            sections:
-              type: array
-              items: {$ref: "#/components/schemas/Section"}
-      unevaluatedProperties: false
-    Provenance:
+      description: |
+        One ToxTemp. This is the same document the app offers as its JSON download,
+        so every export format is built from it. Internal fields (processing logs,
+        user ids) are never part of it.
       type: object
       additionalProperties: false
-      required: [models_used, app_version, reference_toxtemp, reference_toxtempassistant]
+      required: [format_version, metadata, investigation, study, assay, sections]
       properties:
+        format_version:
+          type: integer
+          description: Layout of this document. Changes only when the layout does.
+        metadata: {$ref: "#/components/schemas/Metadata"}
+        investigation: {$ref: "#/components/schemas/Investigation"}
+        study: {$ref: "#/components/schemas/Study"}
+        assay: {$ref: "#/components/schemas/Assay"}
+        sections:
+          type: array
+          items: {$ref: "#/components/schemas/Section"}
+    Metadata:
+      type: object
+      additionalProperties: false
+      required:
+        - creation_date
+        - filename
+        - reference_toxtemp
+        - website
+        - models_used
+        - config
+        - author
+        - authors
+        - main_author
+        - co_authors
+        - investigation_owner
+      properties:
+        creation_date:
+          type: string
+          format: date-time
+          description: When this document was generated, in Amsterdam time.
+        filename: {type: string}
+        reference_toxtemp:
+          type: [string, "null"]
+          description: DOI of the ToxTemp template publication.
+        website: {type: string}
         models_used:
           type: array
           description: |
@@ -302,34 +319,124 @@ components:
           items:
             type: object
             additionalProperties: false
-            required: [model_id, temperature]
+            required: [model_key, model_id, info_url, temperature]
             properties:
-              model_id: {type: [string, "null"]}
+              model_key: {type: string}
+              model_id: {type: string}
+              info_url: {type: string}
               temperature:
-                type: [string, "null"]
-                description: Null for runs that predate temperature tracking.
-        app_version: {type: [string, "null"]}
-        reference_toxtemp:
-          type: [string, "null"]
-          description: DOI of the ToxTemp template publication.
-        reference_toxtempassistant:
-          type: [string, "null"]
-          description: DOI of the ToxTempAssistant publication.
+                type: string
+                description: '"not recorded" for runs that predate temperature tracking.'
+        config:
+          type: object
+          description: How the document was produced, for reproducibility.
+          additionalProperties: false
+          required:
+            - model
+            - model_info_url
+            - reference_toxtempassistant
+            - reference_toxtemp
+            - website
+            - version
+            - github_repo_url
+            - git_hash
+            - license_url
+          properties:
+            model: {type: string}
+            model_info_url: {type: [string, "null"]}
+            reference_toxtempassistant: {type: [string, "null"]}
+            reference_toxtemp: {type: [string, "null"]}
+            website: {type: string}
+            version: {type: [string, "null"]}
+            github_repo_url: {type: [string, "null"]}
+            git_hash: {type: [string, "null"]}
+            license_url: {type: [string, "null"]}
+        author:
+          type: array
+          description: Names of `authors`, in the same order.
+          items: {type: string}
+        authors:
+          type: array
+          description: |
+            In author order: the creator first, then the people who edited the
+            answers (most edits first), and the investigation owner last. A
+            contributor who has not agreed to be named keeps their place.
+          items: {$ref: "#/components/schemas/Author"}
+        main_author: {type: [string, "null"]}
+        co_authors:
+          type: array
+          items: {type: string}
+        investigation_owner:
+          type: "null"
+          description: Always null here; the owner's details are not shared.
     Author:
       type: object
       additionalProperties: false
-      required: [credited, name, organization, orcid_id]
+      required: [credited, name, organization, orcid_id, email]
       properties:
         credited:
           type: boolean
           description: |
-            False for a contributor who has not agreed to be named; then `name`,
-            `organization` and `orcid_id` are null.
-        name: {type: [string, "null"]}
+            False for a contributor who has not agreed to be named; then `name` is
+            "Contributor (not named)" and the other fields are null.
+        name: {type: string}
         organization: {type: [string, "null"]}
         orcid_id:
           type: [string, "null"]
           description: ORCID iD, e.g. 0000-0002-1825-0097.
+        email:
+          type: "null"
+          description: Always null here; email addresses are never shared.
+    Investigation:
+      type: object
+      additionalProperties: false
+      required: [id, title, description, submission_date, public_release_date]
+      properties:
+        id: {type: integer}
+        title: {type: string}
+        description: {type: string}
+        submission_date: {type: string, format: date-time}
+        public_release_date: {type: [string, "null"], format: date-time}
+    Study:
+      type: object
+      additionalProperties: false
+      required: [id, title, description, submission_date]
+      properties:
+        id: {type: integer}
+        title: {type: string}
+        description: {type: string}
+        submission_date: {type: string, format: date-time}
+    Assay:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - description
+        - status
+        - submission_date
+        - last_modified
+        - question_set
+        - completion_time_seconds
+      properties:
+        id: {type: integer}
+        title: {type: string}
+        description: {type: string}
+        status:
+          type: string
+          description: State of the AI drafting for this ToxTemp.
+          enum: [none, scheduled, busy, done, error]
+        submission_date: {type: string, format: date-time}
+        last_modified:
+          type: string
+          format: date-time
+          description: |
+            The later of creation and the latest answer edit. Changes to titles,
+            descriptions or status are not reflected.
+        question_set:
+          type: [string, "null"]
+          description: Label of the questionnaire version the ToxTemp uses.
+        completion_time_seconds: {type: [integer, "null"]}
     Section:
       type: object
       additionalProperties: false
@@ -353,13 +460,27 @@ components:
     Question:
       type: object
       additionalProperties: false
-      required: [id, parent_question_id, text, answer]
+      required:
+        - id
+        - parent_question_id
+        - question_text
+        - answering_round
+        - additional_llm_instruction
+        - only_additional_llm_instruction
+        - only_subsections_for_context
+        - riskhunt3r_db_label
+        - answer
       properties:
         id: {type: integer}
         parent_question_id:
           type: [integer, "null"]
           description: Set for follow-up questions.
-        text: {type: string}
+        question_text: {type: string}
+        answering_round: {type: integer}
+        additional_llm_instruction: {type: string}
+        only_additional_llm_instruction: {type: boolean}
+        only_subsections_for_context: {type: boolean}
+        riskhunt3r_db_label: {type: string}
         answer: {$ref: "#/components/schemas/Answer"}
     Answer:
       type: object
