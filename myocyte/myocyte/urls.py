@@ -273,6 +273,26 @@ urlpatterns += [
         views.remove_workspace_member,
         name="remove_workspace_member",
     ),
+    path(
+        "workspace/<int:pk>/invitation/<int:invitation_id>/cancel/",
+        views.cancel_workspace_invitation,
+        name="cancel_workspace_invitation",
+    ),
+    path(
+        "workspace/invitation/<int:pk>/",
+        views.workspace_invitation,
+        name="workspace_invitation",
+    ),
+    path(
+        "workspace/invitation/<int:pk>/respond/",
+        views.respond_workspace_invitation,
+        name="respond_workspace_invitation",
+    ),
+    path(
+        "workspace/<int:pk>/credit/",
+        views.set_workspace_credit,
+        name="set_workspace_credit",
+    ),
     path("workspace/<int:pk>/tokens/", api.list_tokens, name="workspace_tokens"),
     path(
         "workspace/<int:pk>/tokens/create/",

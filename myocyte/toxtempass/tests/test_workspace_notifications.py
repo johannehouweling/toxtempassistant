@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from toxtempass import Config, notifications
-from toxtempass.models import EmailLog, WorkspaceMember
+from toxtempass.models import EmailLog, WorkspaceInvitation, WorkspaceMember
 from toxtempass.tests.fixtures.factories import (
     AdminFactory,
     PersonFactory,
@@ -43,12 +43,26 @@ def workspace(owner):
 
 
 def _add(client, actor, workspace, person):
+    """Invite ``person`` and let them accept, which is how anyone joins."""
     client.force_login(actor)
     response = client.post(
         reverse("add_workspace_member_by_email", args=[workspace.pk]),
         {"email": person.email},
     )
     assert response.json()["success"] is True
+    invitation = WorkspaceInvitation.objects.get(workspace=workspace, user=person)
+    client.force_login(person)
+    client.post(
+        reverse("respond_workspace_invitation", args=[invitation.pk]),
+        {"action": "accept"},
+    )
+
+
+def _admin_add(workspace, person, by):
+    """Add ``person`` the way the admin does, which still sends the 'added' email."""
+    member = WorkspaceMemberFactory(workspace=workspace, user=person, added_by=by)
+    notifications.notify_member_added(member, by)
+    return member
 
 
 def _remove(client, actor, workspace, person):
@@ -64,8 +78,8 @@ def _after_cooloff(extra_minutes=0):
     return timezone.now() + COOLOFF + timedelta(minutes=1 + extra_minutes)
 
 
-def test_added_member_is_emailed_once_after_the_cooloff(client, owner, workspace, member):
-    _add(client, owner, workspace, member)
+def test_admin_added_member_is_emailed_once_after_the_cooloff(owner, workspace, member):
+    _admin_add(workspace, member, owner)
 
     notifications.run_email_jobs(now=timezone.now() + timedelta(minutes=5))
     assert mail.outbox == []
@@ -83,9 +97,9 @@ def test_added_member_is_emailed_once_after_the_cooloff(client, owner, workspace
     assert len(mail.outbox) == 1
 
 
-def test_several_adds_arrive_as_one_email(client, owner, member):
-    _add(client, owner, WorkspaceFactory(owner=owner), member)
-    _add(client, owner, WorkspaceFactory(owner=owner), member)
+def test_several_adds_arrive_as_one_email(owner, member):
+    _admin_add(WorkspaceFactory(owner=owner), member, owner)
+    _admin_add(WorkspaceFactory(owner=owner), member, owner)
 
     notifications.run_email_jobs(now=_after_cooloff())
 
@@ -96,7 +110,7 @@ def test_several_adds_arrive_as_one_email(client, owner, member):
 
 
 def test_add_undone_within_the_cooloff_sends_nothing(client, owner, workspace, member):
-    _add(client, owner, workspace, member)
+    _admin_add(workspace, member, owner)
     _remove(client, owner, workspace, member)
 
     notifications.run_email_jobs(now=_after_cooloff())
@@ -105,7 +119,7 @@ def test_add_undone_within_the_cooloff_sends_nothing(client, owner, workspace, m
 
 
 def test_removed_member_is_told_after_the_cooloff(client, owner, workspace, member):
-    _add(client, owner, workspace, member)
+    _admin_add(workspace, member, owner)
     notifications.run_email_jobs(now=_after_cooloff())
     assert len(mail.outbox) == 1
 
@@ -157,10 +171,10 @@ def test_deleting_a_workspace_tells_the_other_members(client, owner, workspace, 
     )
 
 
-def test_switched_off_workspace_emails_are_not_sent(client, owner, workspace, member):
+def test_switched_off_workspace_emails_are_not_sent(owner, workspace, member):
     notifications.set_email_enabled(member, notifications.WORKSPACE_ADDED, False)
 
-    _add(client, owner, workspace, member)
+    _admin_add(workspace, member, owner)
     notifications.run_email_jobs(now=_after_cooloff())
 
     assert mail.outbox == []

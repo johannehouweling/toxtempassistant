@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Workspace invitation | ToxTempAssistant{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-body">
+        <h1 class="card-title fs-3">Invitation to {{ invitation.workspace.name }}</h1>
+        <p class="card-text">
+          {{ invitation.invited_by.get_full_name|default:invitation.invited_by.email|default:"Someone" }}
+          invited you to join this workspace as {{ invitation.get_role_display|lower }}.
+          You have no access until you accept.
+        </p>
+        {% if invitation.is_expired %}
+        <div class="alert alert-warning">
+          This invitation has expired. Ask the workspace owner or an admin to invite you again.
+        </div>
+        {% else %}
+        {% include "toxtempass/base_extras/workspaces/workspace_terms.html" %}
+        <form method="post" action="{% url 'respond_workspace_invitation' invitation.pk %}" class="d-flex gap-2">
+          {% csrf_token %}
+          <button type="submit" name="action" value="accept" class="btn btn-primary">Accept and join</button>
+          <button type="submit" name="action" value="decline" class="btn btn-outline-secondary">Decline</button>
+        </form>
+        <p class="text-muted fs-7 mt-3 mb-0">Valid until {{ invitation.expires_at|date:"j F Y" }}.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

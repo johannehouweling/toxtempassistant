@@ -45,6 +45,7 @@ from toxtempass.models import (
     Person,
     WorkspaceApiToken,
     WorkspaceInvestigation,
+    WorkspaceInvitation,
     WorkspaceMember,
 )
 
@@ -54,6 +55,7 @@ EMAIL_CONFIRMATION = "email_confirmation"
 BETA_APPROVED = "beta_approved"
 PASSWORD_CHANGED = "password_changed"  # noqa: S105 - an email kind, not a secret
 WORKSPACE_ADDED = "workspace_added"
+WORKSPACE_INVITATION = "workspace_invitation"
 WORKSPACE_ACCESS_LOST = "workspace_access_lost"
 API_TOKEN_CREATED = "api_token_created"  # noqa: S105 - an email kind, not a secret
 MAINTAINER_BETA_DIGEST = "maintainer_beta_digest"
@@ -118,6 +120,9 @@ KINDS: dict[str, EmailKind] = {
             grouped=True,
             label="I am removed from a workspace, or it is deleted",
         ),
+        # Not optional: an invitation only takes effect when it is answered, and the
+        # answer is the person's agreement to what the email explains.
+        EmailKind(WORKSPACE_INVITATION, "toxtempass/email/workspace_invitation"),
         # Not optional, unlike the other workspace emails: it tells owners that an
         # outside server can read their investigation, which they must not be able
         # to miss by switching a setting off.
@@ -593,6 +598,51 @@ def _build_workspace_added(logs: list[EmailLog]) -> _Built | str:
     )
 
 
+def active_token_names(workspace_id: int) -> list[str]:
+    """Return the names of the workspace's API tokens that can be used now."""
+    return [
+        _one_line(name)
+        for name in WorkspaceApiToken.objects.filter(
+            workspace_id=workspace_id,
+            revoked_at__isnull=True,
+            expires_at__gt=timezone.now(),
+        )
+        .order_by("created_at")
+        .values_list("name", flat=True)
+    ]
+
+
+def _build_workspace_invitation(logs: list[EmailLog]) -> _Built | str:
+    """Build the invitation, which doubles as the explanation of what joining means."""
+    log = logs[0]
+    invitation = (
+        WorkspaceInvitation.objects.filter(pk=log.payload.get("invitation_id"))
+        .select_related("workspace", "invited_by", "user")
+        .first()
+    )
+    if invitation is None:
+        return "The invitation was answered or cancelled"
+    if invitation.is_expired:
+        return "The invitation has expired"
+    workspace_name = _one_line(invitation.workspace.name)
+    inviter = _display_name(invitation.invited_by)
+    return _Built(
+        subject=(
+            f"{inviter or 'Someone'} invited you to the workspace “{workspace_name}”"
+        ),
+        context={
+            "workspace_name": workspace_name,
+            "invited_by": inviter,
+            "role": invitation.get_role_display(),
+            "token_names": active_token_names(invitation.workspace_id),
+            "expires_on": invitation.expires_at.date(),
+            "invitation_url": utilities.absolute_url(
+                reverse("workspace_invitation", args=[invitation.pk])
+            ),
+        },
+    )
+
+
 def _build_api_token_created(logs: list[EmailLog]) -> _Built | str:
     """Tell an investigation owner that a token can now read their investigation."""
     log = logs[0]
@@ -742,6 +792,7 @@ _BUILDERS: dict[str, Callable[[list[EmailLog]], _Built | str]] = {
     ACCOUNT_DELETED: _build_account_deleted,
     WORKSPACE_ADDED: _build_workspace_added,
     WORKSPACE_ACCESS_LOST: _build_workspace_access_lost,
+    WORKSPACE_INVITATION: _build_workspace_invitation,
     API_TOKEN_CREATED: _build_api_token_created,
     MAINTAINER_BETA_DIGEST: _build_beta_digest,
     MAINTAINER_COST_ALERT: _build_cost_alert,
@@ -824,6 +875,47 @@ def notify_member_added(member: WorkspaceMember, added_by: Person | None) -> Non
         user=member.user,
         payload={"workspace_id": member.workspace_id},
         send_after=now + timedelta(minutes=config._email_cooloff_minutes),
+    )
+
+
+def notify_invited(invitation: WorkspaceInvitation) -> None:
+    """Queue the invitation email, to go out after the cool-off.
+
+    A mistyped invitation that is cancelled within the cool-off sends nothing.
+    """
+    queue_email(
+        WORKSPACE_INVITATION,
+        user=invitation.user,
+        payload={"invitation_id": invitation.pk},
+        dedup_key=f"workspace-invitation:{invitation.pk}",
+        send_after=timezone.now() + timedelta(minutes=config._email_cooloff_minutes),
+    )
+
+
+def cancel_access_lost_notice(user_id: int, workspace_id: int) -> None:
+    """Drop a pending 'you lost access' email for someone who has just rejoined."""
+    EmailLog.objects.filter(
+        kind=WORKSPACE_ACCESS_LOST,
+        user_id=user_id,
+        status=EmailLog.Status.PENDING,
+        payload__workspace_id=workspace_id,
+    ).update(
+        status=EmailLog.Status.SKIPPED,
+        error="Rejoined the workspace during the cool-off",
+        updated_at=timezone.now(),
+    )
+
+
+def cancel_invitation_notice(invitation_id: int) -> None:
+    """Drop the invitation email if it has not gone out yet."""
+    EmailLog.objects.filter(
+        kind=WORKSPACE_INVITATION,
+        status=EmailLog.Status.PENDING,
+        payload__invitation_id=invitation_id,
+    ).update(
+        status=EmailLog.Status.SKIPPED,
+        error="The invitation was answered or cancelled during the cool-off",
+        updated_at=timezone.now(),
     )
 
 

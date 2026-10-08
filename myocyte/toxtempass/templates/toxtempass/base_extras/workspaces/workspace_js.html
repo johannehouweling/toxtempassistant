@@ -372,35 +372,28 @@
           const empty = wrap.querySelector(".empty-members");
           if (empty) empty.remove();
 
-          const canRemove = workspaceEl.getAttribute("data-can-remove") === "1";
+          // Nobody joins by being added: show the invitation until it is answered.
           const memberEmailRaw = (data.member_email || email).trim();
-          const currentUserEmail =
-            document.getElementById("ownedWorkspacesContainer")?.dataset
-              .currentUser || "";
-          const initial = memberEmailRaw.slice(0, 1).toUpperCase();
-          const displayText =
-            memberEmailRaw.toLowerCase() ===
-            (currentUserEmail || "").toLowerCase()
-              ? "You"
-              : memberEmailRaw;
-
           const chip = document.createElement("span");
           chip.className =
-            "d-inline-flex align-items-center member-row member-chip";
-          chip.setAttribute("data-user-id", data.user_id || "");
-
-          chip.innerHTML = `
-          <span class="d-inline-flex align-items-center justify-content-center fw-bold text-white member-avatar">${escapeHtml(initial)}</span>
-          <span class="member-text" data-bs-email="${escapeHtml(memberEmailRaw)}">${escapeHtml(displayText)}</span>
-          ${
-            canRemove
-              ? `
-            <button type="button" class="btn btn-link p-0 m-0 text-secondary btn-remove-member" aria-label="Remove ${escapeHtml(memberEmailRaw)}" title="Remove ${escapeHtml(memberEmailRaw)}">
-              <i class="bi bi-x"></i>
-            </button>`
-              : ``
-          }
-        `;
+            "d-inline-flex align-items-center member-chip invite-row text-muted";
+          chip.dataset.invitationId = data.invitation_id || "";
+          chip.title = "Invitation sent, not accepted yet";
+          const avatar = document.createElement("span");
+          avatar.className =
+            "d-inline-flex align-items-center justify-content-center fw-bold member-avatar";
+          avatar.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+          const text = document.createElement("span");
+          text.className = "member-text";
+          text.textContent = `${memberEmailRaw} (invited)`;
+          const cancel = document.createElement("button");
+          cancel.type = "button";
+          cancel.className =
+            "btn btn-link p-0 m-0 text-secondary btn-cancel-invitation";
+          cancel.title = "Cancel invitation";
+          cancel.setAttribute("aria-label", `Cancel invitation for ${memberEmailRaw}`);
+          cancel.innerHTML = '<i class="bi bi-x"></i>';
+          chip.append(avatar, text, cancel);
 
           const addBtn = wrap.querySelector(".btn-add-member");
           if (addBtn) wrap.insertBefore(chip, addBtn);
@@ -707,6 +700,41 @@
         .catch((err) => alert("Error: " + err));
       return;
     }
+  });
+
+  // Withdrawing an invitation, and giving or withdrawing the agreement to be credited.
+  document.addEventListener("click", function (e) {
+    const cancel = e.target.closest(".btn-cancel-invitation");
+    if (!cancel) return;
+    const card = cancel.closest(".workspace-list");
+    const row = cancel.closest(".invite-row");
+    if (!card || !row) return;
+    fetch(
+      `/workspace/${card.getAttribute("data-workspace-id")}/invitation/${row.dataset.invitationId}/cancel/`,
+      { method: "POST", headers: { "X-CSRFToken": csrftoken } },
+    )
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) row.remove();
+      });
+  });
+  document.addEventListener("change", function (e) {
+    const sw = e.target.closest(".credit-switch");
+    if (!sw) return;
+    const card = sw.closest(".workspace-list");
+    fetch(`/workspace/${card.getAttribute("data-workspace-id")}/credit/`, {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": csrftoken,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ credit: sw.checked ? "on" : "off" }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.success) sw.checked = !sw.checked;
+      })
+      .catch(() => (sw.checked = !sw.checked));
   });
 
   // API tokens (owner and admins): list, create, revoke. Text goes in via textContent.

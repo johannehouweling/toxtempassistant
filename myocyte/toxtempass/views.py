@@ -3104,12 +3104,16 @@ from toxtempass.workspace import (  # noqa: E402, F401
     add_workspace_assay,
     add_workspace_member,
     add_workspace_member_by_email,
+    cancel_workspace_invitation,
     create_or_update_workspace,
     delete_workspace,
     get_workspace_list,
     remove_workspace_assay,
     remove_workspace_member,
     remove_workspace_member_by_email,
+    respond_workspace_invitation,
+    set_workspace_credit,
+    workspace_invitation,
 )
 
 

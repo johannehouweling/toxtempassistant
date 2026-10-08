@@ -15,6 +15,7 @@ from toxtempass.models import (
     Study,
     Workspace,
     WorkspaceInvestigation,
+    WorkspaceInvitation,
     WorkspaceMember,
     WorkspaceRole,
 )
@@ -482,7 +483,13 @@ class TestAddWorkspaceMember:
         assert resp.status_code == 200
         data = resp.json()
         assert data["success"] is True
-        assert WorkspaceMember.objects.filter(workspace=workspace, user=member_user).exists()
+        # Added means invited: no membership, and so no access, until accepted.
+        assert not WorkspaceMember.objects.filter(
+            workspace=workspace, user=member_user
+        ).exists()
+        assert WorkspaceInvitation.objects.filter(
+            workspace=workspace, user=member_user
+        ).exists()
 
     def test_admin_can_add_member_by_id(self, client, workspace, admin_user, member_user):
         WorkspaceMemberFactory.create(
@@ -541,6 +548,18 @@ class TestAddWorkspaceMember:
             reverse("add_workspace_member", kwargs={"pk": workspace.pk}),
             data={"user": member_user.pk, "role": WorkspaceRole.MEMBER},
         )
+        # Invited only: nothing is granted yet.
+        assert "view_investigation" not in get_perms(
+            Person.objects.get(pk=member_user.pk), investigation
+        )
+        invitation = WorkspaceInvitation.objects.get(
+            workspace=workspace, user=member_user
+        )
+        client.force_login(member_user)
+        client.post(
+            reverse("respond_workspace_invitation", args=[invitation.pk]),
+            {"action": "accept"},
+        )
         fresh = Person.objects.get(pk=member_user.pk)
         assert "view_investigation" in get_perms(fresh, investigation)
 
@@ -553,7 +572,9 @@ class TestAddWorkspaceMember:
         assert resp.status_code == 200
         data = resp.json()
         assert data["success"] is True
-        assert WorkspaceMember.objects.filter(workspace=workspace, user=member_user).exists()
+        assert WorkspaceInvitation.objects.filter(
+            workspace=workspace, user=member_user
+        ).exists()
 
     def test_add_member_by_email_nonexistent_email_returns_404(self, client, owner, workspace):
         client.force_login(owner)
@@ -1027,6 +1048,17 @@ def _give_member_access(client, workspace, investigation, owner, member_user):
         reverse("add_workspace_member", kwargs={"pk": workspace.pk}),
         data={"user": member_user.pk, "role": WorkspaceRole.MEMBER},
     )
+    # Nobody joins by being added: the invited person has to accept.
+    invitation = WorkspaceInvitation.objects.filter(
+        workspace=workspace, user=member_user
+    ).first()
+    if invitation is not None:
+        client.force_login(member_user)
+        client.post(
+            reverse("respond_workspace_invitation", args=[invitation.pk]),
+            {"action": "accept"},
+        )
+        client.force_login(owner)
 
 
 # ---------------------------------------------------------------------------

@@ -5,6 +5,16 @@
     <div class="text-muted">Share investigations with others via workspaces.</div>
   </div>
 
+  {% for inv in my_invitations %}
+  <div class="alert alert-info d-flex align-items-center justify-content-between gap-2 py-2">
+    <span class="fs-7">
+      <i class="bi bi-envelope-open"></i>
+      You are invited to <strong>{{ inv.workspace.name }}</strong>{% if inv.invited_by %} by {{ inv.invited_by.get_full_name|default:inv.invited_by.email }}{% endif %}.
+    </span>
+    <a class="btn btn-sm btn-primary" href="{% url 'workspace_invitation' inv.pk %}">Review</a>
+  </div>
+  {% endfor %}
+
   <div class="d-flex gap-2 mb-3">
     <button id="btnNewWorkspace" class="btn btn-outline-primary">New Workspace</button>
   </div>

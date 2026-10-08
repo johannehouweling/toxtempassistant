@@ -1057,8 +1057,57 @@ class WorkspaceMember(models.Model):
         ),
     )
 
+    credit_consent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "When the member agreed to be credited by name (name, organization and "
+            "ORCID iD, never email) as an author in what this workspace's API "
+            "tokens read. Empty means they appear as 'Contributor (not named)'. "
+            "Set on accepting an invitation; members from before invitations "
+            "existed, or added in the admin, confirm it themselves."
+        ),
+    )
+
     class Meta:
         unique_together = ("workspace", "user")
+
+
+class WorkspaceInvitation(models.Model):
+    """A pending offer to join a workspace; accepting it creates the membership.
+
+    Only the invited person can accept. Until then the invitee has no access, so
+    ``WorkspaceMember`` keeps meaning "an accepted member" everywhere else. The
+    row is deleted when the invitation is accepted, declined or cancelled.
+    """
+
+    workspace = models.ForeignKey(
+        Workspace, on_delete=models.CASCADE, related_name="invitations"
+    )
+    user = models.ForeignKey(
+        Person, on_delete=models.CASCADE, related_name="workspace_invitations"
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=[
+            (WorkspaceRole.MEMBER, WorkspaceRole.MEMBER.label),
+            (WorkspaceRole.ADMIN, WorkspaceRole.ADMIN.label),
+        ],
+        default=WorkspaceRole.MEMBER,
+    )
+    invited_by = models.ForeignKey(
+        Person, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        unique_together = ("workspace", "user")
+
+    @property
+    def is_expired(self) -> bool:
+        """Return True once the invitation can no longer be accepted."""
+        return self.expires_at <= timezone.now()
 
 
 class WorkspaceInvestigation(models.Model):

@@ -468,6 +468,8 @@ class Config:
     # A PDF costs a pandoc run and is not stored, so each API token may request one
     # per this many seconds (JSON reads are cheap and not limited this way).
     _api_pdf_cooldown_seconds: Final[int] = 60
+    # A workspace invitation can be accepted for this many days.
+    _workspace_invitation_days: Final[int] = 14
     _email_confirmation_required_message: Final[str] = (
         "Please confirm your email address before generating drafts. Use the link "
         "in the email we sent you, or request a new one."
