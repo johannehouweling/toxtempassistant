@@ -179,8 +179,23 @@ def get_assay_export_authors(assay: Assay) -> list[ExportAuthor]:
     return authors
 
 
-def get_assay_export_author_metadata(assay: Assay) -> ExportAuthorMetadata:
-    """Return export author metadata for an assay."""
+def get_assay_export_author_metadata(
+    assay: Assay, include_people: bool = True
+) -> ExportAuthorMetadata:
+    """Return export author metadata for an assay.
+
+    With ``include_people=False`` no person is named: the export is for a
+    recipient outside the app (the workspace API), which must not receive names,
+    organizations, ORCID iDs or email addresses of our users.
+    """
+    if not include_people:
+        return {
+            "author": [],
+            "authors": [],
+            "main_author": None,
+            "co_authors": [],
+            "investigation_owner": None,
+        }
     authors = get_assay_export_authors(assay)
     author_names = [author["name"] for author in authors]
     investigation_owner = _person_export_owner_entry(assay.study.investigation.owner)
@@ -193,8 +208,10 @@ def get_assay_export_author_metadata(assay: Assay) -> ExportAuthorMetadata:
     }
 
 
-def generate_json_from_assay(assay: Assay) -> dict | None:
-    """Generate Json from assay."""
+def generate_json_from_assay(
+    assay: Assay, include_people: bool = True
+) -> dict | None:
+    """Generate Json from assay (``include_people=False`` leaves out all people)."""
     try:
         # Set the timezone to Amsterdam
         amsterdam_tz = timezone.get_fixed_timezone(
@@ -250,7 +267,7 @@ def generate_json_from_assay(assay: Assay) -> dict | None:
             model_info_url_value = ""
 
         # Prepare the data structure
-        author_metadata = get_assay_export_author_metadata(assay)
+        author_metadata = get_assay_export_author_metadata(assay, include_people)
         export_data = {
             "metadata": {
                 # Current date and time in ISO format
@@ -355,9 +372,9 @@ def generate_json_from_assay(assay: Assay) -> dict | None:
         return None
 
 
-def generate_markdown_from_assay(assay: Assay) -> str:
+def generate_markdown_from_assay(assay: Assay, include_people: bool = True) -> str:
     """Generate markdown from assay."""
-    export_data = generate_json_from_assay(assay)
+    export_data = generate_json_from_assay(assay, include_people)
     # Start with metadata
     markdown = []
     markdown.append("## Metadata\n")
@@ -447,7 +464,11 @@ def generate_markdown_from_assay(assay: Assay) -> str:
 
 
 def get_create_meta_data_yaml(
-    request: HttpRequest, assay: Assay, file_path: Path, export_type: str = "pdf"
+    request: HttpRequest,
+    assay: Assay,
+    file_path: Path,
+    export_type: str = "pdf",
+    include_people: bool = True,
 ) -> Path:
     """Create meta data yaml file for pandoc.
 
@@ -503,7 +524,7 @@ def get_create_meta_data_yaml(
             r"\usepackage[a4paper, margin=3cm]{geometry}",
         ]
 
-    author_metadata = get_assay_export_author_metadata(assay)
+    author_metadata = get_assay_export_author_metadata(assay, include_people)
     metadata_dict = {
         "author": author_metadata["author"],
         "authors": author_metadata["authors"],
@@ -518,6 +539,10 @@ def get_create_meta_data_yaml(
         "toc": "true",
         "toc-title": "Table of Contents",
     }
+    if not include_people:
+        # No empty author block: the title page simply names nobody.
+        metadata_dict.pop("author")
+        metadata_dict.pop("authors")
     yaml_file_path = file_path.with_name("yaml" + file_path.name).with_suffix(".yaml")
     with open(yaml_file_path, "w") as file:
         yaml.dump(metadata_dict, file, default_flow_style=False)
@@ -525,9 +550,12 @@ def get_create_meta_data_yaml(
 
 
 def export_assay_to_file(
-    request: HttpRequest, assay: Assay, export_type: str
+    request: HttpRequest,
+    assay: Assay,
+    export_type: str,
+    include_people: bool = True,
 ) -> FileResponse:
-    """Export assay to file."""
+    """Export assay to file (``include_people=False`` names nobody in it)."""
     # EXPORT_MAPPING (defined in toxtempass/__init__.py) is the single security
     # gate: only types with both trusted Pandoc options and known MIME/suffix
     # metadata are permitted.
@@ -543,13 +571,13 @@ def export_assay_to_file(
 
         export_data = None
         if export_type == "json":
-            export_data = generate_json_from_assay(assay)
+            export_data = generate_json_from_assay(assay, include_people)
             with file_path.open("w", encoding="utf-8") as json_file:
                 json.dump(export_data, json_file, indent=4)
 
         elif export_type in PANDOC_EXPORT_TYPES:
             # Generate the markdown file
-            export_data = generate_markdown_from_assay(assay)
+            export_data = generate_markdown_from_assay(assay, include_people)
             md_file_path = file_path.with_name(f"{file_path.stem}_md").with_suffix(
                 ".md"
             )
@@ -557,7 +585,7 @@ def export_assay_to_file(
                 md_file.write(export_data)
 
             yaml_metadata_file_path = get_create_meta_data_yaml(
-                request, assay, file_path, export_type
+                request, assay, file_path, export_type, include_people
             )
 
             # Convert the markdown file to the requested format using Pandoc

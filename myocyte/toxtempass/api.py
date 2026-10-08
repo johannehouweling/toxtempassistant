@@ -7,13 +7,14 @@ admins, ever sees a token's secret, because only its hash is stored.
 
 import hashlib
 import logging
+import math
 import secrets
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import wraps
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import F, OuterRef, QuerySet, Subquery
+from django.db.models import F, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import Coalesce, Greatest
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
@@ -23,6 +24,7 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET, require_POST
 
 from toxtempass import config, utilities
+from toxtempass.export import export_assay_to_file
 from toxtempass.models import (
     Answer,
     Assay,
@@ -172,6 +174,7 @@ def token_required(
         if token is None or not token.is_active:
             return _unauthorized()
         WorkspaceApiToken.objects.filter(pk=token.pk).update(last_used_at=timezone.now())
+        request.api_token = token
         return view(request, token.workspace, *args, **kwargs)
 
     return wrapper
@@ -304,7 +307,9 @@ def api_root(request: HttpRequest, workspace: Workspace) -> HttpResponse:
                 "endpoints": {
                     "assays": reverse("api_assay_list"),
                     "assay": reverse("api_assay_detail", args=[0]).replace("0", "{id}"),
+                    "assay_pdf": reverse("api_assay_pdf", args=[0]).replace("0", "{id}"),
                 },
+                "limits": {"pdf_cooldown_seconds": config._api_pdf_cooldown_seconds},
             }
         )
     )
@@ -367,3 +372,54 @@ def api_assay_detail(
     if assay is None:
         return _error("Not found", 404)
     return _api_response(JsonResponse(_assay_detail(assay)))
+
+
+@require_GET
+@token_required
+def api_assay_pdf(
+    request: HttpRequest, workspace: Workspace, assay_id: int
+) -> HttpResponse:
+    """Return a ToxTemp as a PDF, built on the spot and not stored.
+
+    A PDF costs a pandoc run, so each token may ask for one per cool-down period
+    (``Config._api_pdf_cooldown_seconds``); asking sooner gets a 429 with
+    ``Retry-After``. Requests that fail, or name an unknown assay, do not use up
+    the cool-down.
+    """
+    assay = (
+        _workspace_assays(workspace)
+        .select_related("study__investigation", "question_set")
+        .filter(pk=assay_id)
+        .first()
+    )
+    if assay is None:
+        return _error("Not found", 404)
+
+    token: WorkspaceApiToken = request.api_token
+    now = timezone.now()
+    cooldown = timedelta(seconds=config._api_pdf_cooldown_seconds)
+    previous = token.last_pdf_at
+    # One conditional UPDATE decides the winner, so concurrent requests with the
+    # same token cannot both start a build.
+    claimed = (
+        WorkspaceApiToken.objects.filter(pk=token.pk)
+        .filter(Q(last_pdf_at__isnull=True) | Q(last_pdf_at__lte=now - cooldown))
+        .update(last_pdf_at=now)
+    )
+    if not claimed:
+        last = WorkspaceApiToken.objects.values_list("last_pdf_at", flat=True).get(
+            pk=token.pk
+        )
+        wait = max(1, math.ceil((last + cooldown - now).total_seconds())) if last else 1
+        response = _error(f"PDF export is limited; retry in {wait} s", 429)
+        response["Retry-After"] = str(wait)
+        return response
+
+    # People are never named in what leaves the system through the API.
+    response = export_assay_to_file(request, assay, "pdf", include_people=False)
+    if response.status_code >= 400:
+        # Give the cool-down back, unless another request has taken it since.
+        WorkspaceApiToken.objects.filter(pk=token.pk, last_pdf_at=now).update(
+            last_pdf_at=previous
+        )
+    return _api_response(response)

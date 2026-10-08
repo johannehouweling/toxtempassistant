@@ -1096,6 +1096,11 @@ class WorkspaceApiToken(models.Model):
     expires_at = models.DateTimeField()
     last_used_at = models.DateTimeField(null=True, blank=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
+    last_pdf_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this token last requested a PDF; drives the PDF cool-down.",
+    )
 
     def __str__(self):
         return f"{self.name} ({self.prefix}…)"

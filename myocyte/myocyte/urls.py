@@ -293,6 +293,11 @@ urlpatterns += [
         api.api_assay_detail,
         name="api_assay_detail",
     ),
+    path(
+        "api/preview/assays/<int:assay_id>/pdf/",
+        api.api_assay_pdf,
+        name="api_assay_pdf",
+    ),
     path("workspace/<int:pk>/assay/add/", views.add_workspace_assay, name="add_workspace_assay"),
     path(
         "workspace/<int:pk>/assay/<int:assay_id>/remove/",

@@ -1,8 +1,11 @@
 """Tests for workspace API tokens: who may issue them, and what they can read."""
 
+import io
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
+from django.http import FileResponse, JsonResponse
 from django.urls import reverse
 from django.utils import timezone
 
@@ -380,3 +383,185 @@ class TestDataApi:
             for r in client.get(url, {"updated_since": marker}, **auth).json()["results"]
         ]
         assert ids == [in_ws.pk]
+
+
+class TestPdf:
+    @pytest.fixture
+    def export(self):
+        def fake(request, assay, export_type, include_people=True):
+            return FileResponse(
+                io.BytesIO(b"%PDF-fake"),
+                as_attachment=True,
+                filename="toxtemp.pdf",
+                content_type="application/pdf",
+            )
+
+        with patch("toxtempass.api.export_assay_to_file", side_effect=fake) as mocked:
+            yield mocked
+
+    def _auth(self, client, workspace, name="reporting"):
+        secret = _issue(client, workspace.owner, workspace, name=name).json()["token"]
+        client.logout()
+        return _bearer(secret)
+
+    def test_pdf_is_returned(self, client, shared, export):
+        workspace, in_ws, *_ = shared
+        response = client.get(
+            reverse("api_assay_pdf", args=[in_ws.pk]), **self._auth(client, workspace)
+        )
+        assert response.status_code == 200
+        assert response["Content-Type"] == "application/pdf"
+        assert response["X-API-Version"] == "preview"
+        assert b"".join(response.streaming_content) == b"%PDF-fake"
+
+    def test_second_request_within_cooldown_is_429(self, client, shared, export):
+        workspace, in_ws, *_ = shared
+        auth = self._auth(client, workspace)
+        url = reverse("api_assay_pdf", args=[in_ws.pk])
+        assert client.get(url, **auth).status_code == 200
+        again = client.get(url, **auth)
+        assert again.status_code == 429
+        assert 1 <= int(again["Retry-After"]) <= 60
+        assert export.call_count == 1  # the second request built nothing
+
+    def test_cooldown_ends(self, client, shared, export):
+        workspace, in_ws, *_ = shared
+        auth = self._auth(client, workspace)
+        url = reverse("api_assay_pdf", args=[in_ws.pk])
+        client.get(url, **auth)
+        WorkspaceApiToken.objects.update(
+            last_pdf_at=timezone.now() - timedelta(seconds=61)
+        )
+        assert client.get(url, **auth).status_code == 200
+
+    def test_cooldown_is_per_token(self, client, shared, export):
+        workspace, in_ws, *_ = shared
+        one = self._auth(client, workspace, "one")
+        two = self._auth(client, workspace, "two")
+        url = reverse("api_assay_pdf", args=[in_ws.pk])
+        assert client.get(url, **one).status_code == 200
+        assert client.get(url, **two).status_code == 200
+
+    def test_json_reads_are_not_limited_by_the_pdf_cooldown(self, client, shared, export):
+        workspace, in_ws, *_ = shared
+        auth = self._auth(client, workspace)
+        client.get(reverse("api_assay_pdf", args=[in_ws.pk]), **auth)
+        for _ in range(3):
+            response = client.get(reverse("api_assay_detail", args=[in_ws.pk]), **auth)
+            assert response.status_code == 200
+
+    def test_unknown_assay_does_not_use_the_cooldown(self, client, shared, export):
+        workspace, in_ws, _, unshared = shared
+        auth = self._auth(client, workspace)
+        missing = client.get(reverse("api_assay_pdf", args=[unshared.pk]), **auth)
+        assert missing.status_code == 404
+        assert export.call_count == 0
+        assert (
+            client.get(reverse("api_assay_pdf", args=[in_ws.pk]), **auth).status_code
+            == 200
+        )
+
+    def test_failed_build_gives_the_cooldown_back(self, client, shared):
+        workspace, in_ws, *_ = shared
+        auth = self._auth(client, workspace)
+        url = reverse("api_assay_pdf", args=[in_ws.pk])
+        broken = JsonResponse({"error": "Export failed (ref abc)"}, status=500)
+        with patch("toxtempass.api.export_assay_to_file", return_value=broken):
+            assert client.get(url, **auth).status_code == 500
+        assert WorkspaceApiToken.objects.get().last_pdf_at is None
+        ok = FileResponse(io.BytesIO(b"%PDF"), content_type="application/pdf")
+        with patch("toxtempass.api.export_assay_to_file", return_value=ok):
+            assert client.get(url, **auth).status_code == 200
+
+    def test_pdf_needs_a_token(self, client, shared, export):
+        _, in_ws, *_ = shared
+        assert client.get(reverse("api_assay_pdf", args=[in_ws.pk])).status_code == 401
+        assert export.call_count == 0
+
+    def test_root_advertises_the_pdf_endpoint_and_limit(self, client, shared):
+        workspace, in_ws, *_ = shared
+        body = client.get(reverse("api_root"), **self._auth(client, workspace)).json()
+        assert body["endpoints"]["assay_pdf"].endswith("/{id}/pdf/")
+        assert body["limits"] == {"pdf_cooldown_seconds": 60}
+
+
+class TestNoPeopleLeaveThroughTheApi:
+    """Names, organizations, ORCID iDs and emails must stay inside the system."""
+
+    SECRETS = ("Grace Hopper", "Hopper", "Navy Lab", "0000-0002-1825-0097", "grace@")
+
+    @pytest.fixture
+    def assay(self):
+        owner = PersonFactory(
+            first_name="Grace",
+            last_name="Hopper",
+            organization="Navy Lab",
+            orcid_id="0000-0002-1825-0097",
+            email="grace@navy.example",
+        )
+        qset = QuestionSetFactory(label="vpeople")
+        question = QuestionFactory(
+            subsection=SubsectionFactory(section=SectionFactory(question_set=qset))
+        )
+        assay = AssayFactory(
+            study=StudyFactory(investigation=InvestigationFactory(owner=owner)),
+            created_by=owner,
+            question_set=qset,
+        )
+        AnswerFactory(assay=assay, question=question, answer_text="HepG2 cells")
+        return assay
+
+    def test_the_normal_exports_do_name_people(self, assay):
+        # Guards the tests below: without this they would pass on an empty export.
+        from toxtempass.export import generate_markdown_from_assay
+
+        markdown = generate_markdown_from_assay(assay)
+        assert "Grace Hopper" in markdown and "grace@navy.example" in markdown
+
+    def test_exports_without_people_name_nobody(self, assay, tmp_path):
+        import json
+
+        import yaml
+
+        from toxtempass.export import (
+            generate_json_from_assay,
+            generate_markdown_from_assay,
+            get_create_meta_data_yaml,
+        )
+
+        markdown = generate_markdown_from_assay(assay, include_people=False)
+        as_json = json.dumps(generate_json_from_assay(assay, include_people=False))
+        yaml_path = get_create_meta_data_yaml(
+            None, assay, tmp_path / "t.pdf", include_people=False
+        )
+        metadata = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+        assert "author" not in metadata and "authors" not in metadata
+        for text in (markdown, as_json, yaml_path.read_text(encoding="utf-8")):
+            for secret in self.SECRETS:
+                assert secret not in text
+        assert "HepG2 cells" in markdown  # the content itself is still there
+
+    def test_api_asks_for_a_pdf_without_people(self, client):
+        workspace = WorkspaceFactory()
+        inv = InvestigationFactory(owner=workspace.owner)
+        assay = AssayFactory(study=StudyFactory(investigation=inv))
+        WorkspaceInvestigation.objects.create(workspace=workspace, investigation=inv)
+        secret = _issue(client, workspace.owner, workspace).json()["token"]
+        client.logout()
+        ok = FileResponse(io.BytesIO(b"%PDF"), content_type="application/pdf")
+        with patch("toxtempass.api.export_assay_to_file", return_value=ok) as export:
+            client.get(reverse("api_assay_pdf", args=[assay.pk]), **_bearer(secret))
+        assert export.call_args.kwargs == {"include_people": False}
+
+    def test_api_json_has_no_people(self, client, assay):
+        workspace = WorkspaceFactory()
+        WorkspaceInvestigation.objects.create(
+            workspace=workspace, investigation=assay.study.investigation
+        )
+        secret = _issue(client, workspace.owner, workspace).json()["token"]
+        client.logout()
+        raw = client.get(
+            reverse("api_assay_detail", args=[assay.pk]), **_bearer(secret)
+        ).content.decode()
+        for secret_value in self.SECRETS:
+            assert secret_value not in raw
