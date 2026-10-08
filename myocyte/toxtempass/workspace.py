@@ -7,17 +7,19 @@ logic.
 """
 
 import logging
+from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.http import HttpRequest, HttpResponseRedirect
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http.response import JsonResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 from guardian.shortcuts import assign_perm, remove_perm
 
-from toxtempass import notifications
+from toxtempass import config, notifications
 from toxtempass.forms import (
     WorkspaceForm,
     WorkspaceInvestigationForm,
@@ -27,11 +29,16 @@ from toxtempass.models import (
     Investigation,
     Person,
     Workspace,
+    WorkspaceApiToken,
     WorkspaceInvestigation,
+    WorkspaceInvitation,
     WorkspaceMember,
     WorkspaceRole,
 )
-from toxtempass.workspace_perms import revoke_investigation_from_members
+from toxtempass.workspace_perms import (
+    accept_invitation,
+    revoke_investigation_from_members,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +71,43 @@ def get_workspace_list(request: HttpRequest) -> dict:
         setattr(ws, "current_user_role", m.role)
         member_workspaces.append(ws)
 
+    # Whether the current user agreed to be credited by name, per workspace.
+    own_memberships = {m.workspace_id: m for m in memberships}
+    for ws in owned_workspaces + member_workspaces:
+        own = own_memberships.get(ws.pk)
+        setattr(ws, "my_credit", bool(own and own.credit_consent_at))
+
+    # Invitations: owners and admins see who they are waiting for; the invited
+    # person sees what is waiting for them.
+    managed_ids = [
+        ws.pk
+        for ws in owned_workspaces + member_workspaces
+        if ws.current_user_role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+    ]
+    pending: dict[int, list[WorkspaceInvitation]] = {}
+    for invitation in WorkspaceInvitation.objects.filter(
+        workspace_id__in=managed_ids, expires_at__gt=timezone.now()
+    ).select_related("user"):
+        pending.setdefault(invitation.workspace_id, []).append(invitation)
+    for ws in owned_workspaces + member_workspaces:
+        setattr(ws, "pending_invitations", pending.get(ws.pk, []))
+    my_invitations = list(
+        WorkspaceInvitation.objects.filter(
+            user=request.user, expires_at__gt=timezone.now()
+        ).select_related("workspace", "invited_by")
+    )
+
+    # Every member sees which external servers can read the workspace, by token name.
+    tokens_by_workspace: dict[int, list[WorkspaceApiToken]] = {}
+    for token in WorkspaceApiToken.objects.filter(
+        workspace__in=owned_workspaces + member_workspaces,
+        revoked_at__isnull=True,
+        expires_at__gt=timezone.now(),
+    ).order_by("created_at"):
+        tokens_by_workspace.setdefault(token.workspace_id, []).append(token)
+    for ws in owned_workspaces + member_workspaces:
+        setattr(ws, "active_api_tokens", tokens_by_workspace.get(ws.pk, []))
+
     # Only show investigations owned by the current user in the Add modal to avoid allowing
     # users to share investigations they do not own via the UI. Server-side check will also enforce ownership.
     owned_investigations = Investigation.objects.filter(owner=request.user)
@@ -72,6 +116,9 @@ def get_workspace_list(request: HttpRequest) -> dict:
         "owned_workspaces": owned_workspaces,
         "member_workspaces": member_workspaces,
         "accessible_investigations": owned_investigations,
+        "my_invitations": my_invitations,
+        "api_token_default_days": config._api_token_default_days,
+        "api_token_max_days": config._api_token_max_days,
     }
 
 
@@ -240,6 +287,135 @@ def delete_workspace(request: HttpRequest, pk: int) -> HttpResponseRedirect:
     return redirect("overview")
 
 
+def _invite(
+    request: HttpRequest, workspace: Workspace, user: Person, role: str
+) -> tuple[WorkspaceInvitation | None, JsonResponse | None]:
+    """Invite ``user`` to ``workspace``; return ``(invitation, error response)``.
+
+    Nobody becomes a member by being added: the invitee gets an email explaining
+    what joining means and has no access until they accept it themselves.
+    """
+    if role == WorkspaceRole.OWNER:
+        return None, JsonResponse(
+            {
+                "success": False,
+                "error": "Only the workspace owner may be assigned the owner role",
+            },
+            status=400,
+        )
+    if user.pk == request.user.pk:
+        return None, JsonResponse(
+            {"success": False, "error": "You cannot invite yourself"}, status=400
+        )
+    if WorkspaceMember.objects.filter(workspace=workspace, user=user).exists():
+        return None, JsonResponse(
+            {"success": False, "error": "User is already a member"}, status=400
+        )
+    with transaction.atomic():
+        existing = WorkspaceInvitation.objects.filter(
+            workspace=workspace, user=user
+        ).first()
+        if existing is not None and not existing.is_expired:
+            return None, JsonResponse(
+                {"success": False, "error": "User has already been invited"},
+                status=400,
+            )
+        if existing is not None:
+            existing.delete()
+        invitation = WorkspaceInvitation.objects.create(
+            workspace=workspace,
+            user=user,
+            role=role,
+            invited_by=request.user,
+            expires_at=timezone.now()
+            + timedelta(days=config._workspace_invitation_days),
+        )
+        notifications.notify_invited(invitation)
+    return invitation, None
+
+
+@login_required(login_url="/login/")
+@require_POST
+def cancel_workspace_invitation(
+    request: HttpRequest, pk: int, invitation_id: int
+) -> JsonResponse:
+    """Withdraw a pending invitation (owner and admins)."""
+    workspace = get_object_or_404(Workspace, pk=pk)
+    if not WorkspaceMember.objects.filter(
+        workspace=workspace,
+        user=request.user,
+        role__in=[WorkspaceRole.OWNER, WorkspaceRole.ADMIN],
+    ).exists():
+        return JsonResponse(
+            {"success": False, "error": "You do not have permission"}, status=404
+        )
+    invitation = get_object_or_404(
+        WorkspaceInvitation, pk=invitation_id, workspace=workspace
+    )
+    notifications.cancel_invitation_notice(invitation.pk)
+    invitation.delete()
+    return JsonResponse({"success": True})
+
+
+@login_required(login_url="/login/")
+def workspace_invitation(request: HttpRequest, pk: int) -> HttpResponse:
+    """Show an invitation to the person it is for, with what accepting means."""
+    invitation = get_object_or_404(
+        WorkspaceInvitation.objects.select_related("workspace", "invited_by"),
+        pk=pk,
+        user=request.user,  # anyone else gets a 404, so ids reveal nothing
+    )
+    return render(
+        request,
+        "toxtempass/workspace_invitation.html",
+        {
+            "invitation": invitation,
+            "token_names": notifications.active_token_names(invitation.workspace_id),
+        },
+    )
+
+
+@login_required(login_url="/login/")
+@require_POST
+def respond_workspace_invitation(request: HttpRequest, pk: int) -> HttpResponse:
+    """Accept or decline an invitation. Only the invited person can."""
+    with transaction.atomic():
+        invitation = get_object_or_404(
+            WorkspaceInvitation.objects.select_for_update().select_related(
+                "workspace"
+            ),
+            pk=pk,
+            user=request.user,
+        )
+        if request.POST.get("action") == "accept":
+            if invitation.is_expired:
+                return render(
+                    request,
+                    "toxtempass/workspace_invitation.html",
+                    {"invitation": invitation, "token_names": []},
+                    status=410,
+                )
+            member = accept_invitation(invitation)
+            notifications.cancel_access_lost_notice(
+                member.user_id, member.workspace_id
+            )
+        else:
+            notifications.cancel_invitation_notice(invitation.pk)
+            invitation.delete()
+    return redirect("overview")
+
+
+@login_required(login_url="/login/")
+@require_POST
+def set_workspace_credit(request: HttpRequest, pk: int) -> JsonResponse:
+    """Let a member give or withdraw their agreement to be credited by name."""
+    member = get_object_or_404(WorkspaceMember, workspace_id=pk, user=request.user)
+    agreed = request.POST.get("credit") == "on"
+    member.credit_consent_at = timezone.now() if agreed else None
+    member.save(update_fields=["credit_consent_at"])
+    return JsonResponse({"success": True, "credit": agreed})
+
+
 @login_required(login_url="/login/")
 def add_workspace_member(request: HttpRequest, pk: int) -> JsonResponse:
     """Add a member to a workspace."""
@@ -274,35 +450,18 @@ def add_workspace_member(request: HttpRequest, pk: int) -> JsonResponse:
                 status=400,
             )
 
-        if WorkspaceMember.objects.filter(workspace=workspace, user=user).exists():
-            return JsonResponse(
-                {"success": False, "error": "User is already a member"}, status=400
-            )
+        invitation, error = _invite(request, workspace, user, role)
+        if error is not None:
+            return error
 
-        try:
-            with transaction.atomic():
-                member = WorkspaceMember.objects.create(
-                    workspace=workspace, user=user, role=role, added_by=request.user
-                )
-                notifications.notify_member_added(member, request.user)
-
-                # Ensure the newly added member receives object permissions for any
-                # Investigations already shared into this workspace.
-                shared_invs = WorkspaceInvestigation.objects.filter(
-                    workspace=workspace
-                ).select_related("investigation")
-                for winv in shared_invs:
-                    assign_perm("view_investigation", user, winv.investigation)
-        except Exception:
-            return JsonResponse(
-                {
-                    "success": False,
-                    "error": "Failed to add member and assign investigation permissions",
-                },
-                status=500,
-            )
-
-        return JsonResponse({"success": True, "errors": {}})
+        return JsonResponse(
+            {
+                "success": True,
+                "errors": {},
+                "pending": True,
+                "invitation_id": invitation.pk,
+            }
+        )
     else:
         return JsonResponse({"success": False, "errors": form.errors})
 
@@ -343,44 +502,23 @@ def add_workspace_member_by_email(request: HttpRequest, pk: int) -> JsonResponse
     except Person.DoesNotExist:
         return JsonResponse({"success": False, "error": "User not found"}, status=404)
 
-    if WorkspaceMember.objects.filter(workspace=workspace, user=user).exists():
-        return JsonResponse(
-            {"success": False, "error": "User is already a member"}, status=400
-        )
-
     # normalize role — do not allow creating extra OWNER-role memberships via this
     # endpoint; those cannot be removed through the member-management flow.
     if role not in dict(WorkspaceRole.choices) or role == WorkspaceRole.OWNER:
         role = WorkspaceRole.MEMBER
 
-    try:
-        with transaction.atomic():
-            member = WorkspaceMember.objects.create(
-                workspace=workspace, user=user, role=role, added_by=request.user
-            )
-            notifications.notify_member_added(member, request.user)
+    invitation, error = _invite(request, workspace, user, role)
+    if error is not None:
+        return error
 
-            # Assign view permissions for all investigations already shared into this workspace
-            shared_invs = WorkspaceInvestigation.objects.filter(
-                workspace=workspace
-            ).select_related("investigation")
-            for winv in shared_invs:
-                assign_perm("view_investigation", user, winv.investigation)
-    except Exception:
-        logger.exception(
-            "Failed to add workspace member %s to workspace %s with investigation permissions",
-            getattr(user, "email", None),
-            getattr(workspace, "id", None),
-        )
-        return JsonResponse(
-            {
-                "success": False,
-                "error": "Failed to add member and assign investigation permissions",
-            },
-            status=500,
-        )
-
-    return JsonResponse({"success": True, "member_email": user.email})
+    return JsonResponse(
+        {
+            "success": True,
+            "member_email": user.email,
+            "pending": True,
+            "invitation_id": invitation.pk,
+        }
+    )
 
 
 @login_required(login_url="/login/")

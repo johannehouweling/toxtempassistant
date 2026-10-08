@@ -1,0 +1,19 @@
+{# What joining a workspace means. Shown in the invitation email and on the page where it is answered. #}
+<p style="margin:0 0 8px 0;"><strong>What joining a workspace means</strong></p>
+<ul style="margin:0 0 12px 0;padding-left:20px;">
+  <li><strong>Ownership does not change.</strong> Every investigation stays with its
+    owner. As a member you can view and work on the investigations shared into the
+    workspace. A ToxTemp you create inside someone else's investigation is credited to
+    you as its creator, but you can open it only while that investigation is shared
+    with you: if you leave, or the sharing ends, you lose access to it.</li>
+  <li><strong>Reading from outside.</strong> Owners and admins of the workspace can create
+    API tokens. A token lets an external server read, and only read, the investigations
+    shared into the workspace: the questions, the answers and the ToxTemp as a PDF.
+    {% if token_names %}This workspace has {{ token_names|length }} token{{ token_names|length|pluralize }} now:
+    {{ token_names|join:", " }}.{% else %}This workspace has none now; you will get an email if one is created.{% endif %}</li>
+  <li><strong>Credit.</strong> By joining you agree to be credited by name, with your
+    organization and ORCID iD but never your email address, as an author of the ToxTemps
+    you created or edited, in what those tokens read. The partners may use this when they
+    publish. Without it you appear as &ldquo;Contributor (not named)&rdquo;. You can
+    withdraw at any time, on the workspace in the user menu or by leaving it.</li>
+</ul>

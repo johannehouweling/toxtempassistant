@@ -5,17 +5,19 @@ import re
 import subprocess
 import tempfile
 import uuid
+from collections.abc import Collection
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import yaml
-from django.core.serializers import serialize
 from django.db.models import Count, Min
 from django.http import FileResponse, HttpRequest, JsonResponse
 from django.utils import timezone  # Import timezone utilities
 from django.utils.text import slugify
 
 from toxtempass import Config
-from toxtempass.models import Assay, Person, Section
+from toxtempass.models import Answer, Assay, Person, Section
 from toxtempass.utilities import log_processing_event
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,15 @@ PANDOC_EXPORT_TYPES = Config.PANDOC_EXPORT_TYPES
 
 MATH_BLOCK_START = re.compile(r"^\s*(\$\$|\\\[)")
 MATH_BLOCK_END = re.compile(r"(\$\$|\\\])\s*$")
+
+# LaTeX breaks a line after a hyphen but not after an underscore, so the long file
+# names the model cites as sources ("_(Source: my_protocol_v2.pdf)_") ran past the
+# margin. Allow a break after every underscore, and let paragraphs stretch a little
+# rather than overflow.
+LATEX_BREAK_LONG_NAMES = (
+    r"\let\svunderscore\_ \renewcommand{\_}{\svunderscore\allowbreak{}}",
+    r"\emergencystretch=3em",
+)
 
 ExportAuthor = dict[str, str | None]
 ExportInvestigationOwner = dict[str, str | None]
@@ -94,6 +105,7 @@ def _person_export_author_entry(person: Person | None) -> ExportAuthor | None:
     if author_name is None:
         return None
     return {
+        "credited": True,
         "name": author_name,
         "organization": _export_optional_value(person.organization),
         "orcid_id": _export_optional_value(person.orcid_id),
@@ -109,14 +121,15 @@ def _person_export_owner_entry(
     if author_entry is None:
         return None
     return {
-        **author_entry,
-        "email": _export_optional_value(person.email),
-        "orcid_id": _export_optional_value(person.orcid_id),
+        "name": author_entry["name"],
+        "organization": author_entry["organization"],
+        "orcid_id": author_entry["orcid_id"],
+        "email": author_entry["email"],
     }
 
 
-def get_assay_export_authors(assay: Assay) -> list[ExportAuthor]:
-    """Return ordered author entries with name, organization, ORCID iD, and email.
+def get_assay_author_ids(assay: Assay) -> list[int]:
+    """Return the ids of the assay's authors, in author order.
 
     Ordering rules:
     1. First author is the assay creator when available.
@@ -162,8 +175,12 @@ def get_assay_export_authors(assay: Assay) -> list[ExportAuthor]:
     )
     if owner_id is not None and owner_id != first_author_id:
         ordered_ids.append(owner_id)
-    ordered_ids = list(dict.fromkeys(ordered_ids))
+    return list(dict.fromkeys(ordered_ids))
 
+
+def get_assay_export_authors(assay: Assay) -> list[ExportAuthor]:
+    """Return ordered author entries with name, organization, ORCID iD, and email."""
+    ordered_ids = get_assay_author_ids(assay)
     people_by_id = Person.objects.only(
         "first_name",
         "last_name",
@@ -179,11 +196,69 @@ def get_assay_export_authors(assay: Assay) -> list[ExportAuthor]:
     return authors
 
 
-def get_assay_export_author_metadata(assay: Assay) -> ExportAuthorMetadata:
-    """Return export author metadata for an assay."""
-    authors = get_assay_export_authors(assay)
+ANONYMOUS_AUTHOR = "Contributor (not named)"
+
+
+def get_assay_api_authors(assay: Assay, credited_ids: Collection[int]) -> list[dict]:
+    """Return the authors for a recipient outside the app, in author order.
+
+    Only people in ``credited_ids`` (members who agreed to be credited) are named,
+    and then only with name, organization and ORCID iD: never an email address.
+    Everyone else keeps their place as an unnamed contributor, so the number and
+    order of authors stay honest. A credited person with no name on their account
+    is not named either, because the export would fall back to their email.
+    """
+    ordered_ids = get_assay_author_ids(assay)
+    people = Person.objects.only(
+        "first_name", "last_name", "organization", "orcid_id"
+    ).in_bulk([i for i in ordered_ids if i in credited_ids])
+    authors: list[dict] = []
+    for user_id in ordered_ids:
+        person = people.get(user_id)
+        if person is not None and person.get_full_name().strip():
+            authors.append(
+                {
+                    "credited": True,
+                    "name": person.get_full_name().strip(),
+                    "organization": _export_optional_value(person.organization),
+                    "orcid_id": _export_optional_value(person.orcid_id),
+                }
+            )
+        else:
+            authors.append(
+                {"credited": False, "name": None, "organization": None, "orcid_id": None}
+            )
+    return authors
+
+
+def get_assay_export_author_metadata(
+    assay: Assay, credited_ids: Collection[int] | None = None
+) -> ExportAuthorMetadata:
+    """Return export author metadata for an assay.
+
+    ``credited_ids=None`` is the in-app export, which names everyone. A collection
+    is for a recipient outside the app (the workspace API): only those people are
+    named, without email addresses, and the investigation owner's details are left
+    out (they appear as an author, if credited, like anyone else).
+    """
+    if credited_ids is not None:
+        authors = [
+            {
+                "credited": a["credited"],
+                "name": a["name"] or ANONYMOUS_AUTHOR,
+                "organization": a["organization"],
+                "orcid_id": a["orcid_id"],
+                "email": None,
+            }
+            for a in get_assay_api_authors(assay, credited_ids)
+        ]
+        investigation_owner = None
+    else:
+        authors = get_assay_export_authors(assay)
+        investigation_owner = _person_export_owner_entry(
+            assay.study.investigation.owner
+        )
     author_names = [author["name"] for author in authors]
-    investigation_owner = _person_export_owner_entry(assay.study.investigation.owner)
     return {
         "author": author_names,
         "authors": authors,
@@ -193,16 +268,56 @@ def get_assay_export_author_metadata(assay: Assay) -> ExportAuthorMetadata:
     }
 
 
-def generate_json_from_assay(assay: Assay) -> dict | None:
-    """Generate Json from assay."""
+FORMAT_VERSION = 1
+
+# Real Amsterdam time, summer time included. (get_fixed_timezone takes minutes.)
+AMSTERDAM_TZ = ZoneInfo("Europe/Amsterdam")
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def assay_last_modified(assay: Assay) -> datetime | None:
+    """Return the later of creation and the latest answer edit.
+
+    ``Assay`` has no modified timestamp and nothing is version-stamped, so changes
+    are read from the answers' history. Edits to the title, description or status
+    of the assay, study or investigation are not recorded there.
+    """
+    annotated = getattr(assay, "last_modified", None)
+    if annotated is not None:
+        return annotated
+    latest = (
+        assay.answers.model.history.model.objects.filter(assay_id=assay.pk)
+        .order_by("-history_date")
+        .values_list("history_date", flat=True)
+        .first()
+    )
+    return max((d for d in (assay.submission_date, latest) if d), default=None)
+
+
+def _answer_payload(answer: Answer | None) -> dict:
+    return {
+        "text": answer.answer_text if answer else "",
+        "accepted": answer.accepted if answer else None,
+        "llm_abstained": answer.llm_abstained if answer else None,
+        "source_documents": (answer.answer_documents or []) if answer else [],
+    }
+
+
+def generate_json_from_assay(
+    assay: Assay, credited_ids: Collection[int] | None = None
+) -> dict | None:
+    """Return one ToxTemp as a document, the single source of every export format.
+
+    It is built field by field from an allowlist, never by serialising the models:
+    ``Assay.processing_log`` and ``user_alerts`` are server internals and user ids
+    are personal data. Everything else about the ToxTemp is published as is.
+    ``credited_ids``: see ``get_assay_export_author_metadata``.
+    """
     try:
-        # Set the timezone to Amsterdam
-        amsterdam_tz = timezone.get_fixed_timezone(
-            1
-        )  # UTC+1 for Amsterdam (standard time)
-        current_time = timezone.now().astimezone(
-            amsterdam_tz
-        )  # Current time in Amsterdam timezone
+        current_time = timezone.now().astimezone(AMSTERDAM_TZ)
 
         # Source the model identity from AssayCost (the source of truth recorded
         # by process_llm_async), not Config.model — Config.model is the import-time
@@ -249,15 +364,67 @@ def generate_json_from_assay(assay: Assay) -> dict | None:
             model_summary = "Not recorded"
             model_info_url_value = ""
 
-        # Prepare the data structure
-        author_metadata = get_assay_export_author_metadata(assay)
-        export_data = {
+        study = assay.study
+        investigation = study.investigation
+        answers_by_question_id = {a.question_id: a for a in assay.answers.all()}
+        question_set_id = assay.question_set_id
+        if question_set_id is None:
+            # Legacy assays predate the question_set FK; derive it from the
+            # questions their answers point to.
+            question_set_id = assay.answers.values_list(
+                "question__subsection__section__question_set_id", flat=True
+            ).first()
+
+        # Only walk the sections of this assay's questionnaire version —
+        # Section.objects.all() would also include every other QuestionSet in
+        # the DB, whose questions can never match this assay's answers and so
+        # would all render as "Answer not found in documents."
+        sections = [
+            {
+                "id": section.pk,
+                "title": section.title,
+                "subsections": [
+                    {
+                        "id": subsection.pk,
+                        "title": subsection.title,
+                        "questions": [
+                            {
+                                "id": q.pk,
+                                "parent_question_id": q.parent_question_id,
+                                "question_text": q.question_text,
+                                "answering_round": q.answering_round,
+                                "additional_llm_instruction": (
+                                    q.additional_llm_instruction
+                                ),
+                                "only_additional_llm_instruction": (
+                                    q.only_additional_llm_instruction
+                                ),
+                                "only_subsections_for_context": (
+                                    q.only_subsections_for_context
+                                ),
+                                "riskhunt3r_db_label": q.riskhunt3r_db_label,
+                                "answer": _answer_payload(
+                                    answers_by_question_id.get(q.pk)
+                                ),
+                            }
+                            for q in subsection.questions.all()
+                        ],
+                    }
+                    for subsection in section.subsections.all()
+                ],
+            }
+            for section in Section.objects.filter(question_set_id=question_set_id)
+            .prefetch_related("subsections__questions")
+            .order_by("pk")
+        ]
+
+        return {
+            "format_version": FORMAT_VERSION,
             "metadata": {
                 # Current date and time in ISO format
                 "creation_date": current_time.isoformat(),
                 # Filename for the export
                 "filename": f"toxtemp_{slugify(assay.title)}",
-                # Replace with your actual website name
                 "reference_toxtemp": getattr(Config, "reference_toxtemp", None),
                 "website": "toxtempassistant.vhp4safety.nl",
                 # Structured per-run LLM identities (machine-readable companion to
@@ -282,82 +449,43 @@ def generate_json_from_assay(assay: Assay) -> dict | None:
                     "git_hash": getattr(Config, "git_hash", None),
                     "license_url": getattr(Config, "license_url", None),
                 },
-                **author_metadata,
+                **get_assay_export_author_metadata(assay, credited_ids),
             },
-            "investigation": json.loads(serialize("json", [assay.study.investigation]))[
-                0
-            ],
-            "study": json.loads(serialize("json", [assay.study]))[0],
-            "assay": json.loads(serialize("json", [assay]))[0],
-            "answers": json.loads(serialize("json", assay.answers.all())),
+            "investigation": {
+                "id": investigation.pk,
+                "title": investigation.title,
+                "description": investigation.description,
+                "submission_date": _iso(investigation.submission_date),
+                "public_release_date": _iso(investigation.public_release_date),
+            },
+            "study": {
+                "id": study.pk,
+                "title": study.title,
+                "description": study.description,
+                "submission_date": _iso(study.submission_date),
+            },
+            "assay": {
+                "id": assay.pk,
+                "title": assay.title,
+                "description": assay.description,
+                "status": assay.status,
+                "submission_date": _iso(assay.submission_date),
+                "last_modified": _iso(assay_last_modified(assay)),
+                "question_set": assay.question_set.label if assay.question_set else None,
+                "completion_time_seconds": assay.completion_time_seconds,
+            },
+            "sections": sections,
         }
-
-        # Add questions and their corresponding answers
-        questions_with_answers = []
-        for answer in assay.answers.all():
-            question_data = json.loads(serialize("json", [answer.question]))[0]
-            questions_with_answers.append(
-                {
-                    "question": question_data,
-                    "answer": answer.answer_text,
-                    "source": answer.answer_documents,
-                }
-            )
-        export_data["questions_with_answers"] = questions_with_answers
-
-        # Add sections and subsections with questions and answers.
-        # Only walk the sections of this assay's questionnaire version —
-        # Section.objects.all() would also include every other QuestionSet in
-        # the DB, whose questions can never match this assay's answers and so
-        # would all render as "Answer not found in documents."
-        question_set_id = assay.question_set_id
-        if question_set_id is None:
-            # Legacy assays predate the question_set FK; derive it from the
-            # questions their answers point to.
-            question_set_id = assay.answers.values_list(
-                "question__subsection__section__question_set_id", flat=True
-            ).first()
-        answers_by_question_id = {
-            answer.question_id: answer for answer in assay.answers.all()
-        }
-        sections = []
-        for section in Section.objects.filter(
-            question_set_id=question_set_id
-        ).prefetch_related("subsections__questions"):
-            section_data = {
-                "section": json.loads(serialize("json", [section]))[0],
-                "subsections": [],
-            }
-            for subsection in section.subsections.all():
-                subsection_data = {
-                    "subsection": json.loads(serialize("json", [subsection]))[0],
-                    "questions_with_answers": [],
-                }
-                # Add questions and answers for this subsection
-                for question in subsection.questions.all():
-                    # Find the corresponding answer, if any
-                    answer = answers_by_question_id.get(question.id)
-                    answer_text = answer.answer_text if answer else ""
-                    subsection_data["questions_with_answers"].append(
-                        {
-                            "question": json.loads(serialize("json", [question]))[0],
-                            "answer": answer_text,
-                        }
-                    )
-
-                section_data["subsections"].append(subsection_data)
-            sections.append(section_data)
-
-        export_data["sections"] = sections
-        return export_data
 
     except Assay.DoesNotExist:
         return None
 
 
-def generate_markdown_from_assay(assay: Assay) -> str:
+def generate_markdown_from_assay(
+    assay: Assay, credited_ids: Collection[int] | None = None
+) -> str:
     """Generate markdown from assay."""
-    export_data = generate_json_from_assay(assay)
+    export_data = generate_json_from_assay(assay, credited_ids)
     # Start with metadata
     markdown = []
     markdown.append("## Metadata\n")
@@ -390,23 +518,23 @@ def generate_markdown_from_assay(assay: Assay) -> str:
     markdown.append("\n")
 
     # Include investigation details
-    investigation_title = export_data["investigation"]["fields"]["title"]
-    investigation_description = export_data["investigation"]["fields"]["description"]
+    investigation_title = export_data["investigation"]["title"]
+    investigation_description = export_data["investigation"]["description"]
     markdown.append("# Investigation\n")
     markdown.append(f"- **Title:** {investigation_title}\n")
     markdown.append(f"- **Description:** {investigation_description}\n")
     markdown.append("\n")
 
     # Include study details
-    study_title = export_data["study"]["fields"]["title"]
-    study_description = export_data["study"]["fields"]["description"]
+    study_title = export_data["study"]["title"]
+    study_description = export_data["study"]["description"]
     markdown.append("# Study\n")
     markdown.append(f"- **Title:** {study_title}\n")
     markdown.append(f"- **Description:** {study_description}\n")
     markdown.append("\n")
 
     # Include assay details
-    assay_title = export_data["assay"]["fields"]["title"]
+    assay_title = export_data["assay"]["title"]
     markdown.append("# Assay\n")
     markdown.append(f"- **Title:** {assay_title}\n")
     markdown.append("\n")
@@ -417,24 +545,18 @@ def generate_markdown_from_assay(assay: Assay) -> str:
     # Add sections and subsections to Markdown
     for section in sections:
         # Add section title
-        section_title = section["section"]["fields"][
-            "title"
-        ]  # Adjust based on your model's field names
+        section_title = section["title"]
         markdown.append(f"# {section_title}\n")  # Section title
 
         for subsection in section["subsections"]:
             # Add subsection title
-            subsection_title = subsection["subsection"]["fields"][
-                "title"
-            ]  # Adjust based on your model's field names
+            subsection_title = subsection["title"]
             markdown.append(f"## {subsection_title}\n")  # Subsection title
 
-            for qa in subsection["questions_with_answers"]:
-                question_text = qa["question"]["fields"][
-                    "question_text"
-                ]  # Adjust based on your model's field names
+            for question in subsection["questions"]:
+                question_text = question["question_text"]
                 answer_text = (
-                    qa["answer"] if qa["answer"] else "Answer not found in documents."
+                    question["answer"]["text"] or "Answer not found in documents."
                 )
 
                 # Add question and answer in a list format
@@ -447,26 +569,28 @@ def generate_markdown_from_assay(assay: Assay) -> str:
 
 
 def get_create_meta_data_yaml(
-    request: HttpRequest, assay: Assay, file_path: Path, export_type: str = "pdf"
+    request: HttpRequest | None,
+    assay: Assay,
+    file_path: Path,
+    export_type: str = "pdf",
+    credited_ids: Collection[int] | None = None,
 ) -> Path:
     """Create meta data yaml file for pandoc.
 
     Args:
-        request: The current HTTP request (used for author metadata).
+        request: The current HTTP request, or None when built by the task queue.
         assay: The assay being exported.
         file_path: Destination file path; the YAML file is written alongside it.
         export_type: The export format (e.g. ``"pdf"``, ``"tex"``).  When
             ``"tex"``, fontspec and unicode-math are wrapped in an ``iftex``
             conditional so the generated ``.tex`` file also compiles with
             pdfLaTeX.
+        credited_ids: ``None`` names every author, as the in-app export does.
+            A collection is for recipients outside the app: only these people
+            are named, and never by email address.
 
     """
-    # get date:
-    # Define the Amsterdam timezone (UTC+1)
-    amsterdam_tz = timezone.get_fixed_timezone(1)  # 1 means UTC+1
-
-    # Get the current time in UTC and convert it to Amsterdam time
-    current_time = timezone.now().astimezone(amsterdam_tz)
+    current_time = timezone.now().astimezone(AMSTERDAM_TZ)
 
     # Optionally, you can extract the date from the current_time if needed
     current_date = current_time.date()
@@ -492,6 +616,7 @@ def get_create_meta_data_yaml(
             r"\usepackage{amsmath}",
             font_block,
             r"\usepackage[a4paper, margin=3cm]{geometry}",
+            *LATEX_BREAK_LONG_NAMES,
         ]
     else:
         header_includes = [
@@ -501,9 +626,10 @@ def get_create_meta_data_yaml(
             r"\setmainfont{TeX Gyre Termes}",
             r"\setmathfont{TeX Gyre Termes Math}",
             r"\usepackage[a4paper, margin=3cm]{geometry}",
+            *LATEX_BREAK_LONG_NAMES,
         ]
 
-    author_metadata = get_assay_export_author_metadata(assay)
+    author_metadata = get_assay_export_author_metadata(assay, credited_ids)
     metadata_dict = {
         "author": author_metadata["author"],
         "authors": author_metadata["authors"],
@@ -525,9 +651,12 @@ def get_create_meta_data_yaml(
 
 
 def export_assay_to_file(
-    request: HttpRequest, assay: Assay, export_type: str
+    request: HttpRequest | None,
+    assay: Assay,
+    export_type: str,
+    credited_ids: Collection[int] | None = None,
 ) -> FileResponse:
-    """Export assay to file."""
+    """Export assay to file (``credited_ids``: see get_assay_export_author_metadata)."""
     # EXPORT_MAPPING (defined in toxtempass/__init__.py) is the single security
     # gate: only types with both trusted Pandoc options and known MIME/suffix
     # metadata are permitted.
@@ -543,13 +672,13 @@ def export_assay_to_file(
 
         export_data = None
         if export_type == "json":
-            export_data = generate_json_from_assay(assay)
+            export_data = generate_json_from_assay(assay, credited_ids)
             with file_path.open("w", encoding="utf-8") as json_file:
                 json.dump(export_data, json_file, indent=4)
 
         elif export_type in PANDOC_EXPORT_TYPES:
             # Generate the markdown file
-            export_data = generate_markdown_from_assay(assay)
+            export_data = generate_markdown_from_assay(assay, credited_ids)
             md_file_path = file_path.with_name(f"{file_path.stem}_md").with_suffix(
                 ".md"
             )
@@ -557,7 +686,7 @@ def export_assay_to_file(
                 md_file.write(export_data)
 
             yaml_metadata_file_path = get_create_meta_data_yaml(
-                request, assay, file_path, export_type
+                request, assay, file_path, export_type, credited_ids
             )
 
             # Convert the markdown file to the requested format using Pandoc
@@ -573,8 +702,10 @@ def export_assay_to_file(
             pandoc_command.extend(["-o", str(file_path)])
 
             try:
-                subprocess.run(pandoc_command, check=True)  # noqa: S603
-            except subprocess.CalledProcessError as e:
+                subprocess.run(  # noqa: S603
+                    pandoc_command, check=True, timeout=Config._pandoc_timeout_seconds
+                )
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
                 corr_id = uuid.uuid4().hex[:8]
                 logger.exception(
                     "Pandoc conversion failed [corr=%s] for assay %s", corr_id, assay.id

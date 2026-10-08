@@ -24,7 +24,7 @@ from django.contrib.auth.views import (
 )
 from django.contrib.sitemaps.views import sitemap
 from django.urls import path
-from toxtempass import account, seo, views
+from toxtempass import account, api, seo, views
 
 from myocyte import settings
 
@@ -272,6 +272,63 @@ urlpatterns += [
         "workspace/<int:pk>/member/<int:user_id>/remove/",
         views.remove_workspace_member,
         name="remove_workspace_member",
+    ),
+    path(
+        "workspace/<int:pk>/invitation/<int:invitation_id>/cancel/",
+        views.cancel_workspace_invitation,
+        name="cancel_workspace_invitation",
+    ),
+    path(
+        "workspace/invitation/<int:pk>/",
+        views.workspace_invitation,
+        name="workspace_invitation",
+    ),
+    path(
+        "workspace/invitation/<int:pk>/respond/",
+        views.respond_workspace_invitation,
+        name="respond_workspace_invitation",
+    ),
+    path(
+        "workspace/<int:pk>/credit/",
+        views.set_workspace_credit,
+        name="set_workspace_credit",
+    ),
+    path("workspace/<int:pk>/tokens/", api.list_tokens, name="workspace_tokens"),
+    path(
+        "workspace/<int:pk>/tokens/create/",
+        api.create_token,
+        name="workspace_token_create",
+    ),
+    path(
+        "workspace/<int:pk>/tokens/<int:token_id>/revoke/",
+        api.revoke_token,
+        name="workspace_token_revoke",
+    ),
+    # Data API. "preview" has no stability promise until the contract is agreed;
+    # the frozen version will live under api/v1/ (see toxtempass/api.py).
+    path("api/preview/", api.api_root, name="api_root"),
+    path("api/preview/openapi.json", api.api_openapi, name="api_openapi"),
+    path("api/preview/docs/", api.api_docs, name="api_docs"),
+    path("api/preview/assays/", api.api_assay_list, name="api_assay_list"),
+    path(
+        "api/preview/assays/<int:assay_id>/",
+        api.api_assay_detail,
+        name="api_assay_detail",
+    ),
+    path(
+        "api/preview/assays/<int:assay_id>/pdf/",
+        api.api_assay_pdf,
+        name="api_assay_pdf",
+    ),
+    path(
+        "api/preview/pdf-jobs/<uuid:job_id>/",
+        api.api_pdf_job,
+        name="api_pdf_job",
+    ),
+    path(
+        "api/preview/pdf-jobs/<uuid:job_id>/file/",
+        api.api_pdf_job_file,
+        name="api_pdf_job_file",
     ),
     path("workspace/<int:pk>/assay/add/", views.add_workspace_assay, name="add_workspace_assay"),
     path(

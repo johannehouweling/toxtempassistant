@@ -15,6 +15,8 @@ into the same rules, so the rules live here once. In particular
   belong to keeps it.
 """
 
+from django.db import transaction
+from django.utils import timezone
 from guardian.shortcuts import assign_perm, remove_perm
 
 from toxtempass.models import (
@@ -22,6 +24,7 @@ from toxtempass.models import (
     Person,
     Workspace,
     WorkspaceInvestigation,
+    WorkspaceInvitation,
     WorkspaceMember,
 )
 
@@ -127,3 +130,27 @@ def revoke_shared_investigations_from_member(workspace: Workspace, user: Person)
         remove_perm("view_investigation", user, investigation)
         revoked += 1
     return revoked
+
+
+def accept_invitation(invitation: WorkspaceInvitation) -> WorkspaceMember:
+    """Turn an invitation into a membership, with the access that comes with it.
+
+    Accepting is the member's agreement to be credited by name, so
+    ``credit_consent_at`` is set here. The invitation is used up. Call it inside a
+    transaction that has locked the invitation row, so a double click cannot add
+    the member twice.
+    """
+    now = timezone.now()
+    with transaction.atomic():
+        member = WorkspaceMember.objects.create(
+            workspace=invitation.workspace,
+            user=invitation.user,
+            role=invitation.role,
+            added_by=invitation.invited_by,
+            # They answered the invitation themselves: nothing more to tell them.
+            notified_at=now,
+            credit_consent_at=now,
+        )
+        grant_shared_investigations_to_member(invitation.workspace, invitation.user)
+        invitation.delete()
+    return member

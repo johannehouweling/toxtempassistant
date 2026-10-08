@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.exceptions import ValidationError
@@ -1057,8 +1058,61 @@ class WorkspaceMember(models.Model):
         ),
     )
 
+    credit_consent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "When the member agreed to be credited by name (name, organization and "
+            "ORCID iD, never email) as an author in what this workspace's API "
+            "tokens read. Empty means they appear as 'Contributor (not named)'. "
+            "Set on accepting an invitation; members from before invitations "
+            "existed, or added in the admin, confirm it themselves."
+        ),
+    )
+
     class Meta:
         unique_together = ("workspace", "user")
+
+
+class WorkspaceInvitation(models.Model):
+    """A pending offer to join a workspace; accepting it creates the membership.
+
+    Only the invited person can accept. Until then the invitee has no access, so
+    ``WorkspaceMember`` keeps meaning "an accepted member" everywhere else. The
+    row is deleted when the invitation is accepted, declined or cancelled.
+    """
+
+    workspace = models.ForeignKey(
+        Workspace, on_delete=models.CASCADE, related_name="invitations"
+    )
+    user = models.ForeignKey(
+        Person, on_delete=models.CASCADE, related_name="workspace_invitations"
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=[
+            (WorkspaceRole.MEMBER, WorkspaceRole.MEMBER.label),
+            (WorkspaceRole.ADMIN, WorkspaceRole.ADMIN.label),
+        ],
+        default=WorkspaceRole.MEMBER,
+    )
+    invited_by = models.ForeignKey(
+        Person, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        unique_together = ("workspace", "user")
+
+    def __str__(self) -> str:
+        """Show who was invited to which workspace."""
+        return f"{self.user} invited to {self.workspace}"
+
+    @property
+    def is_expired(self) -> bool:
+        """Return True once the invitation can no longer be accepted."""
+        return self.expires_at <= timezone.now()
 
 
 class WorkspaceInvestigation(models.Model):
@@ -1073,6 +1127,114 @@ class WorkspaceInvestigation(models.Model):
 
     class Meta:
         unique_together = ("workspace", "investigation")
+
+
+class WorkspaceApiToken(models.Model):
+    """Read-only bearer token that lets an external server read a workspace.
+
+    The token belongs to the workspace, not to a person: it reads exactly the
+    investigations shared into that workspace and keeps working when the person
+    who issued it leaves. Only a hash is stored; the plaintext is shown once.
+    """
+
+    workspace = models.ForeignKey(
+        Workspace, on_delete=models.CASCADE, related_name="api_tokens"
+    )
+    name = models.CharField(max_length=100)
+    token_hash = models.CharField(max_length=64, unique=True)
+    prefix = models.CharField(max_length=12)
+    created_by = models.ForeignKey(
+        Person, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    last_pdf_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this token last requested a PDF; drives the PDF cool-down.",
+    )
+
+    def __str__(self) -> str:
+        """Show the token's name and its public prefix, never the secret."""
+        return f"{self.name} ({self.prefix}…)"
+
+    @property
+    def is_active(self) -> bool:
+        """Return True while the token is neither revoked nor expired."""
+        return self.revoked_at is None and self.expires_at > timezone.now()
+
+
+class ApiPdfJob(models.Model):
+    """One PDF requested through the workspace API.
+
+    The task queue builds it, so no web worker is held for the build. The file
+    lives in a temp directory (``Config._api_pdf_dir``) for a short time and is
+    never backed up: it is generated on demand and can simply be requested again.
+    """
+
+    class Status(models.TextChoices):
+        QUEUED = "queued"
+        RUNNING = "running"
+        DONE = "done"
+        FAILED = "failed"
+
+    ACTIVE = (Status.QUEUED, Status.RUNNING)
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(
+        Workspace, on_delete=models.CASCADE, related_name="pdf_jobs"
+    )
+    token = models.ForeignKey(
+        WorkspaceApiToken, on_delete=models.CASCADE, related_name="pdf_jobs"
+    )
+    assay = models.ForeignKey(
+        "Assay", on_delete=models.CASCADE, related_name="api_pdf_jobs"
+    )
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.QUEUED
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(
+        null=True, blank=True, help_text="When the file is deleted."
+    )
+    file_name = models.CharField(max_length=255, blank=True)
+    error = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["status", "created_at"])]
+
+    def __str__(self) -> str:
+        """Show the job's status and its ToxTemp."""
+        return f"PDF {self.status} for assay {self.assay_id}"
+
+    @staticmethod
+    def directory() -> Path:
+        """Return the directory holding the built PDFs."""
+        return Path(config._api_pdf_dir)
+
+    @property
+    def file_path(self) -> Path:
+        """Return where this job's PDF is stored while it exists."""
+        return self.directory() / f"{self.id}.pdf"
+
+    @property
+    def is_active(self) -> bool:
+        """Return True while the job is queued or running."""
+        return self.status in self.ACTIVE
+
+    @property
+    def is_expired(self) -> bool:
+        """Return True once a finished PDF is past its time or its file is gone."""
+        if self.status != self.Status.DONE:
+            return False
+        return (
+            self.expires_at is None
+            or self.expires_at <= timezone.now()
+            or not self.file_path.exists()
+        )
 
 
 class LLMConfig(models.Model):

@@ -20,9 +20,7 @@ from toxtempass.tests.fixtures.factories import (
 
 
 def _section_titles(export_data: dict) -> list[str]:
-    return [
-        section["section"]["fields"]["title"] for section in export_data["sections"]
-    ]
+    return [section["title"] for section in export_data["sections"]]
 
 
 class ExportQuestionSetFilterTests(TestCase):
@@ -78,12 +76,10 @@ class ExportQuestionSetFilterTests(TestCase):
         unanswered_section = next(
             section
             for section in export_data["sections"]
-            if section["section"]["fields"]["title"] == "Own Unanswered Section"
+            if section["title"] == "Own Unanswered Section"
         )
         self.assertEqual(
-            unanswered_section["subsections"][0]["questions_with_answers"][0][
-                "answer"
-            ],
+            unanswered_section["subsections"][0]["questions"][0]["answer"]["text"],
             "",
         )
 
@@ -142,3 +138,47 @@ class ExportQuestionSetFilterTests(TestCase):
 
         markdown = generate_markdown_from_assay(assay)
         self.assertNotIn("Foreign Section", markdown)
+
+
+class ExportDocumentShapeTests(TestCase):
+    """The in-app JSON and the API serve the same document."""
+
+    def test_internal_fields_are_not_exported_and_shape_is_shared(self):
+        assay = AssayFactory(processing_log="TRACEBACK internal", user_alerts="alert")
+        in_app = generate_json_from_assay(assay)
+        outside = generate_json_from_assay(assay, credited_ids=set())
+
+        assert in_app.keys() == outside.keys()
+        assert in_app["metadata"].keys() == outside["metadata"].keys()
+        assert in_app["assay"].keys() == outside["assay"].keys()
+        raw = repr(in_app)
+        assert "TRACEBACK internal" not in raw and "alert" not in in_app["assay"]
+        for hidden in ("processing_log", "user_alerts", "demo_lock", "created_by"):
+            assert hidden not in raw
+        assert in_app["format_version"] == 1
+        # The in-app export names the owner; a recipient outside the app gets none.
+        assert in_app["metadata"]["investigation_owner"] is not None
+        assert outside["metadata"]["investigation_owner"] is None
+
+
+class ExportLongSourceNameTests(TestCase):
+    """Long file names cited as sources must be able to wrap in the PDF."""
+
+    def test_pdf_and_tex_headers_allow_breaks_after_underscores(self):
+        import tempfile
+        from pathlib import Path
+
+        import yaml
+        from django.test import RequestFactory
+
+        from toxtempass.export import LATEX_BREAK_LONG_NAMES, get_create_meta_data_yaml
+
+        assay = AssayFactory()
+        with tempfile.TemporaryDirectory() as tmp:
+            for export_type in ("pdf", "tex"):
+                path = get_create_meta_data_yaml(
+                    RequestFactory().get("/"), assay, Path(tmp) / "x.pdf", export_type
+                )
+                header = yaml.safe_load(path.read_text())["header-includes"]
+                for line in LATEX_BREAK_LONG_NAMES:
+                    assert line in header

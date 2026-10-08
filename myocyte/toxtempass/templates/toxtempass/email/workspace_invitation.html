@@ -1,0 +1,19 @@
+{% extends "toxtempass/email/base.html" %}
+{% block title %}You were invited to a workspace{% endblock %}
+{% block heading %}You were invited to a workspace{% endblock %}
+{% block content %}
+<p style="margin:0 0 12px 0;">Hi {{ user.get_full_name|default:user.email }},</p>
+<p style="margin:0 0 12px 0;">
+  {{ invited_by|default:"Someone" }} invited you to join the workspace
+  <strong>{{ workspace_name }}</strong> as {{ role|lower }}. You have no access until
+  you accept.
+</p>
+{% include "toxtempass/base_extras/workspaces/workspace_terms.html" %}
+<p style="margin:18px 0;">
+  <a href="{{ invitation_url }}" style="display:inline-block;padding:12px 18px;background:#0d6efd;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">Review and answer the invitation</a>
+</p>
+<p style="margin:0 0 12px 0;font-size:13px;">
+  Sign in as {{ user.email }} to answer. The invitation is valid until
+  {{ expires_on|date:"j F Y" }}.
+</p>
+{% endblock %}

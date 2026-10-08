@@ -1,0 +1,42 @@
+{% extends "toxtempass/email/base.html" %}
+{% block title %}The workspace now has API access{% endblock %}
+{% block heading %}The workspace now has API access{% endblock %}
+{% block content %}
+<p style="margin:0 0 12px 0;">Hi {{ user.get_full_name|default:user.email }},</p>
+<p style="margin:0 0 12px 0;">
+  {{ created_by|default:"A workspace administrator" }} created an API token called
+  <strong>{{ token_name }}</strong> for the workspace <strong>{{ workspace_name }}</strong>,
+  of which you are a member. It lets an external server read, and only read, the
+  investigations shared into the workspace: the questions, the answers and the ToxTemp
+  as a PDF. The token expires on {{ expires_on|date:"j F Y" }}.
+</p>
+{% if investigations %}
+<p style="margin:0 0 6px 0;">This includes your own investigations:</p>
+<ul style="margin:0 0 12px 0;padding-left:20px;">
+  {% for title in investigations %}<li>{{ title }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% if credited %}
+<p style="margin:0 0 12px 0;">
+  You agreed to be credited by name when you joined. The server therefore sees your
+  name, organization and ORCID iD (never your email address) as an author of the
+  ToxTemps you created or edited. You can withdraw this on the workspace in the user
+  menu, or by leaving the workspace; it then applies at once.
+</p>
+{% else %}
+<p style="margin:0 0 12px 0;">
+  You joined this workspace before authors could be named, so you appear to the server
+  as &ldquo;Contributor (not named)&rdquo;. If you want to be credited by name (name,
+  organization and ORCID iD, never your email address), switch on <strong>Credit me by
+  name</strong> on the workspace in the user menu.
+</p>
+{% endif %}
+<p style="margin:0 0 12px 0;">
+  If you do not want an outside server to read your work here, leave the workspace or
+  remove your investigations from it, or ask the workspace administrators to revoke the
+  token.
+</p>
+<p style="margin:18px 0;">
+  <a href="{{ overview_url }}" style="display:inline-block;padding:12px 18px;background:#0d6efd;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">Open ToxTempAssistant</a>
+</p>
+{% endblock %}
