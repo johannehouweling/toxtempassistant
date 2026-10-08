@@ -17,9 +17,14 @@ info:
 
     ## What is and is not in the data
 
-    No person is named: authors, organizations, ORCID iDs and email addresses are
-    left out of every response, including the PDF. Free-text answers and source
-    file names are written by users and are returned as they are.
+    Email addresses are never included. A person is named as an author (name,
+    organization and ORCID iD) only if they are a member of the token's workspace
+    and have agreed to be credited by name; the same holds in the PDF. Everyone else
+    keeps their place in the author list as an unnamed contributor, so the number
+    and order of authors stay correct. Leaving the workspace or withdrawing the
+    agreement takes effect on the next request, so do not cache authors for long.
+    Free-text answers and source file names are written by users and are returned as
+    they are.
 
     ## Limits
 
@@ -112,7 +117,8 @@ paths:
       operationId: getAssayPdf
       summary: Download a ToxTemp as a PDF
       description: |
-        Built on the spot and not stored, without any person named. Limited to one
+        Built on the spot and not stored. Authors are named under the same rule as
+        in the JSON (see the description of this API). Limited to one
         per token per `limits.pdf_cooldown_seconds`; a request that fails, or names
         an unknown ToxTemp, does not use up the cool-down.
       parameters:
@@ -265,9 +271,16 @@ components:
       allOf:
         - $ref: "#/components/schemas/AssayFields"
         - type: object
-          required: [description, question_set, sections]
+          required: [description, question_set, authors, sections]
           properties:
             description: {type: string}
+            authors:
+              type: array
+              description: |
+                In author order: the creator first, then the people who edited the
+                answers (most edits first), and the investigation owner last. An
+                unnamed contributor keeps its place.
+              items: {$ref: "#/components/schemas/Author"}
             question_set:
               type: [string, "null"]
               description: Label of the questionnaire version the ToxTemp uses.
@@ -275,6 +288,21 @@ components:
               type: array
               items: {$ref: "#/components/schemas/Section"}
       unevaluatedProperties: false
+    Author:
+      type: object
+      additionalProperties: false
+      required: [credited, name, organization, orcid_id]
+      properties:
+        credited:
+          type: boolean
+          description: |
+            False for a contributor who has not agreed to be named; then `name`,
+            `organization` and `orcid_id` are null.
+        name: {type: [string, "null"]}
+        organization: {type: [string, "null"]}
+        orcid_id:
+          type: [string, "null"]
+          description: ORCID iD, e.g. 0000-0002-1825-0097.
     Section:
       type: object
       additionalProperties: false

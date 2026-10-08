@@ -26,7 +26,7 @@ from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET, require_POST
 
 from toxtempass import config, notifications, utilities
-from toxtempass.export import export_assay_to_file
+from toxtempass.export import export_assay_to_file, get_assay_api_authors
 from toxtempass.models import (
     Answer,
     Assay,
@@ -249,7 +249,20 @@ def _answer_payload(answer: Answer | None) -> dict:
     }
 
 
-def _assay_detail(assay: Assay) -> dict:
+def _credited_ids(workspace: Workspace) -> frozenset[int]:
+    """Return who may be named: members of the workspace who agreed to be credited.
+
+    Leaving the workspace, or withdrawing the agreement, takes effect on the very
+    next request, because nothing is remembered about who was named before.
+    """
+    return frozenset(
+        WorkspaceMember.objects.filter(
+            workspace=workspace, credit_consent_at__isnull=False
+        ).values_list("user_id", flat=True)
+    )
+
+
+def _assay_detail(assay: Assay, credited_ids: frozenset[int]) -> dict:
     """Return one ToxTemp as an explicit allowlist of fields.
 
     Built field by field on purpose: serialising the models would also expose
@@ -273,6 +286,7 @@ def _assay_detail(assay: Assay) -> dict:
         **_assay_summary(assay),
         "description": assay.description,
         "question_set": assay.question_set.label if assay.question_set else None,
+        "authors": get_assay_api_authors(assay, credited_ids),
         "sections": [
             {
                 "id": section.pk,
@@ -376,7 +390,7 @@ def api_assay_detail(
     )
     if assay is None:
         return _error("Not found", 404)
-    return _api_response(JsonResponse(_assay_detail(assay)))
+    return _api_response(JsonResponse(_assay_detail(assay, _credited_ids(workspace))))
 
 
 @require_GET
@@ -420,8 +434,10 @@ def api_assay_pdf(
         response["Retry-After"] = str(wait)
         return response
 
-    # People are never named in what leaves the system through the API.
-    response = export_assay_to_file(request, assay, "pdf", include_people=False)
+    # Only members who agreed to be credited are named, and never by email address.
+    response = export_assay_to_file(
+        request, assay, "pdf", credited_ids=_credited_ids(workspace)
+    )
     if response.status_code >= 400:
         # Give the cool-down back, unless another request has taken it since.
         WorkspaceApiToken.objects.filter(pk=token.pk, last_pdf_at=now).update(

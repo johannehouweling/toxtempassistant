@@ -5,6 +5,7 @@ import re
 import subprocess
 import tempfile
 import uuid
+from collections.abc import Collection
 from pathlib import Path
 
 import yaml
@@ -115,8 +116,8 @@ def _person_export_owner_entry(
     }
 
 
-def get_assay_export_authors(assay: Assay) -> list[ExportAuthor]:
-    """Return ordered author entries with name, organization, ORCID iD, and email.
+def get_assay_author_ids(assay: Assay) -> list[int]:
+    """Return the ids of the assay's authors, in author order.
 
     Ordering rules:
     1. First author is the assay creator when available.
@@ -162,8 +163,12 @@ def get_assay_export_authors(assay: Assay) -> list[ExportAuthor]:
     )
     if owner_id is not None and owner_id != first_author_id:
         ordered_ids.append(owner_id)
-    ordered_ids = list(dict.fromkeys(ordered_ids))
+    return list(dict.fromkeys(ordered_ids))
 
+
+def get_assay_export_authors(assay: Assay) -> list[ExportAuthor]:
+    """Return ordered author entries with name, organization, ORCID iD, and email."""
+    ordered_ids = get_assay_author_ids(assay)
     people_by_id = Person.objects.only(
         "first_name",
         "last_name",
@@ -179,26 +184,68 @@ def get_assay_export_authors(assay: Assay) -> list[ExportAuthor]:
     return authors
 
 
+ANONYMOUS_AUTHOR = "Contributor (not named)"
+
+
+def get_assay_api_authors(assay: Assay, credited_ids: Collection[int]) -> list[dict]:
+    """Return the authors for a recipient outside the app, in author order.
+
+    Only people in ``credited_ids`` (members who agreed to be credited) are named,
+    and then only with name, organization and ORCID iD: never an email address.
+    Everyone else keeps their place as an unnamed contributor, so the number and
+    order of authors stay honest. A credited person with no name on their account
+    is not named either, because the export would fall back to their email.
+    """
+    ordered_ids = get_assay_author_ids(assay)
+    people = Person.objects.only(
+        "first_name", "last_name", "organization", "orcid_id"
+    ).in_bulk([i for i in ordered_ids if i in credited_ids])
+    authors: list[dict] = []
+    for user_id in ordered_ids:
+        person = people.get(user_id)
+        if person is not None and person.get_full_name().strip():
+            authors.append(
+                {
+                    "credited": True,
+                    "name": person.get_full_name().strip(),
+                    "organization": _export_optional_value(person.organization),
+                    "orcid_id": _export_optional_value(person.orcid_id),
+                }
+            )
+        else:
+            authors.append(
+                {"credited": False, "name": None, "organization": None, "orcid_id": None}
+            )
+    return authors
+
+
 def get_assay_export_author_metadata(
-    assay: Assay, include_people: bool = True
+    assay: Assay, credited_ids: Collection[int] | None = None
 ) -> ExportAuthorMetadata:
     """Return export author metadata for an assay.
 
-    With ``include_people=False`` no person is named: the export is for a
-    recipient outside the app (the workspace API), which must not receive names,
-    organizations, ORCID iDs or email addresses of our users.
+    ``credited_ids=None`` is the in-app export, which names everyone. A collection
+    is for a recipient outside the app (the workspace API): only those people are
+    named, without email addresses, and the investigation owner's details are left
+    out (they appear as an author, if credited, like anyone else).
     """
-    if not include_people:
-        return {
-            "author": [],
-            "authors": [],
-            "main_author": None,
-            "co_authors": [],
-            "investigation_owner": None,
-        }
-    authors = get_assay_export_authors(assay)
+    if credited_ids is not None:
+        authors = [
+            {
+                "name": a["name"] or ANONYMOUS_AUTHOR,
+                "organization": a["organization"],
+                "orcid_id": a["orcid_id"],
+                "email": None,
+            }
+            for a in get_assay_api_authors(assay, credited_ids)
+        ]
+        investigation_owner = None
+    else:
+        authors = get_assay_export_authors(assay)
+        investigation_owner = _person_export_owner_entry(
+            assay.study.investigation.owner
+        )
     author_names = [author["name"] for author in authors]
-    investigation_owner = _person_export_owner_entry(assay.study.investigation.owner)
     return {
         "author": author_names,
         "authors": authors,
@@ -209,9 +256,9 @@ def get_assay_export_author_metadata(
 
 
 def generate_json_from_assay(
-    assay: Assay, include_people: bool = True
+    assay: Assay, credited_ids: Collection[int] | None = None
 ) -> dict | None:
-    """Generate Json from assay (``include_people=False`` leaves out all people)."""
+    """Generate Json from assay (credited_ids: see get_assay_export_author_metadata)."""
     try:
         # Set the timezone to Amsterdam
         amsterdam_tz = timezone.get_fixed_timezone(
@@ -267,7 +314,7 @@ def generate_json_from_assay(
             model_info_url_value = ""
 
         # Prepare the data structure
-        author_metadata = get_assay_export_author_metadata(assay, include_people)
+        author_metadata = get_assay_export_author_metadata(assay, credited_ids)
         export_data = {
             "metadata": {
                 # Current date and time in ISO format
@@ -372,9 +419,11 @@ def generate_json_from_assay(
         return None
 
 
-def generate_markdown_from_assay(assay: Assay, include_people: bool = True) -> str:
+def generate_markdown_from_assay(
+    assay: Assay, credited_ids: Collection[int] | None = None
+) -> str:
     """Generate markdown from assay."""
-    export_data = generate_json_from_assay(assay, include_people)
+    export_data = generate_json_from_assay(assay, credited_ids)
     # Start with metadata
     markdown = []
     markdown.append("## Metadata\n")
@@ -468,7 +517,7 @@ def get_create_meta_data_yaml(
     assay: Assay,
     file_path: Path,
     export_type: str = "pdf",
-    include_people: bool = True,
+    credited_ids: Collection[int] | None = None,
 ) -> Path:
     """Create meta data yaml file for pandoc.
 
@@ -480,6 +529,9 @@ def get_create_meta_data_yaml(
             ``"tex"``, fontspec and unicode-math are wrapped in an ``iftex``
             conditional so the generated ``.tex`` file also compiles with
             pdfLaTeX.
+        credited_ids: ``None`` names every author, as the in-app export does.
+            A collection is for recipients outside the app: only these people
+            are named, and never by email address.
 
     """
     # get date:
@@ -524,7 +576,7 @@ def get_create_meta_data_yaml(
             r"\usepackage[a4paper, margin=3cm]{geometry}",
         ]
 
-    author_metadata = get_assay_export_author_metadata(assay, include_people)
+    author_metadata = get_assay_export_author_metadata(assay, credited_ids)
     metadata_dict = {
         "author": author_metadata["author"],
         "authors": author_metadata["authors"],
@@ -539,10 +591,6 @@ def get_create_meta_data_yaml(
         "toc": "true",
         "toc-title": "Table of Contents",
     }
-    if not include_people:
-        # No empty author block: the title page simply names nobody.
-        metadata_dict.pop("author")
-        metadata_dict.pop("authors")
     yaml_file_path = file_path.with_name("yaml" + file_path.name).with_suffix(".yaml")
     with open(yaml_file_path, "w") as file:
         yaml.dump(metadata_dict, file, default_flow_style=False)
@@ -553,9 +601,9 @@ def export_assay_to_file(
     request: HttpRequest,
     assay: Assay,
     export_type: str,
-    include_people: bool = True,
+    credited_ids: Collection[int] | None = None,
 ) -> FileResponse:
-    """Export assay to file (``include_people=False`` names nobody in it)."""
+    """Export assay to file (``credited_ids``: see get_assay_export_author_metadata)."""
     # EXPORT_MAPPING (defined in toxtempass/__init__.py) is the single security
     # gate: only types with both trusted Pandoc options and known MIME/suffix
     # metadata are permitted.
@@ -571,13 +619,13 @@ def export_assay_to_file(
 
         export_data = None
         if export_type == "json":
-            export_data = generate_json_from_assay(assay, include_people)
+            export_data = generate_json_from_assay(assay, credited_ids)
             with file_path.open("w", encoding="utf-8") as json_file:
                 json.dump(export_data, json_file, indent=4)
 
         elif export_type in PANDOC_EXPORT_TYPES:
             # Generate the markdown file
-            export_data = generate_markdown_from_assay(assay, include_people)
+            export_data = generate_markdown_from_assay(assay, credited_ids)
             md_file_path = file_path.with_name(f"{file_path.stem}_md").with_suffix(
                 ".md"
             )
@@ -585,7 +633,7 @@ def export_assay_to_file(
                 md_file.write(export_data)
 
             yaml_metadata_file_path = get_create_meta_data_yaml(
-                request, assay, file_path, export_type, include_people
+                request, assay, file_path, export_type, credited_ids
             )
 
             # Convert the markdown file to the requested format using Pandoc

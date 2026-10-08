@@ -388,7 +388,7 @@ class TestDataApi:
 class TestPdf:
     @pytest.fixture
     def export(self):
-        def fake(request, assay, export_type, include_people=True):
+        def fake(request, assay, export_type, credited_ids=None):
             return FileResponse(
                 io.BytesIO(b"%PDF-fake"),
                 as_attachment=True,
@@ -485,14 +485,14 @@ class TestPdf:
         assert body["limits"] == {"pdf_cooldown_seconds": 60}
 
 
-class TestNoPeopleLeaveThroughTheApi:
-    """Names, organizations, ORCID iDs and emails must stay inside the system."""
+class TestAuthorsInTheApi:
+    """Only members who agreed are named, and never with an email address."""
 
-    SECRETS = ("Grace Hopper", "Hopper", "Navy Lab", "0000-0002-1825-0097", "grace@")
+    SECRETS = ("grace@", "Navy Lab", "0000-0002-1825-0097")
 
     @pytest.fixture
     def assay(self):
-        owner = PersonFactory(
+        grace = PersonFactory(
             first_name="Grace",
             last_name="Hopper",
             organization="Navy Lab",
@@ -504,21 +504,136 @@ class TestNoPeopleLeaveThroughTheApi:
             subsection=SubsectionFactory(section=SectionFactory(question_set=qset))
         )
         assay = AssayFactory(
-            study=StudyFactory(investigation=InvestigationFactory(owner=owner)),
-            created_by=owner,
+            study=StudyFactory(investigation=InvestigationFactory(owner=grace)),
+            created_by=grace,
             question_set=qset,
         )
         AnswerFactory(assay=assay, question=question, answer_text="HepG2 cells")
         return assay
 
-    def test_the_normal_exports_do_name_people(self, assay):
-        # Guards the tests below: without this they would pass on an empty export.
+    def _workspace(self, assay, credited: bool):
+        workspace = WorkspaceFactory()
+        WorkspaceInvestigation.objects.create(
+            workspace=workspace, investigation=assay.study.investigation
+        )
+        WorkspaceMemberFactory(
+            workspace=workspace,
+            user=assay.created_by,
+            credit_consent_at=timezone.now() if credited else None,
+        )
+        return workspace
+
+    def _detail(self, client, workspace, assay):
+        client.force_login(workspace.owner)
+        secret = client.post(
+            reverse("workspace_token_create", args=[workspace.pk]), {"name": "t"}
+        ).json()["token"]
+        client.logout()
+        return client.get(reverse("api_assay_detail", args=[assay.pk]), **_bearer(secret))
+
+    def test_the_in_app_exports_still_name_everyone(self, assay):
         from toxtempass.export import generate_markdown_from_assay
 
         markdown = generate_markdown_from_assay(assay)
         assert "Grace Hopper" in markdown and "grace@navy.example" in markdown
 
-    def test_exports_without_people_name_nobody(self, assay, tmp_path):
+    def test_an_author_who_agreed_is_named_without_email(self, client, assay):
+        response = self._detail(client, self._workspace(assay, credited=True), assay)
+        assert response.json()["authors"] == [
+            {
+                "credited": True,
+                "name": "Grace Hopper",
+                "organization": "Navy Lab",
+                "orcid_id": "0000-0002-1825-0097",
+            }
+        ]
+        assert "grace@navy.example" not in response.content.decode()
+
+    def test_an_author_who_has_not_agreed_keeps_their_place_unnamed(self, client, assay):
+        response = self._detail(client, self._workspace(assay, credited=False), assay)
+        assert response.json()["authors"] == [
+            {"credited": False, "name": None, "organization": None, "orcid_id": None}
+        ]
+        raw = response.content.decode()
+        for secret in ("Grace", "Hopper", *self.SECRETS):
+            assert secret not in raw
+
+    def test_an_author_outside_the_workspace_is_not_named(self, client, assay):
+        # Agreed in some other workspace, but not a member of this one.
+        other = WorkspaceFactory()
+        WorkspaceMemberFactory(
+            workspace=other, user=assay.created_by, credit_consent_at=timezone.now()
+        )
+        workspace = WorkspaceFactory()
+        WorkspaceInvestigation.objects.create(
+            workspace=workspace, investigation=assay.study.investigation
+        )
+        authors = self._detail(client, workspace, assay).json()["authors"]
+        assert authors[0]["credited"] is False
+
+    def test_withdrawing_applies_on_the_next_request(self, client, assay):
+        workspace = self._workspace(assay, credited=True)
+        assert self._detail(client, workspace, assay).json()["authors"][0]["credited"]
+        client.force_login(assay.created_by)
+        client.post(
+            reverse("set_workspace_credit", args=[workspace.pk]), {"credit": "off"}
+        )
+        client.logout()
+        assert not self._detail(client, workspace, assay).json()["authors"][0]["credited"]
+
+    def test_an_account_without_a_name_is_not_named_by_its_email(self, client, assay):
+        assay.created_by.first_name = assay.created_by.last_name = ""
+        assay.created_by.save()
+        workspace = self._workspace(assay, credited=True)
+        response = self._detail(client, workspace, assay)
+        assert response.json()["authors"][0]["credited"] is False
+        assert "grace@navy.example" not in response.content.decode()
+
+    def test_the_order_is_creator_then_editors_then_owner(self, client):
+        owner = PersonFactory(first_name="Olga", last_name="Owner")
+        creator = PersonFactory(first_name="Carl", last_name="Creator")
+        editor = PersonFactory(first_name="Edith", last_name="Editor")
+        qset = QuestionSetFactory(label="vorder")
+        question = QuestionFactory(
+            subsection=SubsectionFactory(section=SectionFactory(question_set=qset))
+        )
+        assay = AssayFactory(
+            study=StudyFactory(investigation=InvestigationFactory(owner=owner)),
+            created_by=creator,
+            question_set=qset,
+        )
+        answer = AnswerFactory(assay=assay, question=question, answer_text="a")
+        answer._history_user = editor
+        answer.answer_text = "edited"
+        answer.save()
+        workspace = WorkspaceFactory()
+        WorkspaceInvestigation.objects.create(
+            workspace=workspace, investigation=assay.study.investigation
+        )
+        for person in (owner, creator, editor):
+            WorkspaceMemberFactory(
+                workspace=workspace, user=person, credit_consent_at=timezone.now()
+            )
+        names = [
+            a["name"] for a in self._detail(client, workspace, assay).json()["authors"]
+        ]
+        assert names == ["Carl Creator", "Edith Editor", "Olga Owner"]
+
+    def test_the_pdf_is_built_with_exactly_the_agreed_members(self, client, assay):
+        workspace = self._workspace(assay, credited=True)
+        client.force_login(workspace.owner)
+        secret = client.post(
+            reverse("workspace_token_create", args=[workspace.pk]), {"name": "t"}
+        ).json()["token"]
+        client.logout()
+        ok = FileResponse(io.BytesIO(b"%PDF"), content_type="application/pdf")
+        with patch("toxtempass.api.export_assay_to_file", return_value=ok) as export:
+            client.get(reverse("api_assay_pdf", args=[assay.pk]), **_bearer(secret))
+        assert export.call_args.kwargs == {
+            "credited_ids": frozenset({assay.created_by_id})
+        }
+
+    def test_the_api_exports_never_contain_an_email(self, assay, tmp_path):
         import json
 
         import yaml
@@ -529,39 +644,17 @@ class TestNoPeopleLeaveThroughTheApi:
             get_create_meta_data_yaml,
         )
 
-        markdown = generate_markdown_from_assay(assay, include_people=False)
-        as_json = json.dumps(generate_json_from_assay(assay, include_people=False))
+        credited = {assay.created_by_id}
+        markdown = generate_markdown_from_assay(assay, credited)
+        as_json = json.dumps(generate_json_from_assay(assay, credited))
         yaml_path = get_create_meta_data_yaml(
-            None, assay, tmp_path / "t.pdf", include_people=False
+            None, assay, tmp_path / "t.pdf", credited_ids=credited
         )
         metadata = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-        assert "author" not in metadata and "authors" not in metadata
+        assert metadata["author"] == ["Grace Hopper"]
         for text in (markdown, as_json, yaml_path.read_text(encoding="utf-8")):
-            for secret in self.SECRETS:
-                assert secret not in text
-        assert "HepG2 cells" in markdown  # the content itself is still there
-
-    def test_api_asks_for_a_pdf_without_people(self, client):
-        workspace = WorkspaceFactory()
-        inv = InvestigationFactory(owner=workspace.owner)
-        assay = AssayFactory(study=StudyFactory(investigation=inv))
-        WorkspaceInvestigation.objects.create(workspace=workspace, investigation=inv)
-        secret = _issue(client, workspace.owner, workspace).json()["token"]
-        client.logout()
-        ok = FileResponse(io.BytesIO(b"%PDF"), content_type="application/pdf")
-        with patch("toxtempass.api.export_assay_to_file", return_value=ok) as export:
-            client.get(reverse("api_assay_pdf", args=[assay.pk]), **_bearer(secret))
-        assert export.call_args.kwargs == {"include_people": False}
-
-    def test_api_json_has_no_people(self, client, assay):
-        workspace = WorkspaceFactory()
-        WorkspaceInvestigation.objects.create(
-            workspace=workspace, investigation=assay.study.investigation
-        )
-        secret = _issue(client, workspace.owner, workspace).json()["token"]
-        client.logout()
-        raw = client.get(
-            reverse("api_assay_detail", args=[assay.pk]), **_bearer(secret)
-        ).content.decode()
-        for secret_value in self.SECRETS:
-            assert secret_value not in raw
+            assert "grace@navy.example" not in text
+        assert "Grace Hopper" in markdown and "HepG2 cells" in markdown
+        # And with nobody credited, the name is gone but the author is still counted.
+        unnamed = generate_markdown_from_assay(assay, set())
+        assert "Grace" not in unnamed and "Contributor (not named)" in unnamed

@@ -130,6 +130,10 @@ def populated(client):
     WorkspaceInvestigation.objects.create(
         workspace=workspace, investigation=investigation
     )
+    # The investigation owner is the last author; once they agree they are named.
+    workspace.memberships.filter(user=workspace.owner).update(
+        credit_consent_at=timezone.now()
+    )
     client.force_login(workspace.owner)
     secret = client.post(
         reverse("workspace_token_create", args=[workspace.pk]), {"name": "contract"}
@@ -183,6 +187,7 @@ def test_detail(client, populated, which):
     url = reverse("api_assay_detail", args=[populated[which].pk])
     response = client.get(url, **populated["auth"])
     check(response, url)
+    assert [a["credited"] for a in response.json()["authors"]] == [True]
     if which == "full":
         question = response.json()["sections"][0]["subsections"][0]["questions"]
         assert {q["parent_question_id"] for q in question} == {None, question[0]["id"]}
