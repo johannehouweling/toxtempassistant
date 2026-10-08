@@ -37,7 +37,7 @@ def _release_file_response(response: FileResponse) -> None:
 def _make_pandoc_stub(captured_commands: list) -> object:
     """Return a side_effect callable that records the command and touches the output file."""
 
-    def _run(cmd, check=False):
+    def _run(cmd, check=False, timeout=None):
         captured_commands.append(list(cmd))
         try:
             o_idx = cmd.index("-o")
