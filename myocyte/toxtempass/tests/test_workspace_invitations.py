@@ -501,6 +501,26 @@ class TestWorkspaceTab:
         assert "Liver models" in html
         assert "credit-switch" not in html and "Credit me by name" not in html
 
+    def test_every_card_is_in_a_column_so_deleting_it_removes_it(
+        self, client, owner, workspace
+    ):
+        """The delete script removes the card's column; a card without one stayed."""
+        member = PersonFactory()
+        WorkspaceMemberFactory(workspace=workspace, user=member)
+        WorkspaceFactory(owner=member, name="Mine")
+        # Only the server-rendered cards: the script below holds templates of its own.
+        html = self._html(member).split("<style>")[0]
+        card = '<div class="card border-0 h-100 workspace-card workspace-list'
+        wrapped = '<div class="col">\n          ' + card
+        assert html.count(card) == 2 and html.count(wrapped) == 2
+
+    def test_the_delete_script_removes_the_card_even_without_a_column(self):
+        script = (
+            Path(ws_views.__file__).parent
+            / "templates/toxtempass/base_extras/workspaces/workspace_js.html"
+        ).read_text(encoding="utf-8")
+        assert 'parent.classList.contains("col") ? parent : workspaceEl' in script
+
     def test_token_chips_are_readable(self, client, owner, workspace):
         """A chip needs a real background and text colour, or its text is white."""
         member = PersonFactory()

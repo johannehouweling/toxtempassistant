@@ -74,8 +74,8 @@
   function showNoOwnedPlaceholder() {
     const container = document.getElementById("ownedWorkspacesContainer");
     if (!container) return;
-    // If there are any workspace cards, don't show placeholder
-    if (container.querySelector(".col")) return;
+    // If there are any workspace cards (or the placeholder), don't add another
+    if (container.querySelector(".workspace-list, .col > .text-muted")) return;
     const col = document.createElement("div");
     col.className = "col";
     col.innerHTML = `<div class="text-muted">You don't own any workspace yet.</div>`;
@@ -692,8 +692,9 @@
             return;
           }
           // Remove the workspace card from the DOM to reflect deletion instantly.
-          const col = workspaceEl.closest(".col");
-          if (col) col.remove();
+          // Its column goes with it; without one, the card itself is removed.
+          const parent = workspaceEl.parentElement;
+          (parent && parent.classList.contains("col") ? parent : workspaceEl).remove();
           // if there are no more workspace cards, show placeholder
           showNoOwnedPlaceholder();
         })

@@ -22,13 +22,17 @@
   <div id="ownedWorkspacesContainer" class="row row-cols-1 g-3" data-current-user="{{ request.user.email }}">
     {% if owned_workspaces %}
       {% for ws in owned_workspaces %}
-        {% include "toxtempass/base_extras/workspaces/workspace_card_owned.html" with ws=ws %}
+        <div class="col">
+          {% include "toxtempass/base_extras/workspaces/workspace_card_owned.html" with ws=ws %}
+        </div>
       {% endfor %}
     {% endif %}
 
     {% if member_workspaces %}
       {% for ws in member_workspaces %}
-        {% include "toxtempass/base_extras/workspaces/workspace_card_member.html" with ws=ws %}
+        <div class="col">
+          {% include "toxtempass/base_extras/workspaces/workspace_card_member.html" with ws=ws %}
+        </div>
       {% endfor %}
     {% endif %}
 
