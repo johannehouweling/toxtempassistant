@@ -702,7 +702,7 @@
     }
   });
 
-  // Withdrawing an invitation, and giving or withdrawing the agreement to be credited.
+  // Withdrawing an invitation.
   document.addEventListener("click", function (e) {
     const cancel = e.target.closest(".btn-cancel-invitation");
     if (!cancel) return;
@@ -717,24 +717,6 @@
       .then((d) => {
         if (d.success) row.remove();
       });
-  });
-  document.addEventListener("change", function (e) {
-    const sw = e.target.closest(".credit-switch");
-    if (!sw) return;
-    const card = sw.closest(".workspace-list");
-    fetch(`/workspace/${card.getAttribute("data-workspace-id")}/credit/`, {
-      method: "POST",
-      headers: {
-        "X-CSRFToken": csrftoken,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({ credit: sw.checked ? "on" : "off" }),
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (!d.success) sw.checked = !sw.checked;
-      })
-      .catch(() => (sw.checked = !sw.checked));
   });
 
   // API tokens (owner and admins): list, create, revoke. Text goes in via textContent.

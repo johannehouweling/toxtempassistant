@@ -14,6 +14,7 @@ from toxtempass import Config, notifications
 from toxtempass import workspace as ws_views
 from toxtempass.models import (
     EmailLog,
+    Person,
     WorkspaceApiToken,
     WorkspaceInvestigation,
     WorkspaceInvitation,
@@ -141,9 +142,21 @@ class TestAnswering:
         assert response.status_code == 302
         member = WorkspaceMember.objects.get(workspace=workspace, user=invitee)
         assert member.role == WorkspaceRole.ADMIN and member.added_by == owner
-        assert member.credit_consent_at is not None and member.notified_at is not None
+        assert member.notified_at is not None
+        invitee.refresh_from_db()
+        assert invitee.credit_by_name is True
         assert "view_investigation" in get_perms(invitee, investigation)
         assert not WorkspaceInvitation.objects.exists()
+
+    def test_accepting_does_not_override_an_explicit_no(
+        self, client, owner, workspace, invitee
+    ):
+        Person.objects.filter(pk=invitee.pk).update(credit_by_name=False)
+        _invite(client, owner, workspace, invitee)
+        _respond(client, invitee, WorkspaceInvitation.objects.get(), "accept")
+        invitee.refresh_from_db()
+        assert WorkspaceMember.objects.filter(user=invitee).exists()
+        assert invitee.credit_by_name is False
 
     def test_declining_leaves_no_trace_of_membership(
         self, client, owner, workspace, invitee
@@ -309,24 +322,62 @@ class TestCancelling:
 
 
 class TestCredit:
-    def test_a_member_can_withdraw_and_restore_their_credit(self, client, workspace):
-        person = PersonFactory()
-        WorkspaceMemberFactory(
-            workspace=workspace, user=person, credit_consent_at=timezone.now()
-        )
-        client.force_login(person)
-        url = reverse("set_workspace_credit", args=[workspace.pk])
-        client.post(url, {"credit": "off"})
-        assert WorkspaceMember.objects.get(user=person).credit_consent_at is None
-        client.post(url, {"credit": "on"})
-        assert WorkspaceMember.objects.get(user=person).credit_consent_at is not None
+    """Being named as an author is one setting of the person, for every workspace."""
 
-    def test_a_non_member_gets_a_404(self, client, workspace):
+    def test_a_person_can_withdraw_and_restore_it_from_the_privacy_tab(self, client):
+        person = PersonFactory()
+        client.force_login(person)
+        url = reverse("account_set_credit")
+        assert client.post(url, {"credit": "on"}).json() == {
+            "success": True,
+            "credit": True,
+        }
+        person.refresh_from_db()
+        assert person.credit_by_name is True
+        client.post(url, {"credit": "off"})
+        person.refresh_from_db()
+        assert person.credit_by_name is False
+
+    def test_it_needs_a_login_and_a_post(self, client):
+        url = reverse("account_set_credit")
+        assert client.post(url, {"credit": "on"}).status_code == 302
         client.force_login(PersonFactory())
-        response = client.post(
-            reverse("set_workspace_credit", args=[workspace.pk]), {"credit": "on"}
-        )
-        assert response.status_code == 404
+        assert client.get(url).status_code == 405
+
+    def test_one_choice_covers_every_workspace_of_the_person(self, workspace):
+        from toxtempass import api
+
+        person = PersonFactory()
+        other = WorkspaceFactory()
+        for ws in (workspace, other):
+            WorkspaceMemberFactory(workspace=ws, user=person)
+        assert person.pk not in api._credited_ids(workspace)
+
+        Person.objects.filter(pk=person.pk).update(credit_by_name=True)
+        assert person.pk in api._credited_ids(workspace)
+        assert person.pk in api._credited_ids(other)
+
+        Person.objects.filter(pk=person.pk).update(credit_by_name=False)
+        assert person.pk not in api._credited_ids(workspace)
+        assert person.pk not in api._credited_ids(other)
+
+    def test_the_switch_is_in_the_privacy_tab_and_not_on_the_workspace_card(
+        self, client, owner, workspace
+    ):
+        client.force_login(owner)
+        page = client.get(reverse("overview")).content.decode()
+        assert 'id="credit-by-name"' in page
+        assert "credit-switch" not in page
+
+    def test_the_privacy_tab_shows_the_current_choice(self, client):
+        person = PersonFactory()
+        Person.objects.filter(pk=person.pk).update(credit_by_name=True)
+        client.force_login(person)
+        on = client.get(reverse("overview")).content.decode()
+        assert 'id="credit-by-name" checked' in on
+        Person.objects.filter(pk=person.pk).update(credit_by_name=False)
+        off = client.get(reverse("overview")).content.decode()
+        assert 'id="credit-by-name" checked' not in off
 
 
 class TestWorkspaceTab:

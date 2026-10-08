@@ -71,12 +71,6 @@ def get_workspace_list(request: HttpRequest) -> dict:
         setattr(ws, "current_user_role", m.role)
         member_workspaces.append(ws)
 
-    # Whether the current user agreed to be credited by name, per workspace.
-    own_memberships = {m.workspace_id: m for m in memberships}
-    for ws in owned_workspaces + member_workspaces:
-        own = own_memberships.get(ws.pk)
-        setattr(ws, "my_credit", bool(own and own.credit_consent_at))
-
     # Invitations: owners and admins see who they are waiting for; the invited
     # person sees what is waiting for them.
     managed_ids = [
@@ -403,17 +397,6 @@ def respond_workspace_invitation(request: HttpRequest, pk: int) -> HttpResponse:
             notifications.cancel_invitation_notice(invitation.pk)
             invitation.delete()
     return redirect("overview")
-
-
-@login_required(login_url="/login/")
-@require_POST
-def set_workspace_credit(request: HttpRequest, pk: int) -> JsonResponse:
-    """Let a member give or withdraw their agreement to be credited by name."""
-    member = get_object_or_404(WorkspaceMember, workspace_id=pk, user=request.user)
-    agreed = request.POST.get("credit") == "on"
-    member.credit_consent_at = timezone.now() if agreed else None
-    member.save(update_fields=["credit_consent_at"])
-    return JsonResponse({"success": True, "credit": agreed})
 
 
 @login_required(login_url="/login/")

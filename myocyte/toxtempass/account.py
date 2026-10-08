@@ -157,6 +157,16 @@ def unlink_orcid(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"success": True, "reload": True, "message": "ORCID unlinked."})
 
 
+@login_required(login_url="/login/")
+@require_POST
+def set_credit_by_name(request: HttpRequest) -> JsonResponse:
+    """Give or withdraw the agreement to be named as an author, for every workspace."""
+    agreed = request.POST.get("credit") == "on"
+    request.user.credit_by_name = agreed
+    request.user.save(update_fields=["credit_by_name"])
+    return JsonResponse({"success": True, "credit": agreed})
+
+
 def _shared_files_html(request: HttpRequest) -> str:
     """Render the Privacy tab's list of shared documents."""
     return render_to_string(

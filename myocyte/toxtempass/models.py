@@ -164,6 +164,20 @@ class Person(AbstractUser):
         ),
     )
 
+    credit_by_name = models.BooleanField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text=(
+            "Whether the person may be named (name, organization and ORCID iD, "
+            "never email) as an author in what a workspace API token reads. "
+            "Applies to every workspace. Empty means they have not decided: they "
+            "appear as 'Contributor (not named)', and accepting a workspace "
+            "invitation turns it on. False is an explicit choice, which accepting "
+            "an invitation never overrides."
+        ),
+    )
+
     @property
     def has_confirmed_email(self) -> bool:
         """Return whether the user may use features that need a confirmed address.
@@ -1055,18 +1069,6 @@ class WorkspaceMember(models.Model):
         help_text=(
             "When the member was emailed about being added. Set straight away for "
             "the owner and for memberships from before notifications existed."
-        ),
-    )
-
-    credit_consent_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text=(
-            "When the member agreed to be credited by name (name, organization and "
-            "ORCID iD, never email) as an author in what this workspace's API "
-            "tokens read. Empty means they appear as 'Contributor (not named)'. "
-            "Set on accepting an invitation; members from before invitations "
-            "existed, or added in the admin, confirm it themselves."
         ),
     )
 

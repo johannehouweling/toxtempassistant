@@ -64,10 +64,6 @@
           <button type="button" class="btn btn-sm btn-outline-primary btn-add-member round-add-btn" title="Add member" aria-label="Add member"><i class="bi bi-person-plus"></i></button>
         {% endif %}
       </div>
-        <div class="form-check form-switch mt-2 fs-7">
-            <input class="form-check-input credit-switch" type="checkbox" role="switch" id="credit-{{ ws.pk }}" {% if ws.my_credit %}checked{% endif %}>
-            <label class="form-check-label" for="credit-{{ ws.pk }}" title="Applies to the ToxTemps you created or edited, in what this workspace's API tokens read. Never your email address.">Credit me by name (name, organization, ORCID iD) in API output</label>
-        </div>
     </div>
 
     <div>

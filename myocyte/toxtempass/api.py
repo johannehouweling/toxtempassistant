@@ -247,12 +247,13 @@ def _assay_summary(assay: Assay) -> dict:
 def _credited_ids(workspace: Workspace) -> frozenset[int]:
     """Return who may be named: members of the workspace who agreed to be credited.
 
+    The agreement is the person's own (Privacy tab) and covers every workspace.
     Leaving the workspace, or withdrawing the agreement, takes effect on the very
     next request, because nothing is remembered about who was named before.
     """
     return frozenset(
         WorkspaceMember.objects.filter(
-            workspace=workspace, credit_consent_at__isnull=False
+            workspace=workspace, user__credit_by_name=True
         ).values_list("user_id", flat=True)
     )
 

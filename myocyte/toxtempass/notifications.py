@@ -105,12 +105,14 @@ KINDS: dict[str, EmailKind] = {
         ),
         EmailKind(EMAIL_CHANGE_REQUESTED, "toxtempass/email/email_change_requested"),
         EmailKind(ACCOUNT_DELETED, "toxtempass/email/account_deleted", to_payload="to"),
+        # Not optional: joining a workspace is answered by an invitation (below), so
+        # the only member who is added without one is someone an admin adds directly,
+        # who now has access to other people's work and should be told. A switch for
+        # it would suggest that joining can be turned off.
         EmailKind(
             WORKSPACE_ADDED,
             "toxtempass/email/workspace_added",
-            optional=True,
             grouped=True,
-            label="Someone adds me to a workspace",
         ),
         EmailKind(
             WORKSPACE_ACCESS_LOST,
@@ -677,7 +679,7 @@ def _build_api_token_created(logs: list[EmailLog]) -> _Built | str:
             "created_by": _display_name(token.created_by),
             "expires_on": token.expires_at.date(),
             "investigations": [_one_line(title) for title in investigations],
-            "credited": membership.credit_consent_at is not None,
+            "credited": user.credit_by_name is True,
             "overview_url": utilities.absolute_url(reverse("overview")),
         },
     )

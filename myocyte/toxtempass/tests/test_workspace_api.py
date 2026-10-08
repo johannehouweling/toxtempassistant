@@ -14,6 +14,7 @@ from django.utils import timezone
 from toxtempass import api
 from toxtempass.models import (
     ApiPdfJob,
+    Person,
     WorkspaceApiToken,
     WorkspaceInvestigation,
     WorkspaceRole,
@@ -728,10 +729,9 @@ class TestAuthorsInTheApi:
         WorkspaceInvestigation.objects.create(
             workspace=workspace, investigation=assay.study.investigation
         )
-        WorkspaceMemberFactory(
-            workspace=workspace,
-            user=assay.created_by,
-            credit_consent_at=timezone.now() if credited else None,
+        WorkspaceMemberFactory(workspace=workspace, user=assay.created_by)
+        Person.objects.filter(pk=assay.created_by_id).update(
+            credit_by_name=True if credited else None
         )
         return workspace
 
@@ -782,11 +782,8 @@ class TestAuthorsInTheApi:
             assert secret not in raw
 
     def test_an_author_outside_the_workspace_is_not_named(self, client, assay):
-        # Agreed in some other workspace, but not a member of this one.
-        other = WorkspaceFactory()
-        WorkspaceMemberFactory(
-            workspace=other, user=assay.created_by, credit_consent_at=timezone.now()
-        )
+        # Agreed to be credited, but is not a member of this workspace.
+        Person.objects.filter(pk=assay.created_by_id).update(credit_by_name=True)
         workspace = WorkspaceFactory()
         WorkspaceInvestigation.objects.create(
             workspace=workspace, investigation=assay.study.investigation
@@ -798,9 +795,7 @@ class TestAuthorsInTheApi:
         workspace = self._workspace(assay, credited=True)
         assert self._authors(client, workspace, assay)[0]["credited"]
         client.force_login(assay.created_by)
-        client.post(
-            reverse("set_workspace_credit", args=[workspace.pk]), {"credit": "off"}
-        )
+        client.post(reverse("account_set_credit"), {"credit": "off"})
         client.logout()
         assert not self._authors(client, workspace, assay)[0]["credited"]
 
@@ -834,9 +829,10 @@ class TestAuthorsInTheApi:
             workspace=workspace, investigation=assay.study.investigation
         )
         for person in (owner, creator, editor):
-            WorkspaceMemberFactory(
-                workspace=workspace, user=person, credit_consent_at=timezone.now()
-            )
+            WorkspaceMemberFactory(workspace=workspace, user=person)
+        Person.objects.filter(pk__in=[owner.pk, creator.pk, editor.pk]).update(
+            credit_by_name=True
+        )
         names = [
             a["name"] for a in self._authors(client, workspace, assay)
         ]
