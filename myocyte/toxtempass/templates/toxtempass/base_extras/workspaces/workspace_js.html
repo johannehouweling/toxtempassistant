@@ -739,7 +739,7 @@
             "badge text-bg-warning-subtle border border-warning-subtle d-inline-flex align-items-center gap-1 api-access-chip";
           chip.title = `API token "${t.name}": an external server can read the investigations shared in this workspace`;
           const icon = document.createElement("i");
-          icon.className = "bi bi-plug";
+          icon.className = "bi bi-hdd-network-fill";
           chip.append(icon, ` ${t.name}`);
           wrap.insertBefore(chip, anchor);
         });

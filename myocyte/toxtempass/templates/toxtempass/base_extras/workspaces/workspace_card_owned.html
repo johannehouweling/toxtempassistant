@@ -52,7 +52,7 @@
             <span class="text-muted small empty-members">No members yet</span>
             {% endfor %}
 
-            {% for t in ws.active_api_tokens %}<span class="badge text-bg-warning-subtle border border-warning-subtle d-inline-flex align-items-center gap-1 api-access-chip" title="API token &quot;{{ t.name }}&quot;: an external server can read the investigations shared in this workspace"><i class="bi bi-plug"></i> {{ t.name }}</span>{% endfor %}
+            {% for t in ws.active_api_tokens %}<span class="badge text-bg-warning-subtle border border-warning-subtle d-inline-flex align-items-center gap-1 api-access-chip" title="API token &quot;{{ t.name }}&quot;: an external server can read the investigations shared in this workspace"><i class="bi bi-hdd-network-fill"></i> {{ t.name }}</span>{% endfor %}
             {% if ws.owner == request.user %}
             <button type="button"
                     class="btn btn-sm btn-outline-primary btn-add-member round-add-btn"
