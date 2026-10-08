@@ -1,0 +1,27 @@
+{% extends "toxtempass/email/base.html" %}
+{% block title %}An API token can read your investigations{% endblock %}
+{% block heading %}An API token can now read your investigations{% endblock %}
+{% block content %}
+<p style="margin:0 0 12px 0;">Hi {{ user.get_full_name|default:user.email }},</p>
+<p style="margin:0 0 12px 0;">
+  {{ created_by|default:"A workspace administrator" }} created an API token called
+  <strong>{{ token_name }}</strong> for the workspace <strong>{{ workspace_name }}</strong>.
+  It lets an external server read, and only read, the investigations shared into that
+  workspace, including:
+</p>
+<ul style="margin:0 0 12px 0;padding-left:20px;">
+  {% for title in investigations %}<li>{{ title }}</li>{% endfor %}
+</ul>
+<p style="margin:0 0 12px 0;">
+  The server can read the questions and answers, and download the ToxTemp as a PDF.
+  Names, organizations, ORCID iDs and email addresses of users are not included. The
+  token expires on {{ expires_on|date:"j F Y" }}.
+</p>
+<p style="margin:0 0 12px 0;">
+  If you do not want this, remove the investigation from the workspace in the user menu
+  of ToxTempAssistant, or ask the workspace administrators to revoke the token.
+</p>
+<p style="margin:18px 0;">
+  <a href="{{ overview_url }}" style="display:inline-block;padding:12px 18px;background:#0d6efd;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">Open ToxTempAssistant</a>
+</p>
+{% endblock %}

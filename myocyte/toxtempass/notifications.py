@@ -40,8 +40,11 @@ from django_q.models import Failure
 from toxtempass import config, privacy, utilities
 from toxtempass.models import (
     EmailLog,
+    Investigation,
     LLMRun,
     Person,
+    WorkspaceApiToken,
+    WorkspaceInvestigation,
     WorkspaceMember,
 )
 
@@ -52,6 +55,7 @@ BETA_APPROVED = "beta_approved"
 PASSWORD_CHANGED = "password_changed"  # noqa: S105 - an email kind, not a secret
 WORKSPACE_ADDED = "workspace_added"
 WORKSPACE_ACCESS_LOST = "workspace_access_lost"
+API_TOKEN_CREATED = "api_token_created"  # noqa: S105 - an email kind, not a secret
 MAINTAINER_BETA_DIGEST = "maintainer_beta_digest"
 MAINTAINER_COST_ALERT = "maintainer_cost_alert"
 MAINTAINER_FAILURE_ALERT = "maintainer_failure_alert"
@@ -114,6 +118,10 @@ KINDS: dict[str, EmailKind] = {
             grouped=True,
             label="I am removed from a workspace, or it is deleted",
         ),
+        # Not optional, unlike the other workspace emails: it tells owners that an
+        # outside server can read their investigation, which they must not be able
+        # to miss by switching a setting off.
+        EmailKind(API_TOKEN_CREATED, "toxtempass/email/api_token_created"),
         EmailKind(
             MAINTAINER_BETA_DIGEST,
             "toxtempass/email/maintainer_beta_digest",
@@ -585,6 +593,43 @@ def _build_workspace_added(logs: list[EmailLog]) -> _Built | str:
     )
 
 
+def _build_api_token_created(logs: list[EmailLog]) -> _Built | str:
+    """Tell an investigation owner that a token can now read their investigation."""
+    log = logs[0]
+    user = log.user
+    if user is None:
+        return "The account no longer exists"
+    token = (
+        WorkspaceApiToken.objects.filter(pk=log.payload.get("token_id"))
+        .select_related("workspace", "created_by")
+        .first()
+    )
+    if token is None or not token.is_active:
+        return "The token was revoked or has expired"
+    investigations = list(
+        Investigation.objects.filter(
+            owner=user, shared_in_workspaces__workspace=token.workspace
+        )
+        .distinct()
+        .order_by("title")
+        .values_list("title", flat=True)
+    )
+    if not investigations:
+        return "No investigation of the user is shared in the workspace any more"
+    workspace_name = _one_line(token.workspace.name)
+    return _Built(
+        subject=f"An API token can now read your investigations in “{workspace_name}”",
+        context={
+            "workspace_name": workspace_name,
+            "token_name": _one_line(token.name),
+            "created_by": _display_name(token.created_by),
+            "expires_on": token.expires_at.date(),
+            "investigations": [_one_line(title) for title in investigations],
+            "overview_url": utilities.absolute_url(reverse("overview")),
+        },
+    )
+
+
 def _build_workspace_access_lost(logs: list[EmailLog]) -> _Built | str:
     """Build one email for every workspace the user lost and has not rejoined."""
     user = logs[0].user
@@ -697,6 +742,7 @@ _BUILDERS: dict[str, Callable[[list[EmailLog]], _Built | str]] = {
     ACCOUNT_DELETED: _build_account_deleted,
     WORKSPACE_ADDED: _build_workspace_added,
     WORKSPACE_ACCESS_LOST: _build_workspace_access_lost,
+    API_TOKEN_CREATED: _build_api_token_created,
     MAINTAINER_BETA_DIGEST: _build_beta_digest,
     MAINTAINER_COST_ALERT: _build_cost_alert,
     MAINTAINER_FAILURE_ALERT: _build_failure_alert,
@@ -778,6 +824,43 @@ def notify_member_added(member: WorkspaceMember, added_by: Person | None) -> Non
         user=member.user,
         payload={"workspace_id": member.workspace_id},
         send_after=now + timedelta(minutes=config._email_cooloff_minutes),
+    )
+
+
+def notify_api_token_created(token: WorkspaceApiToken, created_by: Person) -> None:
+    """Tell the owners of the shared investigations that a token can read them.
+
+    Call it once the token is saved. Every other owner gets one email, after the
+    cool-off, so a token revoked straight away sends nothing. Whoever created the
+    token is not told about their own action.
+    """
+    owner_ids = (
+        WorkspaceInvestigation.objects.filter(workspace_id=token.workspace_id)
+        .exclude(investigation__owner_id=created_by.pk)
+        .values_list("investigation__owner_id", flat=True)
+        .distinct()
+    )
+    send_after = timezone.now() + timedelta(minutes=config._email_cooloff_minutes)
+    for owner in Person.objects.filter(pk__in=list(owner_ids)):
+        queue_email(
+            API_TOKEN_CREATED,
+            user=owner,
+            payload={"token_id": token.pk, "workspace_id": token.workspace_id},
+            dedup_key=f"api-token-created:{token.pk}:{owner.pk}",
+            send_after=send_after,
+        )
+
+
+def cancel_api_token_notices(token: WorkspaceApiToken) -> None:
+    """Drop the emails about a token that was revoked before they went out."""
+    EmailLog.objects.filter(
+        kind=API_TOKEN_CREATED,
+        status=EmailLog.Status.PENDING,
+        payload__token_id=token.pk,
+    ).update(
+        status=EmailLog.Status.SKIPPED,
+        error="The token was revoked during the cool-off",
+        updated_at=timezone.now(),
     )
 
 

@@ -737,6 +737,7 @@
           const chip = document.createElement("span");
           chip.className =
             "badge text-bg-warning-subtle border border-warning-subtle d-inline-flex align-items-center gap-1 api-access-chip";
+          chip.dataset.tokenName = t.name;
           chip.title = `API token "${t.name}": an external server can read the investigations shared in this workspace`;
           const icon = document.createElement("i");
           icon.className = "bi bi-hdd-network-fill";
@@ -779,6 +780,18 @@
         .then((d) => render(d.tokens || []))
         .catch(() => showError("Could not load tokens."));
     }
+
+    // Before sharing an investigation into a workspace with API access, say so.
+    document.addEventListener("click", function (e) {
+      const add = e.target.closest(".btn-add-assay");
+      if (!add) return;
+      const card = add.closest(".workspace-list");
+      const names = card
+        ? Array.from(card.querySelectorAll(".api-access-chip")).map((c) => c.dataset.tokenName)
+        : [];
+      document.getElementById("addAssayApiTokens").textContent = names.join(", ");
+      document.getElementById("addAssayApiWarning").style.display = names.length ? "" : "none";
+    });
 
     document.addEventListener("click", function (e) {
       const open = e.target.closest(".btn-api-tokens");

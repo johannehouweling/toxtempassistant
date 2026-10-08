@@ -48,6 +48,12 @@
               {% endfor %}
             </select>
           </div>
+          <div id="addAssayApiWarning" class="alert alert-warning small" style="display:none">
+            <i class="bi bi-hdd-network-fill"></i>
+            This workspace has API access (<span id="addAssayApiTokens"></span>). Servers using
+            these tokens will be able to read this investigation, read-only and without
+            naming any person. You can remove the investigation again at any time.
+          </div>
           <div id="addAssayError" class="text-danger small" style="display:none"></div>
         </div>
         <div class="modal-footer">

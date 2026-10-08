@@ -15,6 +15,7 @@ from functools import lru_cache, wraps
 from pathlib import Path
 
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import F, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import Coalesce, Greatest
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -24,7 +25,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET, require_POST
 
-from toxtempass import config, utilities
+from toxtempass import config, notifications, utilities
 from toxtempass.export import export_assay_to_file
 from toxtempass.models import (
     Answer,
@@ -117,14 +118,16 @@ def create_token(request: HttpRequest, pk: int) -> JsonResponse:
             status=400,
         )
     secret = TOKEN_PREFIX + secrets.token_urlsafe(32)
-    token = WorkspaceApiToken.objects.create(
-        workspace=workspace,
-        name=name,
-        token_hash=hash_token(secret),
-        prefix=secret[:8],
-        created_by=request.user,
-        expires_at=timezone.now() + timedelta(days=days),
-    )
+    with transaction.atomic():
+        token = WorkspaceApiToken.objects.create(
+            workspace=workspace,
+            name=name,
+            token_hash=hash_token(secret),
+            prefix=secret[:8],
+            created_by=request.user,
+            expires_at=timezone.now() + timedelta(days=days),
+        )
+        notifications.notify_api_token_created(token, request.user)
     logger.info(
         "API token %s issued for workspace %s by user %s",
         token.pk,
@@ -145,6 +148,7 @@ def revoke_token(request: HttpRequest, pk: int, token_id: int) -> JsonResponse:
     if token.revoked_at is None:
         token.revoked_at = timezone.now()
         token.save(update_fields=["revoked_at"])
+        notifications.cancel_api_token_notices(token)
         logger.info("API token %s revoked by user %s", token.pk, request.user.pk)
     return JsonResponse({"success": True})
 
