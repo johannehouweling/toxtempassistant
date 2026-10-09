@@ -27,7 +27,7 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def toxtemp():
     """A ToxTemp with two questions, nothing answered yet."""
-    qset = QuestionSetFactory(label="versions-set")
+    qset = QuestionSetFactory(label="versions")
     sub = SubsectionFactory(section=SectionFactory(question_set=qset))
     questions = [QuestionFactory(subsection=sub) for _ in range(2)]
     creator = PersonFactory()
