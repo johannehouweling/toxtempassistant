@@ -395,22 +395,22 @@
             });
           });
         </script>
-        <div class="d-flex justify-content-center pb-3">
-            <div class="btn-group" role="group">
-                <a class="btn btn-sm btn-outline-primary d-flex align-items-center js-footer-tooltip" href="{{ config.github_repo_url }}" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub">
+        <div class="pb-3">
+            <div class="btn-group d-flex w-100" role="group">
+                <a class="btn btn-sm btn-outline-secondary d-flex align-items-center js-footer-tooltip" href="{{ config.github_repo_url }}" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub">
                     <i class="bi bi-github"></i>
                     {% if config.git_hash %}
                         <span class="ms-1 small text-muted">{{ config.git_hash|slice:":7" }}</span>
                     {% endif %}
                 </a>
-                <a class="btn btn-sm btn-outline-primary js-footer-tooltip" href="{% url 'about' %}" title="About" aria-label="About"><i class="bi bi-info-circle"></i></a>
-                <a class="btn btn-sm btn-outline-primary js-footer-tooltip" href="{% url 'about' %}#how-to-cite" title="How to cite" aria-label="How to cite"><i class="bi bi-chat-left-quote"></i></a>
-                <a class="btn btn-sm btn-outline-primary js-footer-tooltip" href="mailto:{{config.maintainer_email}}?subject=%5BToxTempAssistant%5D%20%3CEnter%20Subject%20Here%3E" title="Contact via Email" aria-label="Contact via Email"><i class="bi bi-envelope-paper-heart"></i></a>
-                <button class="btn btn-sm btn-outline-primary js-footer-tooltip" type="button" data-bs-target="#termsModal" data-bs-toggle="modal" title="Legal" aria-label="Legal"><i class="bi bi-book"></i></button>
-                <button class="btn btn-sm btn-outline-primary js-footer-tooltip" type="button" data-bs-target="#copyrightModal" data-bs-toggle="modal" title="License" aria-label="License"><i class="bi bi-c-circle"></i></button>
+                <a class="btn btn-sm btn-outline-secondary js-footer-tooltip" href="{% url 'about' %}" title="About" aria-label="About"><i class="bi bi-info-circle"></i></a>
+                <a class="btn btn-sm btn-outline-secondary js-footer-tooltip" href="{% url 'about' %}#how-to-cite" title="How to cite" aria-label="How to cite"><i class="bi bi-chat-left-quote"></i></a>
+                <a class="btn btn-sm btn-outline-secondary js-footer-tooltip" href="mailto:{{config.maintainer_email}}?subject=%5BToxTempAssistant%5D%20%3CEnter%20Subject%20Here%3E" title="Contact via Email" aria-label="Contact via Email"><i class="bi bi-envelope-paper-heart"></i></a>
+                <button class="btn btn-sm btn-outline-secondary js-footer-tooltip" type="button" data-bs-target="#termsModal" data-bs-toggle="modal" title="Legal" aria-label="Legal"><i class="bi bi-book"></i></button>
+                <button class="btn btn-sm btn-outline-secondary js-footer-tooltip" type="button" data-bs-target="#copyrightModal" data-bs-toggle="modal" title="License" aria-label="License"><i class="bi bi-c-circle"></i></button>
                 {% if llm_signature %}
                 <a id="llm-signature-badge"
-                      class="btn btn-sm btn-outline-primary d-flex align-items-center"
+                      class="btn btn-sm btn-outline-secondary d-flex align-items-center"
                       href="https://ai.azure.com/catalog/models/{{ llm_signature.model_id }}"
                       target="_blank"
                       rel="noopener noreferrer"

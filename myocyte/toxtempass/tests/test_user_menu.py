@@ -223,7 +223,7 @@ def test_footer_icons_are_in_order_and_each_has_a_tooltip(client):
     menu = _menu(client, PersonFactory())
     start = menu.index('class="border-top px-3 pt-3"')
     footer = menu[start : menu.index("<!-- Modal -->")]
-    top_row, icons = footer.split('class="btn-group"', 1)
+    top_row, icons = footer.split('class="btn-group d-flex w-100"', 1)
 
     assert "If useful, please cite" not in footer
     assert f'href="{reverse("about")}"' not in top_row  # About is one of the icons
@@ -234,3 +234,16 @@ def test_footer_icons_are_in_order_and_each_has_a_tooltip(client):
     assert (
         f'href="{config.github_repo_url}" target="_blank" rel="noopener noreferrer"'
     ) in icons
+
+
+def test_the_bottom_bar_spans_the_menu_and_is_all_secondary(client):
+    html = _menu(client, PersonFactory())
+    start = html.index('<div class="btn-group d-flex w-100" role="group">')
+    bar = html[start : html.index("</div>", html.index("License", start)) + 6]
+    # One group across the whole width, not centred, with no primary-coloured button.
+    assert 'class="pb-3"' in html[start - 80 : start]
+    assert "justify-content-center" not in html[start - 80 : start]
+    assert "btn-outline-primary" not in bar
+    assert bar.count("btn-outline-secondary") >= 6
+    for label in ("GitHub", "About", "How to cite", "Legal", "License"):
+        assert f'aria-label="{label}"' in bar
