@@ -565,6 +565,16 @@ class TestWorkspaceTab:
         )
         assert result.returncode == 0, result.stderr
 
+    def test_the_dialogs_do_not_promise_anonymity_and_link_the_docs(
+        self, owner, workspace
+    ):
+        html = self._html(owner)
+        assert "without naming any person" not in html
+        flat = " ".join(html.split())
+        assert "They see the authors of its ToxTemps by name" in flat
+        assert "unless a person has switched that off under Privacy" in flat
+        assert reverse("api_docs") in html and "API documentation" in html
+
     def test_token_chips_are_readable(self, client, owner, workspace):
         """A chip needs a real background and text colour, or its text is white."""
         member = PersonFactory()
