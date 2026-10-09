@@ -8,6 +8,7 @@ from django.http import FileResponse, HttpRequest, HttpResponseRedirect
 from django.urls import path, reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
+from simple_history.admin import SimpleHistoryAdmin
 
 from toxtempass import notifications
 from toxtempass.azure_registry import (
@@ -80,7 +81,7 @@ class StudyAdmin(admin.ModelAdmin):
 
 
 @admin.register(Assay)
-class AssayAdmin(admin.ModelAdmin):
+class AssayAdmin(SimpleHistoryAdmin):
     list_display = (
         "id",
         "title",
