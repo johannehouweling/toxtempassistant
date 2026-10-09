@@ -26,6 +26,20 @@ info:
     Free-text answers and source file names are written by users and are returned as
     they are.
 
+    ## Versions
+
+    Every saved change to a ToxTemp is a version. Each ToxTemp lists its versions
+    under `history`, newest first, each with an id that is the same every time it is
+    asked for and never changes, so two fetches can be compared by their `version`.
+    `GET /api/preview/assays/{id}/` always returns the newest one;
+    `GET /api/preview/assays/{id}/history/{version_id}/` returns an earlier one, in
+    the same layout. An earlier version shows the answers, title, description and
+    questionnaire as they were then, including text that has since been changed or
+    removed. It does not record the status, and the study, the investigation, the
+    questions and whether an author may be named are as they are now. A single
+    drafting run saves many answers, so it creates many versions in a row; ignore
+    versions while the ToxTemp's `status` is `scheduled` or `busy`.
+
     ## Limits
 
     Requests are rate limited per client IP. A PDF costs more, so it is built in the
@@ -112,6 +126,29 @@ paths:
       responses:
         "200":
           description: The ToxTemp.
+          headers:
+            X-API-Version: {$ref: "#/components/headers/XApiVersion"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AssayDetail"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /api/preview/assays/{assay_id}/history/{version_id}/:
+    get:
+      tags: [ToxTemps]
+      operationId: getAssayVersion
+      summary: Get an earlier version of a ToxTemp
+      description: |
+        The ToxTemp as it was at one of the versions listed in its `history`, in the
+        same layout as `GET /api/preview/assays/{assay_id}/`. See "Versions" above for
+        what an earlier version does and does not contain.
+      parameters:
+        - {$ref: "#/components/parameters/AssayId"}
+        - {$ref: "#/components/parameters/VersionId"}
+      responses:
+        "200":
+          description: The ToxTemp at that version.
           headers:
             X-API-Version: {$ref: "#/components/headers/XApiVersion"}
           content:
@@ -229,6 +266,12 @@ components:
       description: Which API produced the response, e.g. `preview`.
       schema: {type: string}
   parameters:
+    VersionId:
+      name: version_id
+      in: path
+      required: true
+      description: Id of a version, from the `history` of the ToxTemp.
+      schema: {type: string, format: uuid}
     JobId:
       name: job_id
       in: path
@@ -263,7 +306,9 @@ components:
         application/json:
           schema: {$ref: "#/components/schemas/Error"}
     NotFound:
-      description: No such ToxTemp in the investigations shared into the workspace.
+      description: |
+        No such ToxTemp in the investigations shared into the workspace, or no such
+        version of it.
       headers:
         X-API-Version: {$ref: "#/components/headers/XApiVersion"}
       content:
@@ -356,7 +401,7 @@ components:
     AssayFields:
       description: The fields of a list entry.
       type: object
-      required: [id, title, status, submission_date, last_modified, study, investigation]
+      required: [id, title, status, submission_date, last_modified, version, study, investigation]
       properties:
         id: {type: integer}
         title: {type: string}
@@ -368,7 +413,15 @@ components:
         last_modified:
           type: string
           format: date-time
-          description: The later of creation and the latest answer edit.
+          description: |
+            The later of creation and the newest saved change: an answer, or the
+            title, description or questionnaire.
+        version:
+          type: [string, "null"]
+          format: uuid
+          description: |
+            The newest version of this ToxTemp, the same as `assay.version` in the
+            full document. Null if nothing has been saved yet.
         study: {$ref: "#/components/schemas/IdTitle"}
         investigation: {$ref: "#/components/schemas/IdTitle"}
     AssaySummary:
@@ -396,7 +449,7 @@ components:
         user ids) are never part of it.
       type: object
       additionalProperties: false
-      required: [format_version, metadata, investigation, study, assay, sections]
+      required: [format_version, metadata, investigation, study, assay, history, sections]
       properties:
         format_version:
           type: integer
@@ -405,6 +458,12 @@ components:
         investigation: {$ref: "#/components/schemas/Investigation"}
         study: {$ref: "#/components/schemas/Study"}
         assay: {$ref: "#/components/schemas/Assay"}
+        history:
+          type: array
+          description: |
+            Every version of this ToxTemp, the newest first. Fetch an earlier one
+            at `/api/preview/assays/{id}/history/{version_id}/`.
+          items: {$ref: "#/components/schemas/AssayVersion"}
         sections:
           type: array
           items: {$ref: "#/components/schemas/Section"}
@@ -540,25 +599,47 @@ components:
         - last_modified
         - question_set
         - completion_time_seconds
+        - version
       properties:
         id: {type: integer}
         title: {type: string}
         description: {type: string}
         status:
-          type: string
-          description: State of the AI drafting for this ToxTemp.
-          enum: [none, scheduled, busy, done, error]
+          type: [string, "null"]
+          description: |
+            State of the AI drafting for this ToxTemp. Null in an earlier version,
+            because the status is not recorded.
+          enum: [none, scheduled, busy, done, error, null]
         submission_date: {type: string, format: date-time}
         last_modified:
           type: string
           format: date-time
           description: |
-            The later of creation and the latest answer edit. Changes to titles,
-            descriptions or status are not reflected.
+            The later of creation and the newest saved change: an answer, or the
+            title, description or questionnaire. In an earlier version, the moment
+            of that version.
         question_set:
           type: [string, "null"]
           description: Label of the questionnaire version the ToxTemp uses.
-        completion_time_seconds: {type: [integer, "null"]}
+        completion_time_seconds:
+          type: [integer, "null"]
+          description: Null in an earlier version, because it is not recorded.
+        version:
+          type: [string, "null"]
+          format: uuid
+          description: |
+            The version this document shows: the newest one, or the one asked for.
+            Null if nothing has been saved yet.
+    AssayVersion:
+      type: object
+      additionalProperties: false
+      required: [id, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        created_at:
+          type: string
+          format: date-time
+          description: When the change that made this version was saved.
     Section:
       type: object
       additionalProperties: false

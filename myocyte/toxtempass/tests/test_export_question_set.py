@@ -155,7 +155,10 @@ class ExportDocumentShapeTests(TestCase):
         assert "TRACEBACK internal" not in raw and "alert" not in in_app["assay"]
         for hidden in ("processing_log", "user_alerts", "demo_lock", "created_by"):
             assert hidden not in raw
-        assert in_app["format_version"] == 1
+        assert in_app["format_version"] == 2
+        # The in-app download carries the same version and history as the API.
+        assert in_app["assay"]["version"] == outside["assay"]["version"]
+        assert in_app["history"] == outside["history"] and in_app["history"]
         # The in-app export names the owner; a recipient outside the app gets none.
         assert in_app["metadata"]["investigation_owner"] is not None
         assert outside["metadata"]["investigation_owner"] is None

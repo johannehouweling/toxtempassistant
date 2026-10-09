@@ -312,6 +312,11 @@ urlpatterns += [
         name="api_assay_detail",
     ),
     path(
+        "api/preview/assays/<int:assay_id>/history/<uuid:version_id>/",
+        api.api_assay_version,
+        name="api_assay_version",
+    ),
+    path(
         "api/preview/assays/<int:assay_id>/pdf/",
         api.api_assay_pdf,
         name="api_assay_pdf",

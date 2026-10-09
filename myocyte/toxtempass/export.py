@@ -17,8 +17,10 @@ from django.utils import timezone  # Import timezone utilities
 from django.utils.text import slugify
 
 from toxtempass import Config
-from toxtempass.models import Answer, Assay, Person, Section
+from toxtempass.models import Answer, Assay, Person, QuestionSet, Section
 from toxtempass.utilities import log_processing_event
+from toxtempass.versions import Version, answers_as_of, assay_as_of, latest_version
+from toxtempass.versions import versions as list_versions
 
 logger = logging.getLogger(__name__)
 
@@ -128,8 +130,10 @@ def _person_export_owner_entry(
     }
 
 
-def get_assay_author_ids(assay: Assay) -> list[int]:
+def get_assay_author_ids(assay: Assay, as_of: datetime | None = None) -> list[int]:
     """Return the ids of the assay's authors, in author order.
+
+    ``as_of``: only the edits made up to then count, for a past version.
 
     Ordering rules:
     1. First author is the assay creator when available.
@@ -141,12 +145,14 @@ def get_assay_author_ids(assay: Assay) -> list[int]:
     creator_id = assay.created_by_id
 
     historical_answer_model = assay.answers.model.history.model
+    edits = historical_answer_model.objects.filter(
+        assay_id=assay.id,
+        history_user__isnull=False,
+    )
+    if as_of is not None:
+        edits = edits.filter(history_date__lte=as_of)
     contributor_rows = list(
-        historical_answer_model.objects.filter(
-            assay_id=assay.id,
-            history_user__isnull=False,
-        )
-        .values("history_user_id")
+        edits.values("history_user_id")
         .annotate(
             contribution_count=Count("history_id"),
             first_contribution=Min("history_date"),
@@ -178,9 +184,11 @@ def get_assay_author_ids(assay: Assay) -> list[int]:
     return list(dict.fromkeys(ordered_ids))
 
 
-def get_assay_export_authors(assay: Assay) -> list[ExportAuthor]:
+def get_assay_export_authors(
+    assay: Assay, as_of: datetime | None = None
+) -> list[ExportAuthor]:
     """Return ordered author entries with name, organization, ORCID iD, and email."""
-    ordered_ids = get_assay_author_ids(assay)
+    ordered_ids = get_assay_author_ids(assay, as_of)
     people_by_id = Person.objects.only(
         "first_name",
         "last_name",
@@ -199,7 +207,9 @@ def get_assay_export_authors(assay: Assay) -> list[ExportAuthor]:
 ANONYMOUS_AUTHOR = "Contributor (not named)"
 
 
-def get_assay_api_authors(assay: Assay, credited_ids: Collection[int]) -> list[dict]:
+def get_assay_api_authors(
+    assay: Assay, credited_ids: Collection[int], as_of: datetime | None = None
+) -> list[dict]:
     """Return the authors for a recipient outside the app, in author order.
 
     Only people in ``credited_ids`` (members who have not opted out) are named,
@@ -208,7 +218,7 @@ def get_assay_api_authors(assay: Assay, credited_ids: Collection[int]) -> list[d
     order of authors stay honest. A credited person with no name on their account
     is not named either, because the export would fall back to their email.
     """
-    ordered_ids = get_assay_author_ids(assay)
+    ordered_ids = get_assay_author_ids(assay, as_of)
     people = Person.objects.only(
         "first_name", "last_name", "organization", "orcid_id"
     ).in_bulk([i for i in ordered_ids if i in credited_ids])
@@ -232,7 +242,9 @@ def get_assay_api_authors(assay: Assay, credited_ids: Collection[int]) -> list[d
 
 
 def get_assay_export_author_metadata(
-    assay: Assay, credited_ids: Collection[int] | None = None
+    assay: Assay,
+    credited_ids: Collection[int] | None = None,
+    as_of: datetime | None = None,
 ) -> ExportAuthorMetadata:
     """Return export author metadata for an assay.
 
@@ -250,11 +262,11 @@ def get_assay_export_author_metadata(
                 "orcid_id": a["orcid_id"],
                 "email": None,
             }
-            for a in get_assay_api_authors(assay, credited_ids)
+            for a in get_assay_api_authors(assay, credited_ids, as_of)
         ]
         investigation_owner = None
     else:
-        authors = get_assay_export_authors(assay)
+        authors = get_assay_export_authors(assay, as_of)
         investigation_owner = _person_export_owner_entry(
             assay.study.investigation.owner
         )
@@ -268,7 +280,7 @@ def get_assay_export_author_metadata(
     }
 
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 # Real Amsterdam time, summer time included. (get_fixed_timezone takes minutes.)
 AMSTERDAM_TZ = ZoneInfo("Europe/Amsterdam")
@@ -279,22 +291,20 @@ def _iso(value: datetime | None) -> str | None:
 
 
 def assay_last_modified(assay: Assay) -> datetime | None:
-    """Return the later of creation and the latest answer edit.
+    """Return the later of creation and the newest saved change.
 
-    ``Assay`` has no modified timestamp and nothing is version-stamped, so changes
-    are read from the answers' history. Edits to the title, description or status
-    of the assay, study or investigation are not recorded there.
+    A change is a saved answer, or a change of the assay's title, description or
+    questionnaire. Nothing else is recorded, so a change of the study or the
+    investigation does not count.
     """
     annotated = getattr(assay, "last_modified", None)
     if annotated is not None:
         return annotated
-    latest = (
-        assay.answers.model.history.model.objects.filter(assay_id=assay.pk)
-        .order_by("-history_date")
-        .values_list("history_date", flat=True)
-        .first()
+    newest = latest_version(assay)
+    return max(
+        (d for d in (assay.submission_date, newest.at if newest else None) if d),
+        default=None,
     )
-    return max((d for d in (assay.submission_date, latest) if d), default=None)
 
 
 def _answer_payload(answer: Answer | None) -> dict:
@@ -307,7 +317,9 @@ def _answer_payload(answer: Answer | None) -> dict:
 
 
 def generate_json_from_assay(
-    assay: Assay, credited_ids: Collection[int] | None = None
+    assay: Assay,
+    credited_ids: Collection[int] | None = None,
+    version: Version | None = None,
 ) -> dict | None:
     """Return one ToxTemp as a document, the single source of every export format.
 
@@ -315,6 +327,10 @@ def generate_json_from_assay(
     ``Assay.processing_log`` and ``user_alerts`` are server internals and user ids
     are personal data. Everything else about the ToxTemp is published as is.
     ``credited_ids``: see ``get_assay_export_author_metadata``.
+
+    ``version`` builds a past state of the ToxTemp instead of the current one (see
+    ``toxtempass.versions`` for what can be rebuilt). The document is the same
+    either way and lists every version of the ToxTemp under ``history``.
     """
     try:
         current_time = timezone.now().astimezone(AMSTERDAM_TZ)
@@ -329,7 +345,10 @@ def generate_json_from_assay(
         from urllib.parse import quote
 
         models_used: list[dict] = []
-        for c in assay.costs.order_by("updated_at"):
+        costs = assay.costs.order_by("updated_at")
+        if version is not None:
+            costs = costs.filter(updated_at__lte=version.at)
+        for c in costs:
             info_url = (
                 f"https://ai.azure.com/catalog/models/{quote(c.model_id, safe='')}"
                 if c.model_id
@@ -366,14 +385,38 @@ def generate_json_from_assay(
 
         study = assay.study
         investigation = study.investigation
-        answers_by_question_id = {a.question_id: a for a in assay.answers.all()}
-        question_set_id = assay.question_set_id
-        if question_set_id is None:
-            # Legacy assays predate the question_set FK; derive it from the
-            # questions their answers point to.
-            question_set_id = assay.answers.values_list(
-                "question__subsection__section__question_set_id", flat=True
-            ).first()
+        if version is None:
+            answers_by_question_id = {a.question_id: a for a in assay.answers.all()}
+            title, description = assay.title, assay.description
+            question_set_id = assay.question_set_id
+            if question_set_id is None:
+                # Legacy assays predate the question_set FK; derive it from the
+                # questions their answers point to.
+                question_set_id = assay.answers.values_list(
+                    "question__subsection__section__question_set_id", flat=True
+                ).first()
+            question_set = assay.question_set.label if assay.question_set else None
+        else:
+            answers_by_question_id = answers_as_of(assay, version)
+            row = assay_as_of(assay, version)
+            title = row.title if row else assay.title
+            description = row.description if row else assay.description
+            question_set_id = row.question_set_id if row else assay.question_set_id
+            if question_set_id is None and answers_by_question_id:
+                question_set_id = (
+                    Section.objects.filter(
+                        subsections__questions__in=list(answers_by_question_id)
+                    )
+                    .values_list("question_set_id", flat=True)
+                    .first()
+                )
+            question_set = (
+                QuestionSet.objects.filter(pk=question_set_id)
+                .values_list("label", flat=True)
+                .first()
+            )
+        every_version = list_versions(assay)
+        shown = version or (every_version[0] if every_version else None)
 
         # Only walk the sections of this assay's questionnaire version —
         # Section.objects.all() would also include every other QuestionSet in
@@ -424,7 +467,7 @@ def generate_json_from_assay(
                 # Current date and time in ISO format
                 "creation_date": current_time.isoformat(),
                 # Filename for the export
-                "filename": f"toxtemp_{slugify(assay.title)}",
+                "filename": f"toxtemp_{slugify(title)}",
                 "reference_toxtemp": getattr(Config, "reference_toxtemp", None),
                 "website": "toxtempassistant.vhp4safety.nl",
                 # Structured per-run LLM identities (machine-readable companion to
@@ -449,7 +492,9 @@ def generate_json_from_assay(
                     "git_hash": getattr(Config, "git_hash", None),
                     "license_url": getattr(Config, "license_url", None),
                 },
-                **get_assay_export_author_metadata(assay, credited_ids),
+                **get_assay_export_author_metadata(
+                    assay, credited_ids, version.at if version else None
+                ),
             },
             "investigation": {
                 "id": investigation.pk,
@@ -466,14 +511,23 @@ def generate_json_from_assay(
             },
             "assay": {
                 "id": assay.pk,
-                "title": assay.title,
-                "description": assay.description,
-                "status": assay.status,
+                "title": title,
+                "description": description,
+                # Neither is recorded in the history, so a past version has none.
+                "status": None if version else assay.status,
                 "submission_date": _iso(assay.submission_date),
-                "last_modified": _iso(assay_last_modified(assay)),
-                "question_set": assay.question_set.label if assay.question_set else None,
-                "completion_time_seconds": assay.completion_time_seconds,
+                "last_modified": _iso(
+                    version.at if version else assay_last_modified(assay)
+                ),
+                "question_set": question_set,
+                "completion_time_seconds": (
+                    None if version else assay.completion_time_seconds
+                ),
+                "version": str(shown.id) if shown else None,
             },
+            "history": [
+                {"id": str(v.id), "created_at": _iso(v.at)} for v in every_version
+            ],
             "sections": sections,
         }
 

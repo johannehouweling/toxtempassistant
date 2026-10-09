@@ -8,6 +8,7 @@ version are caught separately in CI (``oasdiff``, .github/workflows/api-contract
 """
 
 import io
+import re
 import uuid
 from pathlib import Path
 from unittest.mock import patch
@@ -160,12 +161,7 @@ def test_every_route_is_in_the_spec_and_the_other_way_round():
     for pattern in get_resolver().url_patterns:
         route = str(pattern.pattern)
         if route.startswith("api/preview/") and pattern.name not in NOT_IN_CONTRACT:
-            routes.add(
-                "/"
-                + route.replace("<int:assay_id>", "{assay_id}").replace(
-                    "<uuid:job_id>", "{job_id}"
-                )
-            )
+            routes.add("/" + re.sub(r"<(?:int|uuid):(\w+)>", r"{\1}", route))
     assert routes == set(SPEC["paths"])
 
 
@@ -199,7 +195,8 @@ def test_detail(client, populated, which):
     check(response, url)
     body = response.json()
     assert [a["credited"] for a in body["metadata"]["authors"]] == [True]
-    assert body["format_version"] == 1
+    assert body["format_version"] == 2
+    assert body["assay"]["version"] == body["history"][0]["id"]
     if which == "full":
         question = body["sections"][0]["subsections"][0]["questions"]
         assert {q["parent_question_id"] for q in question} == {None, question[0]["id"]}
@@ -218,6 +215,43 @@ def fake_pdf():
 
     with patch("toxtempass.api.export_assay_to_file", side_effect=build) as mocked:
         yield mocked
+
+
+def test_an_earlier_version_is_served_in_the_documented_layout(client, populated):
+    full = populated["full"]
+    detail = client.get(reverse("api_assay_detail", args=[full.pk]), **populated["auth"])
+    history = detail.json()["history"]
+    assert len(history) >= 2  # the assay was created and answers were saved
+    oldest = history[-1]["id"]
+    url = reverse("api_assay_version", args=[full.pk, oldest])
+    response = client.get(url, **populated["auth"])
+    assert response.status_code == 200
+    check(response, url)
+    body = response.json()
+    assert body["assay"]["version"] == oldest
+    assert body["assay"]["status"] is None  # not recorded in the history
+
+
+def test_versions_that_do_not_exist_are_not_found(client, populated):
+    full, legacy = populated["full"], populated["legacy"]
+    detail = client.get(reverse("api_assay_detail", args=[full.pk]), **populated["auth"])
+    theirs = detail.json()["history"][0]["id"]
+    for assay_id, version_id in (
+        (full.pk, uuid.uuid4()),  # no such version
+        (legacy.pk, theirs),  # a version of another ToxTemp
+        (999999, theirs),  # no such ToxTemp
+    ):
+        url = reverse("api_assay_version", args=[assay_id, version_id])
+        response = client.get(url, **populated["auth"])
+        assert response.status_code == 404
+        check(response, url)
+
+
+def test_versions_need_a_token(client, populated):
+    url = reverse("api_assay_version", args=[populated["full"].pk, uuid.uuid4()])
+    response = client.get(url)
+    assert response.status_code == 401
+    check(response, url)
 
 
 def test_pdf_request_poll_and_download(client, populated, fake_pdf):
