@@ -33,6 +33,7 @@ from toxtempass.tests.fixtures.factories import (
     WorkspaceFactory,
     WorkspaceMemberFactory,
 )
+from toxtempass.tests.history_helpers import age_history
 
 pytestmark = pytest.mark.django_db
 
@@ -727,6 +728,7 @@ class TestVersionsInTheApi:
         in_ws.description = "asdf"
         in_ws.save()
         answer = AnswerFactory(assay=in_ws, question=question, answer_text="first")
+        age_history(in_ws, 3600)  # so that what is saved later is another version
         secret = _issue(client, workspace.owner, workspace).json()["token"]
         client.logout()
         return workspace, in_ws, answer, _bearer(secret)
@@ -737,10 +739,12 @@ class TestVersionsInTheApi:
     def test_the_detail_lists_its_versions_and_the_list_names_the_newest(
         self, client, toxtemp
     ):
-        _, assay, _, auth = toxtemp
+        _, assay, answer, auth = toxtemp
+        answer.answer_text = "second"
+        answer.save()
         body = self._get(client, "api_assay_detail", auth, assay.pk).json()
         ids = [h["id"] for h in body["history"]]
-        assert len(ids) >= 2 and len(set(ids)) == len(ids)
+        assert len(ids) == 2 and len(set(ids)) == len(ids)
         assert body["assay"]["version"] == ids[0]
         listed = self._get(client, "api_assay_list", auth).json()["results"]
         versions_listed = [i["version"] for i in listed if i["id"] == assay.pk]

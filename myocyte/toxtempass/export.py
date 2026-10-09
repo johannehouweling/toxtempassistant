@@ -19,8 +19,15 @@ from django.utils.text import slugify
 from toxtempass import Config
 from toxtempass.models import Answer, Assay, Person, QuestionSet, Section
 from toxtempass.utilities import log_processing_event
-from toxtempass.versions import Version, answers_as_of, assay_as_of, latest_version
-from toxtempass.versions import versions as list_versions
+from toxtempass.versions import (
+    Version,
+    answers_as_of,
+    assay_as_of,
+    latest_version,
+)
+from toxtempass.versions import (
+    history as version_history,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -415,7 +422,7 @@ def generate_json_from_assay(
                 .values_list("label", flat=True)
                 .first()
             )
-        every_version = list_versions(assay)
+        every_version = version_history(assay)
         shown = version or (every_version[0] if every_version else None)
 
         # Only walk the sections of this assay's questionnaire version —
