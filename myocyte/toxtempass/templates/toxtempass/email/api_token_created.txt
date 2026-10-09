@@ -6,8 +6,8 @@ This includes your own investigations:
 {% for title in investigations %}
 - {{ title }}{% endfor %}
 {% endif %}
-{% if credited %}You are credited by name, so the server sees your name, organization and ORCID iD (never your email address) as an author of the ToxTemps you created or edited. You can change this under Privacy in the user menu, or by leaving the workspace; it then applies at once, to all your workspaces.
-{% else %}You are not credited by name, so you appear to the server as "Contributor (not named)". If you want to be credited by name (name, organization and ORCID iD, never your email address), switch on "Credit me by name" under Privacy in the user menu.
+{% if credited %}You are credited by name (this is on by default), so the server sees your name, organization and ORCID iD (never your email address) as an author of the ToxTemps you created or edited. To appear as "Contributor (not named)" instead, switch off "Credit me by name" under Privacy in the user menu, or leave the workspace; it then applies at once, to all your workspaces.
+{% else %}You switched off being credited by name, so you appear to the server as "Contributor (not named)". If you want to be credited (name, organization and ORCID iD, never your email address), switch on "Credit me by name" under Privacy in the user menu.
 {% endif %}
 If you do not want an outside server to read your work here, leave the workspace or remove your investigations from it, or ask the workspace administrators to revoke the token:
 {{ overview_url }}

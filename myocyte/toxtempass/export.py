@@ -202,7 +202,7 @@ ANONYMOUS_AUTHOR = "Contributor (not named)"
 def get_assay_api_authors(assay: Assay, credited_ids: Collection[int]) -> list[dict]:
     """Return the authors for a recipient outside the app, in author order.
 
-    Only people in ``credited_ids`` (members who agreed to be credited) are named,
+    Only people in ``credited_ids`` (members who have not opted out) are named,
     and then only with name, organization and ORCID iD: never an email address.
     Everyone else keeps their place as an unnamed contributor, so the number and
     order of authors stay honest. A credited person with no name on their account

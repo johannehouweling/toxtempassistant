@@ -19,8 +19,8 @@ info:
 
     Email addresses are never included. A person is named as an author (name,
     organization and ORCID iD) only if they are a member of the token's workspace
-    and have agreed to be credited by name; the same holds in the PDF. Everyone else
-    keeps their place in the author list as an unnamed contributor, so the number
+    and have not switched off being credited by name (it is on by default); the same
+    holds in the PDF. Everyone else keeps their place in the author list as an unnamed contributor, so the number
     and order of authors stay correct. Leaving the workspace or withdrawing the
     agreement takes effect on the next request, so do not cache authors for long.
     Free-text answers and source file names are written by users and are returned as
@@ -499,7 +499,7 @@ components:
         credited:
           type: boolean
           description: |
-            False for a contributor who has not agreed to be named; then `name` is
+            False for a contributor who has switched off being named; then `name` is
             "Contributor (not named)" and the other fields are null.
         name: {type: string}
         organization: {type: [string, "null"]}

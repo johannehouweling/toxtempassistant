@@ -686,7 +686,7 @@ def _build_api_token_created(logs: list[EmailLog]) -> _Built | str:
             "created_by": _display_name(token.created_by),
             "expires_on": token.expires_at.date(),
             "investigations": [_one_line(title) for title in investigations],
-            "credited": user.credit_by_name is True,
+            "credited": bool(user.credit_by_name),
             "overview_url": utilities.absolute_url(reverse("overview")),
         },
     )

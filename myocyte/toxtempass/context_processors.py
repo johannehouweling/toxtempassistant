@@ -193,7 +193,7 @@ def email_preferences(request: HttpRequest) -> dict:
     return {
         "email_settings": email_settings_for(user),
         # The Privacy tab's switch for being named as an author in workspace APIs.
-        "credit_by_name": user.credit_by_name is True,
+        "credit_by_name": bool(user.credit_by_name),
         # Shown in the banner asking unconfirmed users to confirm their address.
         "unconfirmed_account_delete_days": config._unconfirmed_account_delete_days,
         # Shown in the Privacy tab's explanation of "Stop sharing".

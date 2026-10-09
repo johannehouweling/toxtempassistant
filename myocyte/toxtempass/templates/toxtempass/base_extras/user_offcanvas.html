@@ -298,9 +298,9 @@
                 <p class="mb-2 text-muted">When an owner or admin gives an outside server API access to a workspace you belong to, that server can read the ToxTemps you created or edited there.</p>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" role="switch" id="credit-by-name"{% if credit_by_name %} checked{% endif %}>
-                    <label class="form-check-label" for="credit-by-name">Credit me by name (name, organization, ORCID iD)</label>
+                    <label class="form-check-label" for="credit-by-name">Credit me by name (name, org, ORCID)</label>
                 </div>
-                <p class="mb-0 mt-1 text-muted small">Applies to all your workspaces and takes effect at once. Never your email address. Without it you appear as "Contributor (not named)". Accepting a workspace invitation turns this on unless you have switched it off.</p>
+                <p class="mb-0 mt-1 text-muted small">On by default. Applies to all your workspaces and takes effect at once. Never your email address. Switched off, you appear as "Contributor (not named)".</p>
                 <div id="credit-by-name-alert" class="alert alert-danger mt-2 py-2 px-3 small" role="alert" hidden></div>
             </div>
             <script>
@@ -395,22 +395,22 @@
             });
           });
         </script>
-        <div class="d-flex justify-content-center pb-3">
-            <div class="btn-group" role="group">
-                <a class="btn btn-sm btn-outline-primary d-flex align-items-center js-footer-tooltip" href="{{ config.github_repo_url }}" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub">
+        <div class="pb-3">
+            <div class="btn-group d-flex w-100" role="group">
+                <a class="btn btn-sm btn-outline-secondary d-flex align-items-center js-footer-tooltip" href="{{ config.github_repo_url }}" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub">
                     <i class="bi bi-github"></i>
                     {% if config.git_hash %}
                         <span class="ms-1 small text-muted">{{ config.git_hash|slice:":7" }}</span>
                     {% endif %}
                 </a>
-                <a class="btn btn-sm btn-outline-primary js-footer-tooltip" href="{% url 'about' %}" title="About" aria-label="About"><i class="bi bi-info-circle"></i></a>
-                <a class="btn btn-sm btn-outline-primary js-footer-tooltip" href="{% url 'about' %}#how-to-cite" title="How to cite" aria-label="How to cite"><i class="bi bi-chat-left-quote"></i></a>
-                <a class="btn btn-sm btn-outline-primary js-footer-tooltip" href="mailto:{{config.maintainer_email}}?subject=%5BToxTempAssistant%5D%20%3CEnter%20Subject%20Here%3E" title="Contact via Email" aria-label="Contact via Email"><i class="bi bi-envelope-paper-heart"></i></a>
-                <button class="btn btn-sm btn-outline-primary js-footer-tooltip" type="button" data-bs-target="#termsModal" data-bs-toggle="modal" title="Legal" aria-label="Legal"><i class="bi bi-book"></i></button>
-                <button class="btn btn-sm btn-outline-primary js-footer-tooltip" type="button" data-bs-target="#copyrightModal" data-bs-toggle="modal" title="License" aria-label="License"><i class="bi bi-c-circle"></i></button>
+                <a class="btn btn-sm btn-outline-secondary js-footer-tooltip" href="{% url 'about' %}" title="About" aria-label="About"><i class="bi bi-info-circle"></i></a>
+                <a class="btn btn-sm btn-outline-secondary js-footer-tooltip" href="{% url 'about' %}#how-to-cite" title="How to cite" aria-label="How to cite"><i class="bi bi-chat-left-quote"></i></a>
+                <a class="btn btn-sm btn-outline-secondary js-footer-tooltip" href="mailto:{{config.maintainer_email}}?subject=%5BToxTempAssistant%5D%20%3CEnter%20Subject%20Here%3E" title="Contact via Email" aria-label="Contact via Email"><i class="bi bi-envelope-paper-heart"></i></a>
+                <button class="btn btn-sm btn-outline-secondary js-footer-tooltip" type="button" data-bs-target="#termsModal" data-bs-toggle="modal" title="Legal" aria-label="Legal"><i class="bi bi-book"></i></button>
+                <button class="btn btn-sm btn-outline-secondary js-footer-tooltip" type="button" data-bs-target="#copyrightModal" data-bs-toggle="modal" title="License" aria-label="License"><i class="bi bi-c-circle"></i></button>
                 {% if llm_signature %}
                 <a id="llm-signature-badge"
-                      class="btn btn-sm btn-outline-primary d-flex align-items-center"
+                      class="btn btn-sm btn-outline-secondary d-flex align-items-center"
                       href="https://ai.azure.com/catalog/models/{{ llm_signature.model_id }}"
                       target="_blank"
                       rel="noopener noreferrer"

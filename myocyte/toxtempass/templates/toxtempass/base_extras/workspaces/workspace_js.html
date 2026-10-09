@@ -74,8 +74,8 @@
   function showNoOwnedPlaceholder() {
     const container = document.getElementById("ownedWorkspacesContainer");
     if (!container) return;
-    // If there are any workspace cards, don't show placeholder
-    if (container.querySelector(".col")) return;
+    // If there are any workspace cards (or the placeholder), don't add another
+    if (container.querySelector(".workspace-list, .col > .text-muted")) return;
     const col = document.createElement("div");
     col.className = "col";
     col.innerHTML = `<div class="text-muted">You don't own any workspace yet.</div>`;
@@ -117,6 +117,27 @@
     }
   }
 
+  // A card built in the browser must look like the one the server renders after a
+  // reload: the creator is its owner (key avatar) and has the settings cogwheel.
+  // (Django tags do not work here: they run once, when this page loads.)
+  const CURRENT_USER_ID = "{{ request.user.id }}";
+  const CURRENT_USER_EMAIL = "{{ request.user.email|escapejs }}";
+  const OWNER_CHIP_HTML =
+    '<span class="d-inline-flex align-items-center bg-success-subtle member-row member-chip" data-user-id="' +
+    CURRENT_USER_ID +
+    '"><span class="d-inline-flex align-items-center justify-content-center bg-success fw-bold text-white member-avatar"><i class="bi bi-key-fill"></i></span><span class="member-text">You</span></span>';
+  function settingsButtonHtml(hidden) {
+    return (
+      '<button type="button" class="btn btn-sm btn-outline-secondary border-0 btn-api-tokens' +
+      (hidden ? " d-none" : "") +
+      '" title="Workspace settings" aria-label="Workspace settings"><i class="bi bi-gear"></i></button>'
+    );
+  }
+  function setOwnerChipEmail(card) {
+    const text = card.querySelector(".member-row .member-text");
+    if (text) text.dataset.bsEmail = CURRENT_USER_EMAIL;
+  }
+
   function createTempWorkspaceCard() {
     const container = document.getElementById("ownedWorkspacesContainer");
     if (!container) return;
@@ -128,6 +149,7 @@
         <div class="card-header d-flex align-items-center justify-content-between border-0 workspace-card-header">
           <span class="fw-semibold form-control px-0 border-0 workspace-name" style="font-size:.95rem;" contenteditable="true">New workspace</span>
           <div class="d-flex align-items-center gap-2">
+            ${settingsButtonHtml(true)}
             <button type="button" class="btn btn-sm btn-outline-danger border-0 workspace-delete-btn" title="Delete workspace" aria-label="Delete workspace">
               <i class="bi bi-trash"></i>
             </button>
@@ -137,11 +159,7 @@
           <div class="mb-3">
             <div class="text-uppercase fw-semibold mb-2 section-label">Members</div>
             <div class="d-flex flex-wrap align-items-center gap-2 members-wrap">
-              <!-- show current user as member immediately -->
-              <span class="d-inline-flex align-items-center {% if request.user %}bg-success-subtle{% endif %} member-row member-chip" data-user-id="{{ request.user.id }}">
-                <span class="d-inline-flex align-items-center justify-content-center {% if request.user %}bg-success{% endif %} fw-bold text-white member-avatar">{% if r == "owner" or r == "admin"%}<i class="bi bi-key-fill"></i>{% else %}{{ u.email|slice:":1"|upper }}{% endif %}</span>
-                <span class="member-text" data-bs-email="{{ u.email }}">You</span>
-              </span>
+              ${OWNER_CHIP_HTML}
               <button type="button" class="btn btn-sm btn-outline-primary btn-add-member round-add-btn" title="Add member" aria-label="Add member">
                 <i class="bi bi-person-plus"></i>
               </button>
@@ -149,7 +167,7 @@
           </div>
           <div>
 
-                <div class="text-uppercase fw-semibold mb-2 section-label">Investigations</div>
+                <div class="text-uppercase fw-semibold mb-2 section-label">Shared Investigations</div>
             <div class="d-flex flex-wrap align-items-center gap-2 assays-wrap">
               <span class="text-muted small empty-assays">No investigations shared</span>
               <button type="button" class="btn btn-sm btn-outline-secondary btn-add-assay round-add-btn" title="Add assay" aria-label="Add assay">
@@ -197,6 +215,10 @@
             const pk = m ? m[1] : "";
             const card = col.querySelector(".workspace-list");
             if (card && pk) card.setAttribute("data-workspace-id", pk);
+            if (card) {
+              card.querySelector(".btn-api-tokens")?.classList.remove("d-none");
+              setOwnerChipEmail(card);
+            }
             nameEl.setAttribute("contenteditable", "false");
           } else {
             alert(
@@ -230,6 +252,7 @@
           <div class="card-header d-flex align-items-center justify-content-between border-0 workspace-card-header">
           <span class="fw-semibold form-control px-0 border-0 workspace-name" style="font-size:.95rem;" contenteditable="false">${escapeHtml(name || "New workspace")}</span>
           <div class="d-flex align-items-center gap-2">
+            ${settingsButtonHtml(false)}
             <button type="button" class="btn btn-sm btn-outline-danger border-0 workspace-delete-btn" title="Delete workspace" aria-label="Delete workspace">
               <i class="bi bi-trash"></i>
             </button>
@@ -240,7 +263,7 @@
           <div class="mb-3">
             <div class="text-uppercase fw-semibold mb-2 section-label">Members</div>
             <div class="d-flex flex-wrap align-items-center gap-2 members-wrap">
-              <span class="text-muted small empty-members">No members yet</span>
+              ${OWNER_CHIP_HTML}
               <button type="button" class="btn btn-sm btn-outline-primary btn-add-member round-add-btn" title="Add member" aria-label="Add member">
                 <i class="bi bi-person-plus"></i>
               </button>
@@ -248,7 +271,7 @@
           </div>
 
           <div>
-            <div class="text-uppercase fw-semibold mb-2 section-label">Investigations</div>
+            <div class="text-uppercase fw-semibold mb-2 section-label">Shared Investigations</div>
             <div class="d-flex flex-wrap align-items-center gap-2 assays-wrap">
               <span class="text-muted small empty-assays">No investigations shared</span>
               <button type="button" class="btn btn-sm btn-outline-secondary btn-add-assay round-add-btn" title="Add assay" aria-label="Add assay">
@@ -260,6 +283,7 @@
       </div>
     `;
 
+    setOwnerChipEmail(col);
     container.prepend(col);
     // if we inserted a card, remove the "no workspaces" placeholder
     removeNoOwnedPlaceholder();
@@ -381,8 +405,8 @@
           chip.title = "Invitation sent, not accepted yet";
           const avatar = document.createElement("span");
           avatar.className =
-            "d-inline-flex align-items-center justify-content-center fw-bold member-avatar";
-          avatar.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+            "d-inline-flex align-items-center justify-content-center fw-bold text-white member-avatar";
+          avatar.innerHTML = '<i class="bi bi-patch-question-fill"></i>';
           const text = document.createElement("span");
           text.className = "member-text";
           text.textContent = `${memberEmailRaw} (invited)`;
@@ -692,8 +716,9 @@
             return;
           }
           // Remove the workspace card from the DOM to reflect deletion instantly.
-          const col = workspaceEl.closest(".col");
-          if (col) col.remove();
+          // Its column goes with it; without one, the card itself is removed.
+          const parent = workspaceEl.parentElement;
+          (parent && parent.classList.contains("col") ? parent : workspaceEl).remove();
           // if there are no more workspace cards, show placeholder
           showNoOwnedPlaceholder();
         })

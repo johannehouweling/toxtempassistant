@@ -241,10 +241,10 @@ class TestWorkspaceUi:
                 ws_views.get_workspace_list(request),
                 request=request,
             )
-            seen[label] = (
-                'aria-label="Workspace settings"'
-                in html  # the button; the JS is shown to all
-            )
+            # Only the cards the server rendered: the script, which everyone gets,
+            # holds the cogwheel's markup too, for a workspace just created.
+            cards = html.split("<style>")[0]
+            seen[label] = 'aria-label="Workspace settings"' in cards
         assert seen == {"owner": True, "admin": True, "member": False}
 
     def test_every_member_sees_each_token_by_name(self):
@@ -746,7 +746,7 @@ class TestAuthorsInTheApi:
         )
         WorkspaceMemberFactory(workspace=workspace, user=assay.created_by)
         Person.objects.filter(pk=assay.created_by_id).update(
-            credit_by_name=True if credited else None
+            credit_by_name=credited
         )
         return workspace
 
@@ -857,6 +857,8 @@ class TestAuthorsInTheApi:
         self, client, assay, pdf_dir
     ):
         workspace = self._workspace(assay, credited=True)
+        # The workspace owner is a member too, and has switched it off.
+        Person.objects.filter(pk=workspace.owner_id).update(credit_by_name=False)
         client.force_login(workspace.owner)
         secret = client.post(
             reverse("workspace_token_create", args=[workspace.pk]), {"name": "t"}

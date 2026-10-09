@@ -104,16 +104,16 @@ def test_members_without_investigations_are_told_too(client, setup):
     assert "now has API access" in message.subject
 
 
-def test_credit_wording_depends_on_whether_they_agreed(client, setup):
-    Person.objects.filter(pk=setup["alice"].pk).update(credit_by_name=True)
-    Person.objects.filter(pk=setup["bob"].pk).update(credit_by_name=None)
+def test_credit_wording_depends_on_whether_they_opted_out(client, setup):
+    assert setup["alice"].credit_by_name is True  # the default
+    Person.objects.filter(pk=setup["bob"].pk).update(credit_by_name=False)
     _issue(client, setup["admin"], setup["workspace"])
     _after_cooloff()
     alice = next(m for m in mail.outbox if m.to == [setup["alice"].email]).body
     bob = next(m for m in mail.outbox if m.to == [setup["bob"].email]).body
-    assert "You are credited by name" in alice
-    assert "Contributor (not named)" not in alice
-    assert "Contributor (not named)" in bob
+    assert "You are credited by name (this is on by default)" in alice
+    assert 'switch off "Credit me by name"' in alice
+    assert "You switched off being credited by name" in bob
     assert 'switch on "Credit me by name"' in bob
 
 

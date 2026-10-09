@@ -51,8 +51,10 @@
           <div id="addAssayApiWarning" class="alert alert-warning small" style="display:none">
             <i class="bi bi-hdd-network-fill"></i>
             This workspace has API access (<span id="addAssayApiTokens"></span>). Servers using
-            these tokens will be able to read this investigation, read-only and without
-            naming any person. You can remove the investigation again at any time.
+            these tokens will be able to read this investigation, read-only. They see the
+            authors of its ToxTemps by name (name, organization, ORCID iD, never an email
+            address) unless a person has switched that off under Privacy. You can remove
+            the investigation again at any time.
           </div>
           <div id="addAssayError" class="text-danger small" style="display:none"></div>
         </div>
@@ -78,6 +80,8 @@
             A token lets an external server read, and only read, the investigations shared into this workspace.
             It keeps working if you leave the workspace. Send it as <code>Authorization: Bearer &lt;token&gt;</code>
             to <code>/api/preview/assays/</code> (preview: may change).
+            <a href="{% url 'api_docs' %}" target="_blank" rel="noopener">API documentation</a>,
+            where you can try every call.
           </p>
           <div id="apiTokenList" class="mb-3"></div>
           <div id="apiTokenSecret" class="alert alert-warning" style="display:none">
