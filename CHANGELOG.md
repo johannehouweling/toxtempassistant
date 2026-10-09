@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v3.61.0 (2026-10-09)
+
+### Bug Fixes
+
+- **workspaces**: Remove a deleted workspace card at once
+  ([`5caac26`](https://github.com/johannehouweling/toxtempassistant/commit/5caac2651a8ee635da1e6400f1c469fd3c7f21f3))
+
+- **workspaces**: Say that authors are named when adding an investigation; link the API docs
+  ([`93f9a83`](https://github.com/johannehouweling/toxtempassistant/commit/93f9a838c438097ef49bd5dbc950d754798f1508))
+
+- **workspaces**: White question icon on pending invitation chips
+  ([`d14d8fe`](https://github.com/johannehouweling/toxtempassistant/commit/d14d8feb4c41faf8a6ecdb49821aadd8175bc1f7))
+
+### Code Style
+
+- **menu**: Make the bottom bar of the user menu span the width, all secondary
+  ([`b71b581`](https://github.com/johannehouweling/toxtempassistant/commit/b71b581200c2b5fa6eeda5820158b6544fe02008))
+
+### Features
+
+- **workspaces**: Credit by name is on by default; new workspace cards match reloaded ones
+  ([`dabfd82`](https://github.com/johannehouweling/toxtempassistant/commit/dabfd82b20f705bacf86c24788076e54ea8cda72))
+
+### Testing
+
+- Read script elements with an HTML parser instead of a regex
+  ([`4939f8e`](https://github.com/johannehouweling/toxtempassistant/commit/4939f8e828b9b892e6a92beb339a2c7bdd625b74))
+
+
 ## v3.60.0 (2026-10-08)
 
 ### Bug Fixes
