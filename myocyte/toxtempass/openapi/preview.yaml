@@ -28,17 +28,21 @@ info:
 
     ## Versions
 
-    Every saved change to a ToxTemp is a version. Each ToxTemp lists its versions
-    under `history`, newest first, each with an id that is the same every time it is
-    asked for and never changes, so two fetches can be compared by their `version`.
+    Every saved change to a ToxTemp is a version. Saving the answers page, or a
+    drafting run, saves many answers at once, so saves by the same person (or by the
+    drafting run) with less than 30 seconds between them count as one version, shown
+    as the state after the last of them. Each ToxTemp lists its versions under
+    `history`, newest first, each with an id that is the same every time it is asked
+    for and never changes, so two fetches can be compared by their `version`. An id
+    you were given keeps working even after later saves join its group.
     `GET /api/preview/assays/{id}/` always returns the newest one;
     `GET /api/preview/assays/{id}/history/{version_id}/` returns an earlier one, in
     the same layout. An earlier version shows the answers, title, description and
     questionnaire as they were then, including text that has since been changed or
     removed. It does not record the status, and the study, the investigation, the
-    questions and whether an author may be named are as they are now. A single
-    drafting run saves many answers, so it creates many versions in a row; ignore
-    versions while the ToxTemp's `status` is `scheduled` or `busy`.
+    questions and whether an author may be named are as they are now. While the
+    ToxTemp's `status` is `scheduled` or `busy` a drafting run is still saving, and
+    the newest version keeps moving; wait until it is done.
 
     ## Limits
 
@@ -461,8 +465,10 @@ components:
         history:
           type: array
           description: |
-            Every version of this ToxTemp, the newest first. Fetch an earlier one
-            at `/api/preview/assays/{id}/history/{version_id}/`.
+            Every version of this ToxTemp, the newest first. Saves made within 30
+            seconds of each other by the same person, or by the drafting run, are one
+            version. Fetch an earlier one at
+            `/api/preview/assays/{id}/history/{version_id}/`.
           items: {$ref: "#/components/schemas/AssayVersion"}
         sections:
           type: array
@@ -639,7 +645,7 @@ components:
         created_at:
           type: string
           format: date-time
-          description: When the change that made this version was saved.
+          description: When the last save of this version was made.
     Section:
       type: object
       additionalProperties: false
