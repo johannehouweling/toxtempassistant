@@ -494,6 +494,10 @@ class Config:
     # Tokens are announced to every member by email, so a workspace may hold only
     # so many active ones.
     _api_tokens_max_active: Final[int] = 4
+    # Saves by the same person (or the drafting run) at most this far apart are one
+    # version of a ToxTemp: one submit of the answers page saves every answer, and a
+    # drafting run saves them as they finish.
+    _version_gap_seconds: Final[int] = 30
     _email_confirmation_required_message: Final[str] = (
         "Please confirm your email address before generating drafts. Use the link "
         "in the email we sent you, or request a new one."

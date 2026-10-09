@@ -40,6 +40,7 @@ from toxtempass.tests.fixtures.factories import (
     SubsectionFactory,
     WorkspaceFactory,
 )
+from toxtempass.tests.history_helpers import age_history
 
 pytestmark = pytest.mark.django_db
 
@@ -219,9 +220,13 @@ def fake_pdf():
 
 def test_an_earlier_version_is_served_in_the_documented_layout(client, populated):
     full = populated["full"]
+    age_history(full, 3600)  # what was saved so far is one version ...
+    answer = full.answers.first()
+    answer.answer_text = "changed later"
+    answer.save()  # ... and this, an hour later, another
     detail = client.get(reverse("api_assay_detail", args=[full.pk]), **populated["auth"])
     history = detail.json()["history"]
-    assert len(history) >= 2  # the assay was created and answers were saved
+    assert len(history) == 2
     oldest = history[-1]["id"]
     url = reverse("api_assay_version", args=[full.pk, oldest])
     response = client.get(url, **populated["auth"])

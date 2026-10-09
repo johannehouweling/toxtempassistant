@@ -20,6 +20,7 @@ from toxtempass.tests.fixtures.factories import (
     SectionFactory,
     SubsectionFactory,
 )
+from toxtempass.tests.history_helpers import age_history, as_user
 
 pytestmark = pytest.mark.django_db
 
@@ -281,3 +282,123 @@ def test_changes_saved_in_the_same_instant_keep_their_order(toxtemp):
     # assay's version; but the assay's later description is not in the answer's.
     assert text_and_description(edited)[1] == "asdf"
     assert text_and_description(assay_rows[-1]) == ("second", "a good description")
+
+
+class TestSavesThatBelongTogether:
+    """One action saves many rows; a person is shown one version for them."""
+
+    def test_creating_every_answer_at_once_is_one_version(self):
+        """Submitting the answers page creates (and saves) an answer per question."""
+        qset = QuestionSetFactory(label="burst")
+        sub = SubsectionFactory(section=SectionFactory(question_set=qset))
+        assay = AssayFactory(question_set=qset, created_by=PersonFactory())
+        person = PersonFactory()
+        with as_user(person):
+            for _ in range(130):
+                answer = AnswerFactory(
+                    assay=assay, question=QuestionFactory(subsection=sub)
+                )
+                answer.accepted = True  # a second save of the same answer
+                answer.save()
+
+        assert len(versions.versions(assay)) > 130  # every row is a saved state
+        # The assay's own creation (by nobody here) and the page's submit.
+        assert len(versions.history(assay)) == 2
+
+    def test_saves_close_together_by_one_person_are_one_version(self, toxtemp):
+        assay, (q1, q2), _ = toxtemp
+        person = PersonFactory()
+        age_history(assay, 3600)
+        for question in (q1, q2):
+            with as_user(person):
+                AnswerFactory(assay=assay, question=question, answer_text="x")
+            age_history(assay, 5)  # five seconds between saves, inside the gap
+        shown = versions.history(assay)
+        assert len(shown) == 2  # what the assay started with, and this edit session
+
+    def test_a_pause_longer_than_the_gap_starts_another_version(self, toxtemp):
+        from toxtempass import config
+
+        assay, (q1, q2), _ = toxtemp
+        person = PersonFactory()
+        age_history(assay, 3600)
+        with as_user(person):
+            AnswerFactory(assay=assay, question=q1, answer_text="x")
+        age_history(assay, config._version_gap_seconds + 1)
+        with as_user(person):
+            AnswerFactory(assay=assay, question=q2, answer_text="y")
+        assert len(versions.history(assay)) == 3  # creation, the first save, the second
+
+    def test_a_different_person_starts_another_version_at_once(self, toxtemp):
+        assay, (q1, q2), _ = toxtemp
+        age_history(assay, 3600)
+        for question, person in ((q1, PersonFactory()), (q2, PersonFactory())):
+            with as_user(person):
+                AnswerFactory(assay=assay, question=question, answer_text="x")
+        assert len(versions.history(assay)) == 3
+
+    def test_a_drafting_run_with_no_person_is_one_version(self, toxtemp):
+        """The drafting task has no request, so its saves carry no user."""
+        assay, (q1, q2), _ = toxtemp
+        age_history(assay, 3600)
+        for question in (q1, q2):
+            answer = AnswerFactory(assay=assay, question=question, answer_text="")
+            answer.answer_text = "the model's draft"
+            answer.save(update_fields=["answer_text"])
+            age_history(assay, 10)  # answers finish seconds apart
+        assert len(versions.history(assay)) == 2
+
+    def test_a_person_editing_after_the_run_is_another_version(self, toxtemp):
+        assay, (q1, _), _ = toxtemp
+        age_history(assay, 3600)
+        answer = AnswerFactory(assay=assay, question=q1, answer_text="draft")
+        age_history(assay, 5)
+        answer.answer_text = "edited by a person"
+        answer._history_user = PersonFactory()
+        answer.save()
+        assert len(versions.history(assay)) == 3
+
+    def test_a_version_is_the_state_after_the_last_save_of_its_burst(self, toxtemp):
+        assay, (q1, q2), _ = toxtemp
+        age_history(assay, 3600)
+        with as_user(PersonFactory()):
+            for question, text in ((q1, "first answer"), (q2, "second answer")):
+                AnswerFactory(assay=assay, question=question, answer_text=text)
+        newest = versions.history(assay)[0]
+        document = _as_of(assay, str(newest.id))
+        assert {"first answer", "second answer"} <= set(_answer_texts(document))
+        assert generate_json_from_assay(assay)["assay"]["version"] == str(newest.id)
+
+    def test_an_id_that_was_listed_keeps_working_when_later_saves_join_its_burst(
+        self, toxtemp
+    ):
+        assay, (q1, q2), _ = toxtemp
+        age_history(assay, 3600)
+        person = PersonFactory()
+        with as_user(person):
+            AnswerFactory(assay=assay, question=q1, answer_text="one")
+        seen_by_a_partner = str(versions.history(assay)[0].id)
+        then = _as_of(assay, seen_by_a_partner)
+
+        with as_user(person):
+            AnswerFactory(assay=assay, question=q2, answer_text="two")  # same burst
+
+        listed = [str(v.id) for v in versions.history(assay)]
+        assert listed[0] != seen_by_a_partner  # the burst now ends later
+        assert seen_by_a_partner not in listed
+        again = _as_of(assay, seen_by_a_partner)  # but the old id still resolves
+        assert again["sections"] == then["sections"]
+        assert "two" not in _answer_texts(again) and "one" in _answer_texts(again)
+
+    def test_the_newest_version_is_always_the_last_save(self, toxtemp):
+        assay, (q1, _), _ = toxtemp
+        AnswerFactory(assay=assay, question=q1)
+        assert versions.history(assay)[0] == versions.versions(assay)[0]
+        assert versions.history(assay)[0] == versions.latest_version(assay)
+
+    def test_an_assay_with_no_saves_has_an_empty_history(self, toxtemp):
+        from toxtempass.models import Assay
+
+        assay, _, _ = toxtemp
+        Assay.history.model.objects.filter(id=assay.pk).delete()
+        assert versions.history(assay) == []

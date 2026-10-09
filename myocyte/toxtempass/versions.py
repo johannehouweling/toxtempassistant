@@ -2,9 +2,16 @@
 
 A ToxTemp has no stored versions. Every saved change to one of its answers, and
 every change to the assay's title, description or questionnaire, leaves a history
-row, and each row is a version: the ToxTemp as it was right after that change. The
-id of a version is derived from the row (a UUIDv5), so it is the same every time
-it is asked for, needs no storage, and never changes.
+row, and each row is a state: the ToxTemp as it was right after that change. The
+id of a state is derived from the row (a UUIDv5), so it is the same every time it
+is asked for, needs no storage, and never changes.
+
+One action saves many rows (submitting the answers page saves every answer, and a
+drafting run saves them as they finish), so the versions a person sees group them:
+saves by the same person, or by the drafting run, with no more than
+``Config._version_gap_seconds`` between them are one version, shown as the state
+after the last of them (see :func:`history`). Every individual state keeps its id
+and can still be asked for, so an id that was once listed never stops working.
 
 An old version is rebuilt from the same rows: each answer as it was last saved
 before that moment. Only what the histories keep can be rebuilt. The study and the
@@ -16,13 +23,14 @@ that moment (a later run replaces the record of an earlier one).
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from django.db.models import F, OuterRef, QuerySet, Subquery
 from django.db.models.functions import Coalesce, Greatest
 
+from toxtempass import config
 from toxtempass.models import Answer, Assay
 
 if TYPE_CHECKING:
@@ -45,6 +53,8 @@ class Version:
     rank: int
     history_id: int
     at: datetime
+    # Who saved it, or None for the drafting run. Only used to group saves.
+    user_id: int | None = field(default=None, compare=False)
 
     @property
     def id(self) -> UUID:
@@ -59,20 +69,49 @@ class Version:
 
 
 def versions(assay: Assay) -> list[Version]:
-    """Return every version of ``assay``, the newest first."""
+    """Return every saved state of ``assay``, the newest first.
+
+    This is every history row, so a single submit of the answers page is many of
+    them. What a person is shown is :func:`history`.
+    """
     answer_rows = Answer.history.model.objects.filter(assay_id=assay.pk).values_list(
-        "history_id", "history_date"
+        "history_id", "history_date", "history_user_id"
     )
     assay_rows = Assay.history.model.objects.filter(id=assay.pk).values_list(
-        "history_id", "history_date"
+        "history_id", "history_date", "history_user_id"
     )
-    found = [Version(assay.pk, ANSWER_RANK, h, d) for h, d in answer_rows]
-    found += [Version(assay.pk, ASSAY_RANK, h, d) for h, d in assay_rows]
+    found = [Version(assay.pk, ANSWER_RANK, h, d, u) for h, d, u in answer_rows]
+    found += [Version(assay.pk, ASSAY_RANK, h, d, u) for h, d, u in assay_rows]
     return sorted(found, key=lambda version: version.key, reverse=True)
 
 
+def history(assay: Assay) -> list[Version]:
+    """Return the versions of ``assay`` a person sees, the newest first.
+
+    Saves by the same person (or by the drafting run, which has no person) with no
+    more than ``Config._version_gap_seconds`` between one and the next are one
+    version, represented by the last of them: the state once the burst was over.
+    """
+    gap = timedelta(seconds=config._version_gap_seconds)
+    bursts: list[Version] = []
+    for state in reversed(versions(assay)):  # oldest first
+        last = bursts[-1] if bursts else None
+        same_burst = last is not None and (
+            state.user_id == last.user_id and state.at - last.at <= gap
+        )
+        if same_burst:
+            bursts[-1] = state  # the burst goes on; its last save represents it
+        else:
+            bursts.append(state)
+    return bursts[::-1]
+
+
 def find(assay: Assay, version_id: UUID) -> Version | None:
-    """Return the version of ``assay`` with this id, or None."""
+    """Return the state of ``assay`` with this id, or None.
+
+    Any saved state resolves, not only the ones :func:`history` lists, so an id that
+    was listed once keeps working after later saves join its burst.
+    """
     return next((v for v in versions(assay) if v.id == version_id), None)
 
 
