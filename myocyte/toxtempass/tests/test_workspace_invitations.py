@@ -29,6 +29,7 @@ from toxtempass.tests.fixtures.factories import (
     WorkspaceFactory,
     WorkspaceMemberFactory,
 )
+from toxtempass.tests.html_helpers import script_blocks
 
 pytestmark = pytest.mark.django_db
 
@@ -521,10 +522,7 @@ class TestWorkspaceTab:
         assert 'parent.classList.contains("col") ? parent : workspaceEl' in script
 
     def _script(self, user) -> str:
-        import re
-
-        html = self._html(user)
-        return max(re.findall(r"<script[^>]*>(.*?)</script>", html, flags=re.S), key=len)
+        return max(script_blocks(self._html(user)), key=len)
 
     def test_a_card_built_in_the_browser_matches_the_one_the_server_renders(
         self, client, owner

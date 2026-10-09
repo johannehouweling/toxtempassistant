@@ -1,7 +1,6 @@
 """Public about page: head metadata, FAQ structured data, and links to the page."""
 
 import json
-import re
 
 import pytest
 from django.test import Client
@@ -9,6 +8,7 @@ from django.urls import reverse
 from django.utils.html import escape
 
 from toxtempass import config
+from toxtempass.tests.html_helpers import script_blocks
 
 
 @pytest.mark.django_db
@@ -26,7 +26,7 @@ def test_about_page_renders_for_anonymous_visitors():
 def test_about_faq_structured_data_matches_visible_faq():
     """FAQPage data must mirror the visible FAQ, or search engines ignore it."""
     html = Client().get(reverse("about")).content.decode()
-    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
+    blocks = script_blocks(html, "application/ld+json")
     faq = next(json.loads(block) for block in blocks if "FAQPage" in block)
     entries = [(q["name"], q["acceptedAnswer"]["text"]) for q in faq["mainEntity"]]
     assert entries == list(config._about_faq)
@@ -53,7 +53,7 @@ def test_about_demo_video_is_embedded_from_peertube_with_video_data():
     assert f'src="{embed_url}"' in html
     assert "youtube.com/embed" not in html
     assert "youtube-nocookie.com" not in html
-    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
+    blocks = script_blocks(html, "application/ld+json")
     video = next(json.loads(block) for block in blocks if "VideoObject" in block)
     assert video["embedUrl"] == embed_url
     assert video["uploadDate"] and video["thumbnailUrl"] and video["duration"]
