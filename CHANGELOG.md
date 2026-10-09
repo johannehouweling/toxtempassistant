@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.63.0 (2026-10-09)
+
+### Features
+
+- **api**: Group saves made together into one version
+  ([`2a4600f`](https://github.com/johannehouweling/toxtempassistant/commit/2a4600faadba4b650568e6b5abd19e9151b7a5f2))
+
+
 ## v3.62.0 (2026-10-09)
 
 ### Bug Fixes
