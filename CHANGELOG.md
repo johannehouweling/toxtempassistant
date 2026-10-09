@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v3.62.0 (2026-10-09)
+
+### Bug Fixes
+
+- **stats**: Count only answers a person saved, and correct the comment
+  ([`b717fe2`](https://github.com/johannehouweling/toxtempassistant/commit/b717fe2a07d3a3e58496f942727a3b92a3acb854))
+
+### Features
+
+- **api**: Every saved change is a version, with an id and the earlier ones to fetch
+  ([`5e51cc6`](https://github.com/johannehouweling/toxtempassistant/commit/5e51cc6b56cf5109b207535661941b95ec0c5d75))
+
+- **assays**: Keep the history of what a draft was made from
+  ([`994f33d`](https://github.com/johannehouweling/toxtempassistant/commit/994f33db9d4e1e1c1521dcbde4893a164404f2d0))
+
+### Testing
+
+- Use a question-set label that fits its column
+  ([`93c40e9`](https://github.com/johannehouweling/toxtempassistant/commit/93c40e9ac139ca3b1f4ec0ac74e84f63684323dd))
+
+
 ## v3.61.0 (2026-10-09)
 
 ### Bug Fixes
