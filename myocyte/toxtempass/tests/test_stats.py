@@ -398,6 +398,34 @@ class StatsAggregationTests(TestCase):
         self.assertEqual(answers["accepted"], 2)
         self.assertEqual(answers["not_found"], 1)
 
+    def test_edited_counts_answers_a_person_saved_not_the_models_draft(self):
+        """The model's draft and creating an answer leave rows without a person."""
+        cache.clear()
+        before = build_stats("all")["answers"]["edited"]
+        assay = _assay_for(self.user)
+
+        drafted_only = AnswerFactory.create(assay=assay, question=self.question)
+        drafted_only.answer_text = "the model's draft"
+        drafted_only.save(update_fields=["answer_text"])  # as process_llm_async does
+        # More than one history row, which is what the count used to look at.
+        history = Answer.history.model.objects.filter(id=drafted_only.pk)
+        self.assertGreater(history.count(), 1)
+
+        saved_by_a_person = AnswerFactory.create(assay=assay, question=self.question2)
+        saved_by_a_person.answer_text = "rewritten"
+        saved_by_a_person._history_user = self.user
+        saved_by_a_person.save()
+
+        saved_twice = AnswerFactory.create(assay=assay, question=self.question)
+        for text in ("one", "two"):
+            saved_twice.answer_text = text
+            saved_twice._history_user = self.user
+            saved_twice.save()
+
+        cache.clear()
+        after = build_stats("all")["answers"]["edited"]
+        self.assertEqual(after - before, 2)  # two answers a person saved, not three
+
     def test_average_progress_is_a_mean_of_per_assay_shares(self):
         """One fully accepted and one half accepted averages to 75%, not 66%.
 
