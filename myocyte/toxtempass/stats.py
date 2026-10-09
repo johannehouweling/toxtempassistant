@@ -750,19 +750,21 @@ def answer_quality(rng: StatsRange) -> dict[str, Any]:
     empty = answers.filter(answer_text="").count()
     not_found = answers.filter(answer_text__icontains=config.not_found_string).count()
 
-    # CAUTION: this is "answers a user saved", not "answers a user rewrote".
-    # process_llm_async writes drafts with Answer.objects.filter(...).update(),
-    # which bypasses save() and so records no history row at all — the model's
-    # draft is invisible here. Accepting an answer calls save(), so an untouched
-    # answer that was merely accepted also lands in this count. Kept in the
-    # export for continuity; do not put it on the page as an edit rate.
-    historical = Answer.history.model.objects.filter(assay__in=assay_ids)
-    edited = (
-        historical.values("id")
-        .annotate(n=Count("history_id"))
-        .filter(n__gt=1)
-        .count()
+    # CAUTION: this is "answers a person saved", not "answers a person rewrote".
+    # Accepting an answer calls save(), so an untouched answer that was merely
+    # accepted also lands in this count. Kept in the export for continuity; do not
+    # put it on the page as an edit rate.
+    #
+    # The model's own draft is saved through the model too (process_llm_async calls
+    # draft.save(), since fdb2e88 on 2026-09-17; before that it used .update() and
+    # left no history), and creating the answer leaves a row as well. Neither is a
+    # person's edit, so only "~" rows with a user count. The drafting task runs in
+    # the queue worker, which has no request, so its rows carry no user. (With the
+    # queue running inline, in development and tests, they carry the requester.)
+    historical = Answer.history.model.objects.filter(
+        assay__in=assay_ids, history_type="~", history_user__isnull=False
     )
+    edited = historical.values("id").distinct().count()
 
     answered = total - empty
     return {

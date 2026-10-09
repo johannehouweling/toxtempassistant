@@ -11,7 +11,8 @@ from django.http import FileResponse, JsonResponse
 from django.urls import reverse
 from django.utils import timezone
 
-from toxtempass import api
+from toxtempass import api, versions
+from toxtempass.export import ANONYMOUS_AUTHOR
 from toxtempass.models import (
     ApiPdfJob,
     Person,
@@ -711,6 +712,116 @@ class TestPdfCleanup:
         ):
             jobs.run_periodic_jobs()
         cleanup.assert_called_once()
+
+
+class TestVersionsInTheApi:
+    """Every saved change is a version; the newest is served, earlier ones by id."""
+
+    @pytest.fixture
+    def toxtemp(self, client, shared):
+        workspace, in_ws, *_ = shared
+        qset = QuestionSetFactory(label="vapi")
+        sub = SubsectionFactory(section=SectionFactory(question_set=qset))
+        question = QuestionFactory(subsection=sub)
+        in_ws.question_set = qset
+        in_ws.description = "asdf"
+        in_ws.save()
+        answer = AnswerFactory(assay=in_ws, question=question, answer_text="first")
+        secret = _issue(client, workspace.owner, workspace).json()["token"]
+        client.logout()
+        return workspace, in_ws, answer, _bearer(secret)
+
+    def _get(self, client, name, auth, *args):
+        return client.get(reverse(name, args=list(args)), **auth)
+
+    def test_the_detail_lists_its_versions_and_the_list_names_the_newest(
+        self, client, toxtemp
+    ):
+        _, assay, _, auth = toxtemp
+        body = self._get(client, "api_assay_detail", auth, assay.pk).json()
+        ids = [h["id"] for h in body["history"]]
+        assert len(ids) >= 2 and len(set(ids)) == len(ids)
+        assert body["assay"]["version"] == ids[0]
+        listed = self._get(client, "api_assay_list", auth).json()["results"]
+        versions_listed = [i["version"] for i in listed if i["id"] == assay.pk]
+        assert versions_listed == [ids[0]]
+
+    def test_an_earlier_version_shows_what_has_since_changed_or_gone(
+        self, client, toxtemp
+    ):
+        _, assay, answer, auth = toxtemp
+        old = self._get(client, "api_assay_detail", auth, assay.pk).json()["history"][0]
+        answer.answer_text = "second"
+        answer.save()
+        assay.description = "a good description"
+        assay.save()
+
+        then = self._get(client, "api_assay_version", auth, assay.pk, old["id"]).json()
+        now = self._get(client, "api_assay_detail", auth, assay.pk).json()
+
+        def text(document):
+            question = document["sections"][0]["subsections"][0]["questions"][0]
+            return question["answer"]["text"]
+
+        assert (text(then), then["assay"]["description"]) == ("first", "asdf")
+        assert (text(now), now["assay"]["description"]) == (
+            "second",
+            "a good description",
+        )
+        assert then["assay"]["version"] == old["id"]
+        assert now["assay"]["version"] != old["id"]
+
+    def test_the_description_moves_last_modified_and_the_sync_filter(
+        self, client, toxtemp
+    ):
+        _, assay, _, auth = toxtemp
+        before = self._get(client, "api_assay_list", auth).json()["results"][0]
+        assay.description = "a good description"
+        assay.save()
+        after = self._get(client, "api_assay_list", auth).json()["results"][0]
+        assert after["last_modified"] > before["last_modified"]
+        assert after["version"] != before["version"]
+        synced = client.get(
+            reverse("api_assay_list"), {"updated_since": before["last_modified"]}, **auth
+        ).json()
+        assert [a["id"] for a in synced["results"]] == [assay.pk]
+
+    def test_an_earlier_version_names_authors_by_the_same_rule_as_the_current_one(
+        self, client, toxtemp
+    ):
+        workspace, assay, answer, auth = toxtemp
+        creator = assay.created_by or PersonFactory()
+        assay.created_by = creator
+        assay.save()
+        Person.objects.filter(pk=creator.pk).update(credit_by_name=False)
+        WorkspaceMemberFactory(workspace=workspace, user=creator)
+        old = self._get(client, "api_assay_detail", auth, assay.pk).json()["history"][0]
+        then = self._get(client, "api_assay_version", auth, assay.pk, old["id"])
+        now = self._get(client, "api_assay_detail", auth, assay.pk)
+        for response in (then, now):
+            first = response.json()["metadata"]["authors"][0]  # the creator comes first
+            assert first["credited"] is False and first["name"] == ANONYMOUS_AUTHOR
+            raw = response.content.decode()
+            assert creator.email not in raw and creator.get_full_name() not in raw
+
+    def test_a_version_of_a_toxtemp_outside_the_workspace_is_not_found(
+        self, client, shared, toxtemp
+    ):
+        workspace, assay, _, auth = toxtemp
+        _, _, _, unshared = shared
+        theirs = versions.versions(unshared)[0].id
+        mine = versions.versions(assay)[0].id
+        wrong = ((unshared.pk, theirs), (assay.pk, theirs), (unshared.pk, mine))
+        for assay_id, version_id in wrong:
+            response = self._get(client, "api_assay_version", auth, assay_id, version_id)
+            assert response.status_code == 404
+            assert response.json() == {"error": "Not found"}
+
+    def test_versions_need_a_token(self, client, toxtemp):
+        _, assay, *_ = toxtemp
+        newest = versions.versions(assay)[0].id
+        url = reverse("api_assay_version", args=[assay.pk, newest])
+        assert client.get(url).status_code == 401
 
 
 class TestAuthorsInTheApi:

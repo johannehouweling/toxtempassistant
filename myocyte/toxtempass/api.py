@@ -17,8 +17,7 @@ from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models import F, OuterRef, Q, QuerySet, Subquery
-from django.db.models.functions import Coalesce, Greatest
+from django.db.models import Q, QuerySet
 from django.http import FileResponse, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -28,10 +27,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from django_q.tasks import async_task
 
-from toxtempass import config, notifications, utilities
+from toxtempass import config, notifications, utilities, versions
 from toxtempass.export import export_assay_to_file, generate_json_from_assay
 from toxtempass.models import (
-    Answer,
     ApiPdfJob,
     Assay,
     Workspace,
@@ -215,25 +213,13 @@ def _error(message: str, status: int) -> HttpResponse:
 def _workspace_assays(workspace: Workspace) -> QuerySet[Assay]:
     """Assays in the investigations shared into ``workspace``.
 
-    ``last_modified`` is the later of creation and the latest answer edit, taken
-    from the answers' history, because ``Assay`` has no modified timestamp.
+    Annotated with ``last_modified`` and the newest version (see
+    ``toxtempass.versions``), because ``Assay`` has no modified timestamp.
     """
-    latest_answer_edit = (
-        Answer.history.model.objects.filter(assay_id=OuterRef("pk"))
-        .order_by("-history_date")
-        .values("history_date")[:1]
-    )
-    return (
+    return versions.with_latest_versions(
         Assay.objects.filter(
             study__investigation__shared_in_workspaces__workspace=workspace
-        )
-        .distinct()
-        .annotate(
-            last_modified=Greatest(
-                F("submission_date"),
-                Coalesce(Subquery(latest_answer_edit), F("submission_date")),
-            )
-        )
+        ).distinct()
     )
 
 
@@ -242,12 +228,14 @@ def _iso(value: datetime | None) -> str | None:
 
 
 def _assay_summary(assay: Assay) -> dict:
+    newest = versions.latest_version(assay)
     return {
         "id": assay.pk,
         "title": assay.title,
         "status": assay.status,
         "submission_date": _iso(assay.submission_date),
         "last_modified": _iso(assay.last_modified),
+        "version": str(newest.id) if newest else None,
         "study": {"id": assay.study_id, "title": assay.study.title},
         "investigation": {
             "id": assay.study.investigation_id,
@@ -384,6 +372,25 @@ def _busy(message: str, status: int, retry_after: int) -> HttpResponse:
     response = _error(message, status)
     response["Retry-After"] = str(retry_after)
     return response
+
+
+@require_GET
+@token_required
+def api_assay_version(
+    request: HttpRequest, workspace: Workspace, assay_id: int, version_id: UUID
+) -> HttpResponse:
+    """Return a ToxTemp as it was at one of the versions in its ``history``."""
+    assay = (
+        _workspace_assays(workspace)
+        .select_related("study__investigation", "question_set")
+        .filter(pk=assay_id)
+        .first()
+    )
+    version = versions.find(assay, version_id) if assay is not None else None
+    if version is None:
+        return _error("Not found", 404)
+    document = generate_json_from_assay(assay, _credited_ids(workspace), version)
+    return _api_response(JsonResponse(document))
 
 
 @csrf_exempt

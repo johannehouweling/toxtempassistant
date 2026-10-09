@@ -23,6 +23,36 @@ class LLMStatus(models.TextChoices):
     ERROR = "error", "Error"
 
 
+class ChangedFieldsHistory(HistoricalRecords):
+    """History that records a row only when a field it tracks has changed.
+
+    A plain ``HistoricalRecords`` writes a row on every save. For ``Assay`` that
+    would be a row (with a copy of the whole description) each time its status or
+    its processing log changes, which says nothing about why a draft looks the
+    way it does. Fields listed in ``excluded_fields`` are not stored, and a save
+    that changed none of the stored ones writes nothing.
+    """
+
+    def create_historical_record(
+        self, instance: models.Model, history_type: str, using: str | None = None
+    ) -> None:
+        """Skip an update that changed nothing this history keeps."""
+        if history_type == "~":
+            history = getattr(instance, self.manager_name).using(using)
+            last = history.order_by("-history_date", "-history_id").first()
+            if last is not None and not self._changed(instance, last):
+                return
+        super().create_historical_record(instance, history_type, using=using)
+
+    def _changed(self, instance: models.Model, last: models.Model) -> bool:
+        """Return whether a tracked field of ``instance`` differs from ``last``."""
+        return any(
+            getattr(instance, field.attname) != getattr(last, field.attname)
+            for field in instance._meta.concrete_fields
+            if field.name not in self.excluded_fields
+        )
+
+
 # we are desinging user access that inherits from the parent object.
 # That way if Investigation is shared, all the children objects will be shared as well.
 class AccessibleModel(models.Model):
@@ -382,6 +412,24 @@ class Assay(AccessibleModel):
             "moment every answer was accepted for the first time. Set automatically; "
             "never overwritten once captured."
         ),
+    )
+
+    # What the draft was made from. The description (like the title and the
+    # questionnaire) goes into the prompt, so a bad draft can be traced to a bad
+    # description that was later corrected. Status, logs and demo flags change on
+    # every run and say nothing about that, so they are not kept. History goes
+    # with the assay when it is deleted.
+    history = ChangedFieldsHistory(
+        excluded_fields=[
+            "status",
+            "demo_lock",
+            "demo_template",
+            "demo_source",
+            "processing_log",
+            "user_alerts",
+            "completion_time_seconds",
+        ],
+        cascade_delete_history=True,
     )
 
     def __str__(self) -> str:
