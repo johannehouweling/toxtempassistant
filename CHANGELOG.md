@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.63.1 (2026-10-19)
+
+### Bug Fixes
+
+- **ui**: Pin Bootstrap Icons to the version its integrity hash is for
+  ([`deb53f5`](https://github.com/johannehouweling/toxtempassistant/commit/deb53f513271046a3242c2aeacb8743fea283ba2))
+
+
 ## v3.63.0 (2026-10-09)
 
 ### Features
