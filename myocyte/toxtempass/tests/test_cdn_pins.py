@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 MYOCYTE = Path(__file__).resolve().parents[2]
-TAG = re.compile(r"<(?:link|script)\b[^>]*>", re.S)
+TAG = re.compile(r"<(?:link|script)\b[^>]*>", re.S | re.IGNORECASE)
 URL = re.compile(r'(?:href|src)="([^"]+)"')
 
 
