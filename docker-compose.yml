@@ -152,6 +152,11 @@ services:
       retries: 3
       start_period: 180s
     entrypoint: ["/home/myocyte/django_startup.sh"]
+    # gthread: each worker serves several requests at once. With plain sync
+    # workers, a few slow requests (a large upload read page by page during the
+    # request, an export) took every worker, and nginx then timed out even on
+    # robots.txt and the favicon (Oct 2026). A failed robots.txt makes Google
+    # stop crawling the whole site.
     command: >
       poetry run gunicorn myocyte.wsgi:application
       --bind 0.0.0.0:8000
@@ -163,6 +168,8 @@ services:
       --error-logfile=/home/myocyte/logs/gunicorn-error.log
       --access-logfile=/home/myocyte/logs/gunicorn-access.log
       --workers=3
+      --worker-class=gthread
+      --threads=4
     volumes:
       - ./myocyte/logs:/home/myocyte/logs
       - ./myocyte/static:/home/myocyte/static
