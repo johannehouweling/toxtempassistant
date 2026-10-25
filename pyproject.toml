@@ -89,7 +89,7 @@ dependencies = [
     "unstructured[docx]>=0.24.0,<1.0.0",
     # unstructured needs this spaCy model and otherwise downloads it on first use.
     "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
-    "urllib3>=2.7.0,<3.0.0",
+    "urllib3>=2.8.0,<3.0.0",
     "wheel>=0.45.1,<1.0.0",
     "yarl>=1.20.1,<2.0.0",
     "zstandard>=0.23.0,<1.0.0",
