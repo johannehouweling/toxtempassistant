@@ -64,6 +64,11 @@
           }
       }
       
+      /* The breakdown toggle points at the bar, and down at the breakdown while open. */
+      .riskhunt3r-toggle .bi { display: inline-block; transition: transform .15s ease-in-out; }
+      .riskhunt3r-toggle[aria-expanded="true"] .bi { transform: rotate(90deg); }
+      @media (prefers-reduced-motion: reduce) { .riskhunt3r-toggle .bi { transition: none; } }
+
       /* Roomier guidance popover (Bootstrap has no width utility — set its own variable); no arrow. */
       .rh-guidance { --bs-popover-max-width: 360px; }
       .popover .popover-arrow { display: none !important; }
@@ -168,47 +173,52 @@
         <nav class="fixed-bottom card border-0 bg-body" style="z-index: unset;">
           <div class="container">
             <!-- Progress bar -->
-            {% with percentanswers=assay.get_n_accepted_answers|intdivperc:assay.get_n_answers %}
-            {% with percent_draft_unaccepted=assay.number_answers_found_but_not_accepted|intdivperc:assay.get_n_answers  %}
-            <div id="progress border bg-white" class="progress mt-5" role="progressbar" aria-label="Example with label" aria-valuenow="{{assay.get_n_accepted_answers}}" aria-valuemin="0" aria-valuemax="{{assay.get_n_answers}}">
-              <div  class="progress-bar bg-primary"  role="progressbar" style="width: {{percentanswers}}%;" aria-valuenow="{{percentanswers}}" aria-valuemin="0" aria-valuemax="100" data-bs-toggle="tooltip" title="{{assay.get_n_accepted_answers}} answer(s) accepted">{{percentanswers}} %</div>
-              <div  class="progress-bar-striped bg-primary opacity-50"  role="progressbar" style="width: {{percent_draft_unaccepted}}%;" aria-valuenow="{{percent_draft_unaccepted}}" aria-valuemin="0" aria-valuemax="100" data-bs-toggle="tooltip" title="{{assay.number_answers_found_but_not_accepted}} unaccepted draft answer(s)"></div>
-
-            </div>
-            {% endwith %}
-            {% endwith %}
-
             <!-- Optional per-category breakdown: hidden by default (it makes the
                  footer busy); revealed on click. Shows, per RISK-HUNT3R readiness
                  colour, how many answers are accepted — so an early-stage method
                  still sees progress on the parts it can complete. -->
             {% with segs=assay.accepted_by_riskhunt3r_label %}
-            {% if segs %}
-            <div class="mt-1">
-              <a id="riskhunt3rBreakdownToggle" class="fg-secondary fs-md text-decoration-none lh-1 d-inline-block"
+            {# The toggle sits in front of the bar and points at it; opened, it points down at the #}
+            {# breakdown, which shares the bar's column so the two line up.                       #}
+            <div class="d-flex align-items-start gap-3 mt-5">
+              {% if segs %}
+              <a id="riskhunt3rBreakdownToggle" class="fg-secondary fs-md text-decoration-none lh-1 riskhunt3r-toggle"
                  data-bs-toggle="collapse" href="#riskhunt3rBreakdown" role="button"
                  aria-expanded="false" aria-controls="riskhunt3rBreakdown"
                  aria-label="Questions per NAM readiness level" title="Questions per NAM readiness level">
-                <i class="bi bi-caret-down-fill"></i>
+                <i class="bi bi-caret-right-fill"></i>
               </a>
-            </div>
-            {# 5 equal rounded NAM-readiness bars side by side, together spanning the main bar's width. Each mirrors the main bar: accepted (solid) + drafted-but-not-accepted (striped). Levels/colours as adapted from the RISK-HUNT3R test-method DB. Decorative — the #progress bar above conveys overall progress; per-bar tooltips give the level counts. #}
-            <div class="collapse" id="riskhunt3rBreakdown">
-              <div class="d-flex gap-1 mt-3" aria-hidden="true">
-                {% for seg in segs %}
-                <div class="progress flex-fill rounded-pill"
-                     data-bs-toggle="tooltip" title="{{ seg.label }}: {{ seg.accepted }}/{{ seg.total }} accepted">
-                  <div class="progress-bar {{ seg.css_class }}" style="width: {{ seg.pct }}%;"></div>
-                  <div class="progress-bar progress-bar-striped {{ seg.css_class }} opacity-50" style="width: {{ seg.draft_pct }}%;"></div>
+              {% endif %}
+              <div class="flex-fill">
+                {% with percentanswers=assay.get_n_accepted_answers|intdivperc:assay.get_n_answers %}
+                {% with percent_draft_unaccepted=assay.number_answers_found_but_not_accepted|intdivperc:assay.get_n_answers  %}
+                <div class="progress" role="progressbar" aria-label="Example with label" aria-valuenow="{{assay.get_n_accepted_answers}}" aria-valuemin="0" aria-valuemax="{{assay.get_n_answers}}">
+                  <div  class="progress-bar bg-primary"  role="progressbar" style="width: {{percentanswers}}%;" aria-valuenow="{{percentanswers}}" aria-valuemin="0" aria-valuemax="100" data-bs-toggle="tooltip" title="{{assay.get_n_accepted_answers}} answer(s) accepted">{{percentanswers}} %</div>
+                  <div  class="progress-bar-striped bg-primary opacity-50"  role="progressbar" style="width: {{percent_draft_unaccepted}}%;" aria-valuenow="{{percent_draft_unaccepted}}" aria-valuemin="0" aria-valuemax="100" data-bs-toggle="tooltip" title="{{assay.number_answers_found_but_not_accepted}} unaccepted draft answer(s)"></div>
+
                 </div>
-                {% endfor %}
+                {% endwith %}
+                {% endwith %}
+                {% if segs %}
+                {# 5 equal rounded NAM-readiness bars side by side, together spanning the main bar's width. Each mirrors the main bar: accepted (solid) + drafted-but-not-accepted (striped). Levels/colours as adapted from the RISK-HUNT3R test-method DB. Decorative — the #progress bar above conveys overall progress; per-bar tooltips give the level counts. #}
+                <div class="collapse" id="riskhunt3rBreakdown">
+                  <div class="d-flex gap-1 mt-3" aria-hidden="true">
+                    {% for seg in segs %}
+                    <div class="progress flex-fill rounded-pill"
+                         data-bs-toggle="tooltip" title="{{ seg.label }}: {{ seg.accepted }}/{{ seg.total }} accepted">
+                      <div class="progress-bar {{ seg.css_class }}" style="width: {{ seg.pct }}%;"></div>
+                      <div class="progress-bar progress-bar-striped {{ seg.css_class }} opacity-50" style="width: {{ seg.draft_pct }}%;"></div>
+                    </div>
+                    {% endfor %}
+                  </div>
+                  <a class="fg-secondary small text-decoration-none"
+                     href="https://risk-hunt3r.net/test-methods/" target="_blank" rel="noopener">
+                    NAM readiness levels as adapted from RISK-HUNT3R <i class="bi bi-box-arrow-up-right"></i>
+                  </a>
+                </div>
+                {% endif %}
               </div>
-              <a class="fg-secondary small text-decoration-none"
-                 href="https://risk-hunt3r.net/test-methods/" target="_blank" rel="noopener">
-                NAM readiness levels as adapted from RISK-HUNT3R <i class="bi bi-box-arrow-up-right"></i>
-              </a>
             </div>
-            {% endif %}
             {% endwith %}
 
             <!-- Buttons -->
