@@ -133,9 +133,7 @@
 
     <section class="mb-12">
       <h2 class="fs-xl mb-5">See it in action</h2>
-      <div class="ratio ratio-16x9 mb-3">
-        <iframe src="https://video.edu.nl/videos/embed/mXiqzVCSYytLb4i2YgT7a6" title="ToxTempAssistant tutorial video (version 2.16.2)" loading="lazy" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-      </div>
+      <iframe class="ratio-16x9 w-100 border-0 mb-3" src="https://video.edu.nl/videos/embed/mXiqzVCSYytLb4i2YgT7a6" title="ToxTempAssistant tutorial video (version 2.16.2)" loading="lazy" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
       <p class="small fg-secondary">
         This demo shows version 2.16.2, so the current version may look slightly different.
         <a href="https://video.edu.nl/w/mXiqzVCSYytLb4i2YgT7a6" target="_blank" rel="noopener noreferrer">Watch on PeerTube</a>.
@@ -230,16 +228,15 @@
 
     <section class="mb-12">
       <h2 class="fs-xl mb-5">Frequently asked questions</h2>
-      <div class="accordion" id="faqAccordion">
+      <div class="accordion">
         {% for question, answer in faq %}
-        <div class="accordion-item">
-          <h3 class="accordion-header">
-            <button class="accordion-button collapsed fs-md" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.counter }}" aria-expanded="false" aria-controls="faq{{ forloop.counter }}">{{ question }}</button>
-          </h3>
-          <div id="faq{{ forloop.counter }}" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-            <div class="accordion-body">{{ answer }}</div>
-          </div>
-        </div>
+        <details class="accordion-item" name="faq" id="faq{{ forloop.counter }}">
+          <summary class="accordion-header fs-md">
+            <h3 class="fs-md fw-normal m-0">{{ question }}</h3>
+            <svg class="accordion-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 5 6 6 6-6"/></svg>
+          </summary>
+          <div class="accordion-body">{{ answer }}</div>
+        </details>
         {% endfor %}
       </div>
     </section>

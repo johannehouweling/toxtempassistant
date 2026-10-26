@@ -114,7 +114,7 @@
                     <h2 class="m-5 fg-white fs-3xl" id="id_headline"><a href="{%url 'overview'%}" class="text-decoration-none fg-white"><i class="bi bi-clipboard-heart me-3"></i><b>ToxTemp</b>Assistant</a></h2>
                     <span class="badge d-none md:d-block theme-warning" data-bs-toggle="tooltip" data-bs-custom-class="header-tooltip" title="This app is still in beta. Features may change."><a class="text-decoration-none fg-black" href="https://github.com/johannehouweling/ToxTempAssistant/releases">{{config.version}}</a></span>
                     {% if user.is_authenticated %} 
-                    <span class="btn orcid-icon-container btn-outline-light ms-auto fs-md me-5" id="id_user_menu" tabindex="0" role="button" data-bs-toggle="drawer" href="#offcanvasUser">
+                    <span class="btn-outline theme-inverse orcid-icon-container ms-auto fs-md me-5" data-bs-theme="dark" id="id_user_menu" tabindex="0" role="button" data-bs-toggle="drawer" href="#offcanvasUser">
                         <i class="bi bi-person-badge"></i>
                         <div class="d-none lg:d-block">
                           {{ user.email }}
@@ -133,9 +133,9 @@
                     </span>
                     {% elif current_url_name == 'about' %}
                     {# Phones only get "Log in", so the button fits next to the logo. #}
-                    <a class="btn btn-outline-light ms-auto me-5" href="{% url 'overview' %}"><span class="d-none sm:d-inline">Sign up / </span>Log in</a>
+                    <a class="btn-outline theme-inverse ms-auto me-5" data-bs-theme="dark" href="{% url 'overview' %}"><span class="d-none sm:d-inline">Sign up / </span>Log in</a>
                     {% else %}
-                    <a class="btn btn-outline-light ms-auto me-5" href="{% url 'about' %}">About</a>
+                    <a class="btn-outline theme-inverse ms-auto me-5" data-bs-theme="dark" href="{% url 'about' %}">About</a>
                     {%endif%}
                 </div>
             </div>

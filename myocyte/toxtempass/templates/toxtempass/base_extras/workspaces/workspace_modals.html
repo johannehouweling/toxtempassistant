@@ -1,7 +1,5 @@
   <!-- Modal: Add member by email -->
-  <div class="dialog fade" id="addMemberModal" tabindex="-1" aria-hidden="true" style="z-index: 1200;">
-    <div class="modal-dialog">
-      <div class="modal-content">
+  <dialog class="dialog" id="addMemberModal">
         <div class="dialog-header">
           <h5 class="dialog-title">Add member to workspace</h5>
           <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
@@ -24,16 +22,12 @@
           <button type="button" class="btn-solid theme-secondary" data-bs-dismiss="dialog">Cancel</button>
           <button type="button" id="confirmAddMember" class="btn-solid theme-primary">Add member</button>
         </div>
-      </div>
-    </div>
-  </div>
+  </dialog>
 
   <!-- (createWorkspaceModal removed; New Workspace now creates an inline card) -->
 
   <!-- Modal: Add investigation to workspace -->
-  <div class="dialog fade" id="addAssayModal" tabindex="-1" aria-hidden="true" style="z-index: 1200;">
-    <div class="modal-dialog">
-      <div class="modal-content">
+  <dialog class="dialog" id="addAssayModal">
             <div class="dialog-header">
           <h5 class="dialog-title">Add investigation to workspace</h5>
           <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
@@ -50,11 +44,13 @@
           </div>
           <div id="addAssayApiWarning" class="alert theme-warning small" style="display:none">
             <i class="bi bi-hdd-network-fill"></i>
-            This workspace has API access (<span id="addAssayApiTokens"></span>). Servers using
-            these tokens will be able to read this investigation, read-only. They see the
-            authors of its ToxTemps by name (name, organization, ORCID iD, never an email
-            address) unless a person has switched that off under Privacy. You can remove
-            the investigation again at any time.
+            <div>
+              This workspace has API access (<span id="addAssayApiTokens"></span>). Servers using
+              these tokens will be able to read this investigation, read-only. They see the
+              authors of its ToxTemps by name (name, organization, ORCID iD, never an email
+              address) unless a person has switched that off under Privacy. You can remove
+              the investigation again at any time.
+            </div>
           </div>
           <div id="addAssayError" class="fg-danger small" style="display:none"></div>
         </div>
@@ -62,14 +58,10 @@
           <button type="button" class="btn-solid theme-secondary" data-bs-dismiss="dialog">Cancel</button>
           <button type="button" id="confirmAddAssay" class="btn-solid theme-primary">Add investigation</button>
         </div>
-      </div>
-    </div>
-  </div>
+  </dialog>
 
   <!-- Modal: API tokens for reading a workspace from an external server -->
-  <div class="dialog fade" id="apiTokensModal" tabindex="-1" aria-hidden="true" style="z-index: 1200;">
-    <div class="modal-dialog">
-      <div class="modal-content">
+  <dialog class="dialog" id="apiTokensModal">
         <div class="dialog-header">
           <h5 class="dialog-title">Workspace settings</h5>
           <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
@@ -84,7 +76,7 @@
             where you can try every call.
           </p>
           <div id="apiTokenList" class="mb-5"></div>
-          <div id="apiTokenSecret" class="alert theme-warning" style="display:none">
+          <div id="apiTokenSecret" class="alert theme-warning flex-column" style="display:none">
             <div class="small mb-1">Copy this token now. It will not be shown again.</div>
             <div class="d-flex align-items-center gap-3">
               <code id="apiTokenSecretValue" class="user-select-all text-break flex-grow-1"></code>
@@ -106,6 +98,4 @@
           <button type="button" class="btn-solid theme-secondary" data-bs-dismiss="dialog">Close</button>
           <button type="button" id="createApiToken" class="btn-solid theme-primary">Create token</button>
         </div>
-      </div>
-    </div>
-  </div>
+  </dialog>

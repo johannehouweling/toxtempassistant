@@ -4,35 +4,32 @@
 {% else %}
 <div class="accordion">
     {% for group in groups %}
-    <div class="accordion-item">
-        <h6 class="accordion-header">
-            <button class="accordion-button collapsed py-3 px-5" type="button" data-bs-toggle="collapse" data-bs-target="#{{ group.panel_id }}" aria-expanded="false" aria-controls="{{ group.panel_id }}">
-                <span class="text-truncate me-3">{% if group.assay %}{{ group.assay.title }}{% else %}Not linked to an assay{% endif %}</span>
-                <span class="badge theme-secondary ms-auto me-3">{{ group.files|length }}</span>
-            </button>
-        </h6>
-        <div id="{{ group.panel_id }}" class="accordion-collapse collapse">
-            <div class="accordion-body px-5 py-3">
-                <ul class="list-unstyled mb-3">
-                    {% for file in group.files %}
-                    <li class="d-flex align-items-center gap-3 py-1 small">
-                        <i class="bi bi-file-earmark{% if file.status == 'withdrawn' %} fg-secondary{% endif %}"></i>
-                        <span class="text-truncate me-auto{% if file.status == 'withdrawn' %} fg-secondary text-decoration-line-through{% endif %}" title="{{ file.original_filename }}">{{ file.original_filename }}</span>
-                        {% if file.status == "withdrawn" %}
-                        <span class="fg-secondary text-nowrap">Removed in {{ file.delete_after|timeuntil }}</span>
-                        <button type="button" class="btn btn-link btn-sm p-0 js-undo-sharing" data-file-ids="{{ file.pk }}">Undo</button>
-                        {% else %}
-                        <button type="button" class="btn-outline theme-danger btn-sm py-0 text-nowrap js-stop-sharing" data-file-ids="{{ file.pk }}">Stop sharing</button>
-                        {% endif %}
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% if group.available_ids|length > 1 %}
-                <button type="button" class="btn-outline theme-danger btn-sm js-stop-sharing" data-file-ids="{{ group.available_ids|join:',' }}">Stop sharing all {{ group.available_ids|length }} files</button>
-                {% endif %}
-            </div>
+    <details class="accordion-item" id="{{ group.panel_id }}">
+        <summary class="accordion-header py-3 px-5">
+            <span class="text-truncate me-3">{% if group.assay %}{{ group.assay.title }}{% else %}Not linked to an assay{% endif %}</span>
+            <span class="badge theme-secondary ms-auto me-3">{{ group.files|length }}</span>
+            <svg class="accordion-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 5 6 6 6-6"/></svg>
+        </summary>
+        <div class="accordion-body px-5 py-3">
+            <ul class="list-unstyled mb-3">
+                {% for file in group.files %}
+                <li class="d-flex align-items-center gap-3 py-1 small">
+                    <i class="bi bi-file-earmark{% if file.status == 'withdrawn' %} fg-secondary{% endif %}"></i>
+                    <span class="text-truncate me-auto{% if file.status == 'withdrawn' %} fg-secondary text-decoration-line-through{% endif %}" title="{{ file.original_filename }}">{{ file.original_filename }}</span>
+                    {% if file.status == "withdrawn" %}
+                    <span class="fg-secondary text-nowrap">Removed in {{ file.delete_after|timeuntil }}</span>
+                    <button type="button" class="btn btn-link btn-sm p-0 js-undo-sharing" data-file-ids="{{ file.pk }}">Undo</button>
+                    {% else %}
+                    <button type="button" class="btn-outline theme-danger btn-sm py-0 text-nowrap js-stop-sharing" data-file-ids="{{ file.pk }}">Stop sharing</button>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% if group.available_ids|length > 1 %}
+            <button type="button" class="btn-outline theme-danger btn-sm js-stop-sharing" data-file-ids="{{ group.available_ids|join:',' }}">Stop sharing all {{ group.available_ids|length }} files</button>
+            {% endif %}
         </div>
-    </div>
+    </details>
     {% endfor %}
 </div>
 {% endif %}

@@ -317,9 +317,7 @@ class MultipleFileInput(forms.ClearableFileInput):
         # Bootstrap modal for centralized upload progress
         modal_html = mark_safe(
             """
-            <div class="dialog fade" id="uploadProgressModal" tabindex="-1" aria-labelledby="uploadProgressModalLabel" aria-hidden="true">
-              <div class="modal-dialog" role="document">
-                <div class="modal-content">
+            <dialog class="dialog" id="uploadProgressModal" aria-labelledby="uploadProgressModalLabel">
                   <div class="dialog-header">
                     <h5 class="dialog-title" id="uploadProgressModalLabel">File Upload Progress</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
@@ -339,9 +337,7 @@ class MultipleFileInput(forms.ClearableFileInput):
                     </div>
                     <div id="uploadProgressFilenameModal" class="small mt-3 text-truncate"></div>
                   </div>
-                </div>
-              </div>
-            </div>
+            </dialog>
             """
         )
 

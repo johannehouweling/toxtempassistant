@@ -67,7 +67,7 @@ def test_about_page_header_links_to_login_instead_of_itself():
     # "Sign up / " is hidden on phones to keep the button narrow.
     assert (
         f'href="{reverse("overview")}">'
-        '<span class="d-none d-sm-inline">Sign up / </span>Log in</a>'
+        '<span class="d-none sm:d-inline">Sign up / </span>Log in</a>'
     ) in header
     assert f'href="{reverse("about")}">About</a>' not in header
 

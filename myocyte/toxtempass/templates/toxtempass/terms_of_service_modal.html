@@ -1,7 +1,5 @@
 <!-- Terms of Service Modal -->
-<div class="dialog fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
-    <div class="modal-dialog dialog-lg">
-      <div class="modal-content">
+<dialog class="dialog dialog-lg" id="termsModal" aria-labelledby="termsModalLabel">
         <div class="dialog-header">
           <h5 class="dialog-title" id="termsModalLabel">Terms of Service</h5>
           <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
@@ -15,6 +13,4 @@
           <a class="btn btn-link me-auto" href="{% url 'terms_of_service' %}" target="_blank" rel="noopener">Open as page</a>
           <button type="button" class="btn-solid theme-secondary" data-bs-dismiss="dialog">Close</button>
         </div>
-      </div>
-    </div>
-  </div>
+  </dialog>

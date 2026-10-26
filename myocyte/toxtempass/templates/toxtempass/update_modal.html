@@ -1,15 +1,7 @@
 {% load bs6 %}
 {% load extras %}
 
-<div 
-    class="dialog fade" 
-    id="updateModal" 
-    tabindex="-1" 
-    aria-labelledby="updateModalLabel" 
-    aria-hidden="true"
-  >
-    <div class="modal-dialog">
-      <div class="modal-content">
+<dialog class="dialog" id="updateModal" aria-labelledby="updateModalLabel">
         <!-- Modal Header -->
         <div class="dialog-header">
           <h5 class="dialog-title" id="updateModalLabel">Update Selected Questions</h5>
@@ -79,9 +71,7 @@
             </div>
           </button>
         </div>
-      </div>
-    </div>
-  </div>
+  </dialog>
 
   {% include "toxtempass/_file_accumulator.html" with input_id="fileUpload" prefix="fileUpload" %}
 
@@ -197,7 +187,7 @@
       allCheckboxes.forEach(function(checkbox) {
         checkbox.addEventListener('change', function() {
           // If the modal is open, update the "Save" button state
-          if (updateModal.classList.contains('show')) {
+          if (updateModal.open) {
             updateSaveButtonState();
             
             // Update the list of selected questions in the modal
@@ -228,7 +218,7 @@
       // (file added, removed via badge ×, or cleared on modal close).
       // The 'change' event itself is handled by _file_accumulator.html.
       fileUpload.addEventListener('fileAccumulator:changed', function() {
-        if (updateModal.classList.contains('show')) {
+        if (updateModal.open) {
           updateSaveButtonState();
         }
       });

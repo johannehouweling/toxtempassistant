@@ -48,7 +48,7 @@
       scroll-margin-top: 130px; /* Adjust this value to match your sticky header height */
     	}
 
-    @media (min-width: 992px) {
+    @media (min-width: 1024px) { /* Bootstrap 6 lg */
       .bd-sidebar {
           position:-webkit-sticky;
           position: sticky;
@@ -61,13 +61,6 @@
           }
       }
       
-      @media (max-width: 991.98px) {
-          .bd-sidebar .offcanvas-lg {
-              border-right-color:var(--bs-border-color);
-              box-shadow: var(--bs-box-shadow-lg)
-          }
-      }
-
       /* Roomier guidance popover (Bootstrap has no width utility — set its own variable); no arrow. */
       .rh-guidance { --bs-popover-max-width: 360px; }
       .popover .popover-arrow { display: none !important; }
@@ -78,6 +71,8 @@
         <aside class="lg:col-4">
 
             <div class="bd-sidebar">
+                {# Hidden below lg (nothing opens it there), inline from lg up; it never opens #}
+                {# as a drawer, so it stays a <nav> rather than a <dialog>.                  #}
                 <nav id="navbar-questions" class="flex-column lg:drawer drawer-start align-items-stretch border-end overflow-y-auto">
                     <nav class="nav nav-pills flex-column drawer-body">
                         {% for section in sections %}
@@ -102,9 +97,9 @@
           {% if assay.user_alerts %}
           <div id="user-alerts-container">
             {% for alert in assay.user_alerts %}
-            <div class="alert alert-{{ alert.level|default:'warning' }} alert-dismissible fade show"
-                 role="alert">
-              <i class="bi bi-exclamation-triangle me-3"></i>{{ alert.message }}
+            <div class="alert theme-{{ alert.level|default:'warning' }}" role="alert">
+              <i class="bi bi-exclamation-triangle"></i>
+              <div class="me-auto">{{ alert.message }}</div>
               <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             {% endfor %}
@@ -222,37 +217,37 @@
                 <button type="button" class="btn-outline theme-secondary" data-bs-toggle="menu" aria-expanded="false">
                   Options
                 </button>
-                <ul class="menu">
+                <div class="menu">
                   {% with id=assay.id %}
-                  <li><a class="menu-item" href="#" type="button" id="btn_next_unaccepted">Next unaccepted</a></li>
-                  <li><a 
+                  <a class="menu-item" href="#" type="button" id="btn_next_unaccepted">Next unaccepted</a>
+                  <a 
                     class="menu-item" 
                     type="button" 
                     data-bs-toggle="dialog" 
                     data-bs-target="#updateModal"
                     >
                     Update selected questions
-                  </a></li>
-                  <li><a class="menu-item" href="#" type="button" id="btn_mark_open_gpt_update">Mark all open for &#39;LLM Update&#39;</a></li>
+                  </a>
+                  <a class="menu-item" href="#" type="button" id="btn_mark_open_gpt_update">Mark all open for &#39;LLM Update&#39;</a>
                   {% endwith %}
-                </ul>
+                </div>
               </div>
 
               <div class="btn-group">
                 <button type="button" class="btn-outline theme-secondary" data-bs-toggle="menu" aria-expanded="false">
                   Export
                 </button>
-                <ul class="menu">
+                <div class="menu">
                   {% with id=assay.id %}
-                  <li><a class="menu-item" onclick=feedback_export("{{export_json_url}}",{{id}})>JSON</a></li>
-                  <li><a class="menu-item" onclick=feedback_export("{{export_md_url}}",{{id}})>MD</a></li>
-                  <li><a class="menu-item" onclick=feedback_export("{{export_pdf_url}}",{{id}})>PDF</a></li>
-                  <li><a class="menu-item" onclick=feedback_export("{{export_xml_url}}",{{id}})>XML</a></li>
-                  <li><a class="menu-item" onclick=feedback_export("{{export_docx_url}}",{{id}})>DOCX</a></li>
-                  <li><a class="menu-item" onclick=feedback_export("{{export_html_url}}",{{id}})>HTML</a></li>
-                  <li><a class="menu-item" onclick=feedback_export("{{export_tex_url}}",{{id}})>TEX</a></li>
+                  <a class="menu-item" onclick=feedback_export("{{export_json_url}}",{{id}})>JSON</a>
+                  <a class="menu-item" onclick=feedback_export("{{export_md_url}}",{{id}})>MD</a>
+                  <a class="menu-item" onclick=feedback_export("{{export_pdf_url}}",{{id}})>PDF</a>
+                  <a class="menu-item" onclick=feedback_export("{{export_xml_url}}",{{id}})>XML</a>
+                  <a class="menu-item" onclick=feedback_export("{{export_docx_url}}",{{id}})>DOCX</a>
+                  <a class="menu-item" onclick=feedback_export("{{export_html_url}}",{{id}})>HTML</a>
+                  <a class="menu-item" onclick=feedback_export("{{export_tex_url}}",{{id}})>TEX</a>
                   {% endwith %}
-                </ul>
+                </div>
               </div>
             </div>
           </div>

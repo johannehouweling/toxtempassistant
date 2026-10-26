@@ -22,4 +22,5 @@ def test_integrity_checked_cdn_urls_pin_an_exact_version():
         if "integrity=" in tag
     ]
     assert urls
-    assert [u for u in urls if not re.search(r"@\d+\.\d+\.\d+/", u)] == []
+    # An exact version may carry a pre-release tag, as in bootstrap@6.0.0-alpha.1.
+    assert [u for u in urls if not re.search(r"@\d+\.\d+\.\d+(-[\w.]+)?/", u)] == []

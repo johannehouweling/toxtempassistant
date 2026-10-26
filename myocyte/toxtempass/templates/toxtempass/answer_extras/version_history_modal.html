@@ -1,7 +1,5 @@
 <!-- Version History Modal -->
-<div class="dialog fade" id="versionHistoryModal" tabindex="-1" aria-labelledby="versionHistoryLabel" aria-hidden="true">
-    <div class="modal-dialog dialog-xl">
-      <div class="modal-content">
+<dialog class="dialog dialog-xl" id="versionHistoryModal" aria-labelledby="versionHistoryLabel">
         <div class="dialog-header">
           <h5 class="dialog-title" id="versionHistoryLabel">Version History</h5>
           <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
@@ -15,9 +13,7 @@
         <div class="dialog-footer">
           <button type="button" class="btn-solid theme-secondary" data-bs-dismiss="dialog">Close</button>
         </div>
-      </div>
-    </div>
-  </div>
+  </dialog>
 
   <script>
     document.addEventListener('DOMContentLoaded', function () {

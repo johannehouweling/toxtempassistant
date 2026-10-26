@@ -51,7 +51,7 @@ class TestAssayTableInvestigationColumn:
         )
         assert "d-inline-flex align-items-center flex-wrap gap-1" in rendered
         assert '<button type="button"' in rendered
-        assert 'data-bs-toggle="offcanvas"' in rendered
+        assert 'data-bs-toggle="drawer"' in rendered
         assert 'data-bs-target="#offcanvasUser"' in rendered
         assert 'aria-label="View workspaces sharing this investigation"' in rendered
         assert 'href="#offcanvasUser"' not in rendered
@@ -110,7 +110,7 @@ class TestAssayTableCostColumn:
         assert "table-responsive" in rendered
         assert "text-break" in rendered
         assert "text-nowrap" in rendered
-        assert 'data-bs-custom-class="mw-100"' in rendered
+        assert 'data-bs-custom-class="max-w-100"' in rendered
         assert "4:GPT4OMINI" in rendered
         assert "4:GPT4O" in rendered
         assert "gpt-4o-mini" in rendered

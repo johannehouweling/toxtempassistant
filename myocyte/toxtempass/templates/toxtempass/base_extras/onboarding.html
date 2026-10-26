@@ -390,7 +390,7 @@
       finishedBtn.textContent = "Finish";
       finishedBtn.setAttribute("data-bs-dismiss", "toast");
       steps[steps.length - 1].toastEl
-        .querySelector(".btn.btn-primary")
+        .querySelector(".btn-solid.theme-primary")
         ?.replaceWith(finishedBtn);
 
       let currentStep = 0;
@@ -571,7 +571,7 @@
 
       // Wire "Next"
       steps.forEach((step, idx) => {
-        const nextBtn = step.toastEl.querySelector(".btn.btn-primary");
+        const nextBtn = step.toastEl.querySelector(".btn-solid.theme-primary");
         if (nextBtn) {
           nextBtn.addEventListener("click", () => {
             if (idx + 1 < steps.length) {
@@ -649,7 +649,7 @@
       if (btn) {
         btn.addEventListener("click", () => {
           const offcanvasEl = document.getElementById("offcanvasUser");
-          if (offcanvasEl && offcanvasEl.classList.contains("show")) {
+          if (offcanvasEl && offcanvasEl.open) {
             const offcanvas = bootstrap.Drawer.getInstance(offcanvasEl);
             if (offcanvas) offcanvas.hide();
           }

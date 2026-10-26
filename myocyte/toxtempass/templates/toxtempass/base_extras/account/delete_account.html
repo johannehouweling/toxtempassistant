@@ -12,10 +12,12 @@
 
 {% if blockers.owned_workspaces %}
 <div class="alert theme-warning py-3 px-5 small mb-0">
-    You still own {{ blockers.owned_workspaces|length }} workspace{{ blockers.owned_workspaces|length|pluralize }} with other members:
-    {% for workspace in blockers.owned_workspaces %}<strong>{{ workspace.name }}</strong>{% if not forloop.last %}, {% endif %}{% endfor %}.
-    Workspaces cannot be handed over, so delete them yourself first, after checking what the other members lose.
-    <button type="button" class="btn btn-link btn-sm p-0 align-baseline js-show-workspaces">Go to Workspaces</button>
+    <div>
+        You still own {{ blockers.owned_workspaces|length }} workspace{{ blockers.owned_workspaces|length|pluralize }} with other members:
+        {% for workspace in blockers.owned_workspaces %}<strong>{{ workspace.name }}</strong>{% if not forloop.last %}, {% endif %}{% endfor %}.
+        Workspaces cannot be handed over, so delete them yourself first, after checking what the other members lose.
+        <button type="button" class="btn btn-link btn-sm p-0 align-baseline js-show-workspaces">Go to Workspaces</button>
+    </div>
 </div>
 {% elif blockers.superuser %}
 <div class="alert theme-warning py-3 px-5 small mb-0">
@@ -47,9 +49,9 @@
         <input type="password" class="form-control" id="account-delete-password" name="password" placeholder="Current password" autocomplete="current-password" required>
         <label for="account-delete-password">Current password</label>
     </div>
-    <div class="form-check small mb-3">
-        <input class="form-check-input" type="checkbox" id="account-delete-confirm" name="confirm" value="1" required>
-        <label class="form-check-label" for="account-delete-confirm">
+    <div class="form-field small mb-3">
+        <input class="check" type="checkbox" id="account-delete-confirm" name="confirm" value="1" required>
+        <label for="account-delete-confirm">
             I understand that this deletes my account and my data for good. It cannot be undone, and copies in backups are gone within {{ backup_retention_days }} days.
         </label>
     </div>

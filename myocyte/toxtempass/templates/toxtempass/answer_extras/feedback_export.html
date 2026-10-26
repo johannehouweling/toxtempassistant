@@ -30,9 +30,8 @@ function feedback_export(export_url,assay_id){
 </script>
 
 <!-- Feedback Modal -->
-<div class="dialog fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <form id="feedbackForm" class="modal-content">
+<dialog class="dialog" id="feedbackModal" aria-labelledby="feedbackModalLabel">
+      <form id="feedbackForm" class="d-contents">
         <div class="dialog-header">
           <h5 class="dialog-title" id="feedbackModalLabel">Submit Feedback Before Export </h5>
           <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
@@ -60,15 +59,17 @@ function feedback_export(export_url,assay_id){
                     “Useful” refers to whether the draft helped you get started, saved time, or provided relevant structure or content.
                 </div>
                 <!-- Slider -->
-                <input 
-                    type="range" 
-                    class="form-range mt-5" 
-                    id="usefulnessRating"  
-                    min="1" max="5" step="0.1" value="3"
-                    name="usefulness_rating" 
-                    required 
-                    oninput="document.getElementById('ratingValue').textContent = this.value"
-                />
+                <div class="form-range mt-5">
+                    <input 
+                        type="range" 
+                        class="form-range-input" 
+                        id="usefulnessRating"  
+                        min="1" max="5" step="0.1" value="3"
+                        name="usefulness_rating" 
+                        required 
+                        oninput="document.getElementById('ratingValue').textContent = this.value"
+                    />
+                </div>
                 <!-- Tick labels below slider -->
                 <div class="d-flex justify-content-between fg-secondary small px-1 mt-0">
                     <div class="text-start"><em>Not useful</em></div>
@@ -89,8 +90,7 @@ function feedback_export(export_url,assay_id){
           <button type="submit" class="btn-solid theme-primary">Submit Feedback</button>
         </div>
       </form>
-    </div>
-  </div>
+  </dialog>
 
   <script>
     const FEEDBACK_USER_ID = parseInt('{{ request.user.id }}', 10);

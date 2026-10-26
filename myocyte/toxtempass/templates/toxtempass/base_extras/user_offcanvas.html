@@ -1,5 +1,5 @@
 {% load static%}
-<div class="drawer drawer-end" tabindex="-1" id="offcanvasUser" aria-labelledby="offcanvasUserLabel">
+<dialog class="drawer drawer-end" id="offcanvasUser" aria-labelledby="offcanvasUserLabel">
     {# No side padding on the header: the tab bar's bottom line then spans the full width, like the footer's top line. #}
     <div class="drawer-header flex-column align-items-stretch p-0">
         <div class="d-flex align-items-center px-5 pt-5 mb-5">
@@ -77,9 +77,9 @@
                             {# Organization errors show here, above the "not in ROR" box they refer to. #}
                             <div class="small fg-danger mt-1 js-organization-error" hidden></div>
                             {# Shown once a new organization matched no ROR record. #}
-                            <div class="form-check mt-1 js-not-in-ror" hidden>
-                                <input class="form-check-input" type="checkbox" id="account-organization-not-in-ror" name="organization_not_in_ror">
-                                <label class="form-check-label small" for="account-organization-not-in-ror">My organization is not in <a href="{{ config.ror_website_url }}" target="_blank" rel="noopener noreferrer">ROR</a></label>
+                            <div class="form-field mt-1 js-not-in-ror" hidden>
+                                <input class="check" type="checkbox" id="account-organization-not-in-ror" name="organization_not_in_ror">
+                                <label class="small" for="account-organization-not-in-ror">My organization is not in <a href="{{ config.ror_website_url }}" target="_blank" rel="noopener noreferrer">ROR</a></label>
                             </div>
                         </div>
                     </div>
@@ -208,7 +208,7 @@
               if (!sel) return;
 
               function showAlert(variant, html) {
-                alertBox.className = 'alert alert-' + variant + ' mt-2 py-2 px-3 small d-flex align-items-center';
+                alertBox.className = 'alert theme-' + variant + ' mt-3 py-3 px-5 small d-flex align-items-center';
                 alertBox.innerHTML = html;
               }
 
@@ -296,9 +296,9 @@
             <div class="mb-7">
                 <h5 class="mb-1">Authorship</h5>
                 <p class="mb-3 fg-secondary">When an owner or admin gives an outside server API access to a workspace you belong to, that server can read the ToxTemps you created or edited there.</p>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" role="switch" id="credit-by-name"{% if credit_by_name %} checked{% endif %}>
-                    <label class="form-check-label" for="credit-by-name">Credit me by name (name, org, ORCID)</label>
+                <div class="form-field">
+                    <div class="switch"><input type="checkbox" role="switch" switch id="credit-by-name"{% if credit_by_name %} checked{% endif %}></div>
+                    <label for="credit-by-name">Credit me by name (name, org, ORCID)</label>
                 </div>
                 <p class="mb-0 mt-1 fg-secondary small">On by default. Applies to all your workspaces and takes effect at once. Never your email address. Switched off, you appear as "Contributor (not named)".</p>
                 <div id="credit-by-name-alert" class="alert theme-danger mt-3 py-3 px-5 small" role="alert" hidden></div>
@@ -330,9 +330,9 @@
                 <h5 class="mb-1">Email notifications</h5>
                 <p class="mb-3 fg-secondary">Emails about your account, like confirmations and password changes, are always sent.</p>
                 {% for setting in email_settings %}
-                <div class="form-check form-switch">
-                    <input class="form-check-input js-email-setting" type="checkbox" role="switch" id="email-setting-{{ setting.kind }}" data-kind="{{ setting.kind }}"{% if setting.enabled %} checked{% endif %}>
-                    <label class="form-check-label" for="email-setting-{{ setting.kind }}">{{ setting.label }}</label>
+                <div class="form-field">
+                    <div class="switch"><input class="js-email-setting" type="checkbox" role="switch" switch id="email-setting-{{ setting.kind }}" data-kind="{{ setting.kind }}"{% if setting.enabled %} checked{% endif %}></div>
+                    <label for="email-setting-{{ setting.kind }}">{{ setting.label }}</label>
                 </div>
                 {% endfor %}
                 <div id="email-setting-alert" class="alert theme-danger mt-3 py-3 px-5 small" role="alert" hidden></div>
@@ -431,12 +431,10 @@
             </div>
         </div>
     </div>
-</div>
+</dialog>
 
 <!-- Modal -->
-<div class="dialog fade" id="copyrightModal" tabindex="-1" aria-labelledby="copyrightModalLabel" aria-hidden="true" style="z-index: 1200;">
-    <div class="modal-dialog dialog-lg">
-        <div class="modal-content">
+<dialog class="dialog dialog-lg" id="copyrightModal" aria-labelledby="copyrightModalLabel">
             <div class="dialog-header">
                 <h5 class="dialog-title" id="copyrightModalLabel">Copyright</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
@@ -450,9 +448,7 @@
                 <a class="btn btn-link me-auto" href="{% url 'license' %}" target="_blank" rel="noopener">Open as page</a>
                 <button type="button" class="btn-solid theme-secondary" data-bs-dismiss="dialog">Close</button>
             </div>
-        </div>
-    </div>
-</div>
+</dialog>
 
 {% include "terms_of_service_modal.html" %}
 
@@ -466,7 +462,7 @@
           }
 
           function showResult(element, ok, text) {
-            element.className = 'small mt-3 js-form-result ' + (ok ? 'text-success' : 'text-danger');
+            element.className = 'small mt-3 js-form-result ' + (ok ? 'fg-success' : 'fg-danger');
             element.textContent = text;
             element.hidden = false;
           }
@@ -541,7 +537,7 @@
               notInRorBox.checked = false;
             };
             const showStatus = function (ok, text) {
-              status.className = 'small mt-1 js-profile-status ' + (ok ? 'text-success' : 'text-danger');
+              status.className = 'small mt-1 js-profile-status ' + (ok ? 'fg-success' : 'fg-danger');
               status.textContent = text;
               status.hidden = false;
               clearTimeout(statusTimer);
@@ -681,15 +677,11 @@
           let loaded = false;
 
           function render(html) {
-            const openPanels = Array.from(container.querySelectorAll('.accordion-collapse.show')).map(function (panel) { return panel.id; });
+            const openPanels = Array.from(container.querySelectorAll('details.accordion-item[open]')).map(function (panel) { return panel.id; });
             container.innerHTML = html;
             openPanels.forEach(function (id) {
               const panel = document.getElementById(id);
-              const toggle = container.querySelector('[data-bs-target="#' + id + '"]');
-              if (!panel || !toggle) return;
-              panel.classList.add('show');
-              toggle.classList.remove('collapsed');
-              toggle.setAttribute('aria-expanded', 'true');
+              if (panel) panel.open = true;
             });
           }
 
@@ -806,58 +798,19 @@
                     .forEach(function (id) {
                         const section = document.getElementById(id);
                         if (!section) return;
-                        // toggle: false, or creating the instance opens a closed section.
-                        bootstrap.Collapse
-                            .getOrCreateInstance(section, { toggle: false })
-                            .hide();
+                        bootstrap.Collapse.getOrCreateInstance(section).hide();
                     });
             });
 
-            // More robust: wait for the offcanvas "hidden" event before showing modal
-            document.querySelectorAll("[data-bs-toggle='dialog']").forEach((btn) => {
+            // A dialog opened from the user menu takes its place (Bootstrap closes
+            // the menu); bring the menu back once that dialog closes.
+            document.querySelectorAll("#offcanvasUser [data-bs-toggle='dialog']").forEach((btn) => {
                 btn.addEventListener("click", function () {
-                    const offcanvasEl = document.querySelector(".drawer.show");
                     const targetModal = document.querySelector(btn.getAttribute("data-bs-target"));
-
                     if (!targetModal) return;
-
-                    if (offcanvasEl) {
-                        // Ensure we have an Offcanvas instance
-                        const ocInstance = bootstrap.Drawer.getInstance(offcanvasEl) || new bootstrap.Drawer(offcanvasEl);
-
-                        // When the offcanvas is fully hidden, show the modal
-                        const onHidden = () => {
-                            const modal = new bootstrap.Dialog(targetModal);
-                            modal.show();
-
-                            // After the modal is hidden, restore the offcanvas once the backdrop is gone
-                            targetModal.addEventListener('hidden.bs.dialog', function () {
-                                const tryRestore = () => {
-                                    const backdrop = document.querySelector('.modal-backdrop');
-                                    if (!backdrop) {
-                                        const oc = new bootstrap.Drawer(offcanvasEl);
-                                        oc.show();
-                                    } else {
-                                        setTimeout(tryRestore, 50);
-                                    }
-                                };
-                                tryRestore();
-                            }, { once: true });
-                        };
-
-                        offcanvasEl.addEventListener('hidden.bs.drawer', onHidden, { once: true });
-                        ocInstance.hide();
-                    }
-                });
-            });
-
-            // Also remove any lingering backdrops when any modal is fully hidden
-            document.querySelectorAll('.dialog').forEach(modalEl => {
-                modalEl.addEventListener('hidden.bs.dialog', () => {
-                    const lingeringBackdrop = document.querySelector('.modal-backdrop');
-                    if (lingeringBackdrop) {
-                        lingeringBackdrop.parentNode.removeChild(lingeringBackdrop);
-                    }
+                    targetModal.addEventListener("hidden.bs.dialog", function () {
+                        bootstrap.Drawer.getOrCreateInstance(document.getElementById("offcanvasUser")).show();
+                    }, { once: true });
                 });
             });
 

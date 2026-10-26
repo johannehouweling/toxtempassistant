@@ -1,56 +1,10 @@
 <script>
   function showModalFromOffcanvas(modalEl) {
-    // Show a Bootstrap modal that was rendered inside an offcanvas without closing the offcanvas.
-    // To avoid z-index/backdrop issues when a modal lives inside an open offcanvas, temporarily
-    // move the modal element to document.body, show it, then restore it after the modal hides.
+    // Show a dialog that lives inside the user menu without closing the menu. Both
+    // are native <dialog> elements in the browser's top layer, so the dialog opened
+    // last sits on top; no stacking or backdrop fixes are needed.
     if (!modalEl) return;
-
-    const originalParent = modalEl.parentNode;
-    const nextSibling = modalEl.nextSibling;
-
-    // Move modal to body so its backdrop and stacking are handled correctly
-    try {
-      document.body.appendChild(modalEl);
-    } catch (err) {
-      // If moving fails, still attempt to show modal in place
-    }
-
-    const modal = new bootstrap.Dialog(modalEl);
-
-    // Ensure the modal and its backdrop render above the offcanvas
-    modalEl.addEventListener(
-      "shown.bs.dialog",
-      function () {
-        const backdrop = document.querySelector(".modal-backdrop");
-        // Give the modal and its backdrop a high z-index so they render above the offcanvas.
-        if (backdrop) backdrop.style.zIndex = "2000";
-        modalEl.style.zIndex = "2010";
-      },
-      { once: true },
-    );
-
-    modalEl.addEventListener(
-      "hidden.bs.dialog",
-      function () {
-        // cleanup inline styles
-        modalEl.style.zIndex = "";
-        const backdrop = document.querySelector(".modal-backdrop");
-        if (backdrop) backdrop.style.zIndex = "";
-
-        // restore original DOM position
-        try {
-          if (originalParent) {
-            if (nextSibling) originalParent.insertBefore(modalEl, nextSibling);
-            else originalParent.appendChild(modalEl);
-          }
-        } catch (err) {
-          // ignore
-        }
-      },
-      { once: true },
-    );
-
-    modal.show();
+    bootstrap.Dialog.getOrCreateInstance(modalEl).show();
   }
 
   function removeNoOwnedPlaceholder() {
@@ -109,7 +63,7 @@
     const rows = wrap.querySelectorAll(selectorRow);
     if (rows.length === 0 && !wrap.querySelector("." + emptyClass)) {
       const empty = document.createElement("span");
-      empty.className = `text-muted small ${emptyClass}`;
+      empty.className = `fg-secondary small ${emptyClass}`;
       empty.textContent = emptyText;
       const btn = wrap.querySelector(insertBeforeBtnSelector);
       if (btn) wrap.insertBefore(empty, btn);
@@ -128,7 +82,8 @@
     '"><span class="d-inline-flex align-items-center justify-content-center bg-success fw-bold fg-white member-avatar"><i class="bi bi-key-fill"></i></span><span class="member-text">You</span></span>';
   function settingsButtonHtml(hidden) {
     return (
-      '<button type="button" class="btn-sm btn-outline theme-secondary border-0 btn-api-tokens' + (hidden ?" d-none" : "") +
+      '<button type="button" class="btn-sm btn-outline theme-secondary border-0 btn-api-tokens' +
+      (hidden ? " d-none" : "") +
       '" title="Workspace settings" aria-label="Workspace settings"><i class="bi bi-gear"></i></button>'
     );
   }

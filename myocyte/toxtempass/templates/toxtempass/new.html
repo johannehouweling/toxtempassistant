@@ -20,7 +20,7 @@
        data-bs-trigger="focus"
        title="ISA"
        data-bs-html="true"
-       data-bs-content="ToxTempAssistant follows the <a href='https://isa-tools.org/format/specification.html' class=' link-underline-opacity-0 link-underline-opacity-75-hover' target='_blank'>ISA format</a> to organize generated ToxTemps.<br>
+       data-bs-content="ToxTempAssistant follows the <a href='https://isa-tools.org/format/specification.html' class='text-decoration-none' target='_blank'>ISA format</a> to organize generated ToxTemps.<br>
 &bull; <strong>Investigations</strong>: High level concept to link related studies. <br>
 &bull; <strong>Studies</strong>: Central unit, containing information on the subject under study its characteristics and any treatments applied. A study has associated assays.<br>
 &bull; <strong>Assays</strong>: Test perfomed either on material taken from the subject or on the whole subject, which produces data. ToxTemps decribe assays.<br>">
@@ -59,9 +59,7 @@
     </form>
 
     <!-- Demo Lock Modal -->
-    <div class="dialog fade" id="demoLockedModal" tabindex="-1" aria-labelledby="demoLockedModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
+    <dialog class="dialog" id="demoLockedModal" aria-labelledby="demoLockedModalLabel">
                 <div class="dialog-header">
                     <h5 class="dialog-title" id="demoLockedModalLabel">Demo Assay</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
@@ -72,9 +70,7 @@
                 <div class="dialog-footer">
                     <button type="button" class="btn-solid theme-primary" data-bs-dismiss="dialog">OK</button>
                 </div>
-            </div>
-        </div>
-    </div>
+    </dialog>
 
     <script>
         // csrftoken is defined globally in base.html.
@@ -397,7 +393,7 @@
         // Create popover icon
         const popoverIcon = document.createElement('a');
         popoverIcon.setAttribute('tabindex', '0');
-        popoverIcon.setAttribute('class', 'text-dark small');
+        popoverIcon.setAttribute('class', 'fg-body small');
         popoverIcon.setAttribute('style', 'margin-left: 0.5rem; cursor: pointer;');
         popoverIcon.setAttribute('role', 'button');
         popoverIcon.setAttribute('data-bs-toggle', 'popover');

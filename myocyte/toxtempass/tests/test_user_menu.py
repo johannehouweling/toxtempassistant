@@ -53,13 +53,13 @@ def _pane(menu, name):
         for other in PANES
         if f'id="{other}"' in menu and menu.index(f'id="{other}"') > start
     ]
-    return menu[start : min(ends, default=menu.index('class="border-top px-3 pt-3"'))]
+    return menu[start : min(ends, default=menu.index('class="border-top px-5 pt-5"'))]
 
 
 def test_menu_opens_on_workspaces_and_puts_privacy_in_its_own_tab(client):
     menu = _menu(client, PersonFactory())
 
-    assert 'class="nav-link active px-2" id="userMenuWorkspacesTab"' in menu
+    assert 'class="nav-link active px-3" id="userMenuWorkspacesTab"' in menu
     assert "New Workspace" in _pane(menu, "userMenuWorkspaces")
     account = _pane(menu, "userMenuAccount")
     assert 'class="js-profile"' in account
@@ -163,7 +163,8 @@ def test_account_tab_lists_who_you_are_then_buttons_without_headings(client):
 def test_link_orcid_spans_the_tab_like_the_other_buttons(client):
     account = _pane(_menu(client, PersonFactory(orcid_id=None)), "userMenuAccount")
     button = (
-        r'<div class="d-grid mb-2">\s*<a class="btn btn-sm btn-outline-secondary d-flex '
+        r'<div class="d-grid mb-3">\s*'
+        r'<a class="btn-sm btn-outline theme-secondary d-flex '
         r'align-items-center justify-content-center" '
         f'href="{re.escape(reverse("orcid_login"))}">'
     )
@@ -172,7 +173,7 @@ def test_link_orcid_spans_the_tab_like_the_other_buttons(client):
 
 def test_not_in_ror_checkbox_is_hidden_in_the_account_tab(client):
     account = _pane(_menu(client, PersonFactory()), "userMenuAccount")
-    assert '<div class="form-check mt-1 js-not-in-ror" hidden>' in account
+    assert '<div class="form-field mt-1 js-not-in-ror" hidden>' in account
     assert 'My organization is not in <a href="https://ror.org"' in account
 
 
@@ -194,7 +195,7 @@ def test_your_details_are_text_to_click_and_edit_without_a_save_button(client):
     assert '<span class="js-organization-value">RIVM</span>' in details
     assert 'aria-label="Edit name"' in details
     assert 'aria-label="Edit organization"' in details
-    assert '<div class="row g-2 js-profile-inputs" hidden>' in details
+    assert '<div class="row g-3 js-profile-inputs" hidden>' in details
     assert "Save</button>" not in details
 
 
@@ -221,7 +222,7 @@ def test_footer_icons_are_in_order_and_each_has_a_tooltip(client):
     from toxtempass import config
 
     menu = _menu(client, PersonFactory())
-    start = menu.index('class="border-top px-3 pt-3"')
+    start = menu.index('class="border-top px-5 pt-5"')
     footer = menu[start : menu.index("<!-- Modal -->")]
     top_row, icons = footer.split('class="btn-group d-flex w-100"', 1)
 
@@ -241,9 +242,9 @@ def test_the_bottom_bar_spans_the_menu_and_is_all_secondary(client):
     start = html.index('<div class="btn-group d-flex w-100" role="group">')
     bar = html[start : html.index("</div>", html.index("License", start)) + 6]
     # One group across the whole width, not centred, with no primary-coloured button.
-    assert 'class="pb-3"' in html[start - 80 : start]
+    assert 'class="pb-5"' in html[start - 80 : start]
     assert "justify-content-center" not in html[start - 80 : start]
-    assert "btn-outline-primary" not in bar
-    assert bar.count("btn-outline-secondary") >= 6
+    assert "theme-primary" not in bar
+    assert bar.count("btn-outline theme-secondary") >= 6
     for label in ("GitHub", "About", "How to cite", "Legal", "License"):
         assert f'aria-label="{label}"' in bar
