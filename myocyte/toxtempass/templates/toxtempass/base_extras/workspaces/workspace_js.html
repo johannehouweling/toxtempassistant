@@ -4,6 +4,9 @@
     // are native <dialog> elements in the browser's top layer, so the dialog opened
     // last sits on top; no stacking or backdrop fixes are needed.
     if (!modalEl) return;
+    // Back to whatever opened it on close, so focus (and Escape) is in the menu again.
+    const opener = document.activeElement;
+    modalEl.addEventListener("hidden.bs.dialog", () => opener?.focus(), { once: true });
     bootstrap.Dialog.getOrCreateInstance(modalEl).show();
   }
 

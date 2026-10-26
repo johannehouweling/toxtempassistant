@@ -406,8 +406,8 @@
                 <a class="btn-sm btn-outline theme-secondary js-footer-tooltip" href="{% url 'about' %}" title="About" aria-label="About"><i class="bi bi-info-circle"></i></a>
                 <a class="btn-sm btn-outline theme-secondary js-footer-tooltip" href="{% url 'about' %}#how-to-cite" title="How to cite" aria-label="How to cite"><i class="bi bi-chat-left-quote"></i></a>
                 <a class="btn-sm btn-outline theme-secondary js-footer-tooltip" href="mailto:{{config.maintainer_email}}?subject=%5BToxTempAssistant%5D%20%3CEnter%20Subject%20Here%3E" title="Contact via Email" aria-label="Contact via Email"><i class="bi bi-envelope-paper-heart"></i></a>
-                <button class="btn-sm btn-outline theme-secondary js-footer-tooltip" type="button" data-bs-target="#termsModal" data-bs-toggle="dialog" title="Legal" aria-label="Legal"><i class="bi bi-book"></i></button>
-                <button class="btn-sm btn-outline theme-secondary js-footer-tooltip" type="button" data-bs-target="#copyrightModal" data-bs-toggle="dialog" title="License" aria-label="License"><i class="bi bi-c-circle"></i></button>
+                <button class="btn-sm btn-outline theme-secondary js-footer-tooltip js-open-dialog" type="button" data-bs-target="#termsModal" title="Legal" aria-label="Legal"><i class="bi bi-book"></i></button>
+                <button class="btn-sm btn-outline theme-secondary js-footer-tooltip js-open-dialog" type="button" data-bs-target="#copyrightModal" title="License" aria-label="License"><i class="bi bi-c-circle"></i></button>
                 {% if llm_signature %}
                 <a id="llm-signature-badge"
                       class="btn-sm btn-outline theme-secondary d-flex align-items-center"
@@ -802,15 +802,17 @@
                     });
             });
 
-            // A dialog opened from the user menu takes its place (Bootstrap closes
-            // the menu); bring the menu back once that dialog closes.
-            document.querySelectorAll("#offcanvasUser [data-bs-toggle='dialog']").forEach((btn) => {
+            // Legal and License open on top of the user menu, which stays open
+            // underneath (both are <dialog>s in the browser's top layer). Not
+            // data-bs-toggle="dialog": from inside an open drawer Bootstrap would
+            // swap the menu out instead.
+            document.querySelectorAll("#offcanvasUser .js-open-dialog").forEach((btn) => {
                 btn.addEventListener("click", function () {
-                    const targetModal = document.querySelector(btn.getAttribute("data-bs-target"));
-                    if (!targetModal) return;
-                    targetModal.addEventListener("hidden.bs.dialog", function () {
-                        bootstrap.Drawer.getOrCreateInstance(document.getElementById("offcanvasUser")).show();
-                    }, { once: true });
+                    const target = document.querySelector(btn.dataset.bsTarget);
+                    if (!target) return;
+                    // Back to the button on close, so focus (and Escape) is in the menu again.
+                    target.addEventListener("hidden.bs.dialog", () => btn.focus(), { once: true });
+                    bootstrap.Dialog.getOrCreateInstance(target).show(btn);
                 });
             });
 
