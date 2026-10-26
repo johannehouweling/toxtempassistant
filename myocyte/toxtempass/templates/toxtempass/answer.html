@@ -80,10 +80,10 @@
                 <nav id="navbar-questions" class="flex-column lg:drawer drawer-start align-items-stretch border-end overflow-y-auto">
                     <nav class="nav nav-pills nav-pills-vertical drawer-body">
                         {% for section in sections %}
-                            <a class="nav-link justify-content-start text-start text-wrap p-1 px-5 m-0 mt-5 fs-lg{% if section.all_answers_accepted %} fg-secondary {% endif %}" href="#section-{{ section.id }}">{{ section.title }}</a>
+                            <a class="nav-link justify-content-start text-start text-wrap rounded-7 p-1 px-5 m-0 mt-5 fs-lg{% if section.all_answers_accepted %} fg-secondary {% endif %}" href="#section-{{ section.id }}">{{ section.title }}</a>
                             <nav class="nav nav-pills-vertical fg-secondary">
                                 {% for subsection in section.subsections.all %}
-                                    <a class="nav-link justify-content-start text-start text-wrap ms-7 p-1 px-5{% if subsection.all_answers_accepted %} fg-secondary {% endif %}" href="#subsection-{{ subsection.id }}">{{ subsection.title }}</a>
+                                    <a class="nav-link justify-content-start text-start text-wrap rounded-7 ms-7 p-1 px-5{% if subsection.all_answers_accepted %} fg-secondary {% endif %}" href="#subsection-{{ subsection.id }}">{{ subsection.title }}</a>
                                 {% endfor %}
                             </nav>
                         {% endfor %}
