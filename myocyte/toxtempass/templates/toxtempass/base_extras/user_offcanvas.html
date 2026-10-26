@@ -470,6 +470,11 @@
     </div>
 </dialog>
 
+{# The workspace dialogs sit outside the menu: a closed Bootstrap 6 dialog keeps #}
+{# its place in the layout (it is only made invisible), so inside the menu's     #}
+{# scrolling body they would give it a scrollbar with nothing to scroll to.      #}
+{% include "toxtempass/base_extras/workspaces/workspace_modals.html" %}
+
 <!-- Modal -->
 <dialog class="dialog dialog-lg" id="copyrightModal" aria-labelledby="copyrightModalLabel">
             <div class="dialog-header">
@@ -729,6 +734,12 @@
           async function load() {
             try {
               const response = await fetch(container.dataset.url);
+              // Logged out, the view redirects to the login page; fetch follows
+              // it, and that whole page must not end up inside the menu.
+              if (response.redirected) {
+                container.innerHTML = '<p class="fg-danger small mb-0">Your session has ended. Please reload the page and log in again.</p>';
+                return;
+              }
               if (!response.ok) throw new Error(response.statusText);
               render(await response.text());
               loaded = true;
@@ -775,6 +786,10 @@
             if (loaded) return;
             try {
               const response = await fetch(container.dataset.url);
+              if (response.redirected) {  // logged out: the login page, see above
+                container.innerHTML = '<p class="fg-danger small mb-0">Your session has ended. Please reload the page and log in again.</p>';
+                return;
+              }
               if (!response.ok) throw new Error(response.statusText);
               container.innerHTML = await response.text();
               loaded = true;

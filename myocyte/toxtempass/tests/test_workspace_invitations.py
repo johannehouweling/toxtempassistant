@@ -566,7 +566,14 @@ class TestWorkspaceTab:
     def test_the_dialogs_do_not_promise_anonymity_and_link_the_docs(
         self, owner, workspace
     ):
-        html = self._html(owner)
+        # The dialogs are rendered outside the workspace list, next to the menu.
+        request = RequestFactory().get("/")
+        request.user = owner
+        html = render_to_string(
+            "toxtempass/base_extras/workspaces/workspace_modals.html",
+            ws_views.get_workspace_list(request),
+            request=request,
+        )
         assert "without naming any person" not in html
         flat = " ".join(html.split())
         assert "They see the authors of its ToxTemps by name" in flat

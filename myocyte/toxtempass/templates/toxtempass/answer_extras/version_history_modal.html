@@ -35,7 +35,8 @@
         // Fetch the version history with assay_id and question_id as query parameters
         fetch(`question/${questionId}/version-history/`)
           .then(response => {
-            if (!response.ok) {
+            // A redirect means a lost login: the login page, not a history.
+            if (!response.ok || response.redirected) {
               throw new Error('Network response was not ok');
             }
             return response.text(); // Get response as HTML
