@@ -215,7 +215,7 @@
         {% if not user.is_authenticated %}
         <footer class="border-top">
             <div class="container px-5 py-7">
-                <nav class="d-flex flex-wrap gap-5 small" aria-label="Site">
+                <nav class="d-flex flex-wrap justify-content-center gap-5 small" aria-label="Site">
                     <a class="fg-secondary" href="{% url 'about' %}">About</a>
                     <a class="fg-secondary" href="{% url 'toxtemp_questions' %}">ToxTemp questions</a>
                     <a class="fg-secondary" href="{% url 'about' %}#how-to-cite">How to cite</a>
@@ -223,7 +223,7 @@
                     <a class="fg-secondary" href="{% url 'license' %}">License</a>
                     <a class="fg-secondary" href="{{ config.github_repo_url }}" target="_blank" rel="noopener noreferrer">GitHub</a>
                 </nav>
-                <p class="small fg-secondary mt-3 mb-0">
+                <p class="small fg-secondary text-center mt-3 mb-0">
                     ToxTempAssistant is open source (AGPL-3.0) and developed within <a class="fg-reset" href="https://vhp4safety.nl/" target="_blank" rel="noopener noreferrer">VHP4Safety</a>. The ToxTemp template is by Krebs et al. (2019).
                 </p>
             </div>
