@@ -3,7 +3,7 @@
 {% block title %}Home Page{% endblock %}
 
 {% block content %}
-{% load django_bootstrap5 %}
+{% load bs6 %}
 {% load extras %}
   <style>
     .graceful-clip {
@@ -133,7 +133,7 @@
                                         <div class="col-md-2 align-self-end">  
                                           <div class="has-validation">
                                               {% with earmark_num='earmarked_'|add_asstring:question.id %}
-                                              {% bootstrap_field form|form_field:earmark_num placeholder="" wrapper_class="mb-2"%}
+                                              {% bootstrap_field form|form_field:earmark_num placeholder="" wrapper_class="mb-3" %}
                                               {% endwith %}
                                           </div>
                                           <div class="btn-group" role="group">
@@ -151,7 +151,7 @@
                                           </div>
                                           <div class="mb-3 has-validation">
                                             {% with accepted_num='accepted_'|add_asstring:question.id %}
-                                            {% bootstrap_field form|form_field:accepted_num placeholder="" wrapper_class="form-check form-switch ps-3" %}
+                                            {% bootstrap_field form|form_field:accepted_num placeholder="" wrapper_class="mb-0" %}
                                             {% endwith %}
                                           </div>
                                         </div>
@@ -215,8 +215,8 @@
             <!-- Buttons -->
 
             <div class="my-3 d-flex">
-              {% bootstrap_button button_type="link" content="Back" href=back_url button_class="btn-outline-danger"  %}
-              {% bootstrap_button button_type="submit" content="Save" button_class="btn-primary ms-auto" form="QuestionsForm" %}
+              {% bootstrap_button button_type="link" content="Back" href=back_url button_class="btn-outline theme-danger"  %}
+              {% bootstrap_button button_type="submit" content="Save" button_class="btn-solid theme-primary ms-auto" form="QuestionsForm" %}
               
               <div class="btn-group mx-1">
                 <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">

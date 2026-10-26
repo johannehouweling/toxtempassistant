@@ -1,0 +1,1 @@
+{% if button_type == "link" %}<a class="{{ button_class }}" href="{{ href }}" role="button"{% for name, value in attrs.items %} {{ name }}="{{ value }}"{% endfor %}>{{ content }}</a>{% else %}<button class="{{ button_class }}" type="{{ button_type }}"{% for name, value in attrs.items %} {{ name }}="{{ value }}"{% endfor %}>{{ content }}</button>{% endif %}

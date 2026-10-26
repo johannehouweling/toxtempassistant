@@ -374,9 +374,9 @@ class StartingForm(forms.Form):
             button_url_names=[],
             button_labels=[],
             button_classes=[
-                "d-flex align-items-center btn btn-outline-secondary",
-                "d-flex align-items-center btn btn-outline-secondary disabled",
-                "d-flex align-items-center btn btn-outline-danger rounded-end disabled",
+                "d-flex align-items-center btn-outline theme-secondary",
+                "d-flex align-items-center btn-outline theme-secondary disabled",
+                "d-flex align-items-center btn-outline theme-danger rounded-end disabled",
             ],
             label=QuestionSet._meta.verbose_name,  # Use the verbose name of the model
         ),
@@ -390,9 +390,9 @@ class StartingForm(forms.Form):
             button_url_names=["create_investigation", "", ""],
             button_labels=["Create", "Modify", "Delete"],
             button_classes=[
-                "d-flex align-items-center btn btn-outline-secondary",
-                "d-flex align-items-center btn btn-outline-secondary disabled",
-                "d-flex align-items-center btn btn-outline-danger rounded-end disabled",
+                "d-flex align-items-center btn-outline theme-secondary",
+                "d-flex align-items-center btn-outline theme-secondary disabled",
+                "d-flex align-items-center btn-outline theme-danger rounded-end disabled",
             ],
         ),
     )
@@ -404,9 +404,9 @@ class StartingForm(forms.Form):
             button_url_names=["create_study", "", ""],
             button_labels=["Create", "Modify", "Delete"],
             button_classes=[
-                "d-flex align-items-center btn btn-outline-secondary",
-                "d-flex align-items-center btn btn-outline-secondary disabled",
-                "d-flex align-items-center btn btn-outline-danger rounded-end disabled",
+                "d-flex align-items-center btn-outline theme-secondary",
+                "d-flex align-items-center btn-outline theme-secondary disabled",
+                "d-flex align-items-center btn-outline theme-danger rounded-end disabled",
             ],
         ),
     )
@@ -418,9 +418,9 @@ class StartingForm(forms.Form):
             button_url_names=["create_assay", "", ""],
             button_labels=["Create", "Modify", "Delete"],
             button_classes=[
-                "d-flex align-items-center btn btn-outline-secondary",
-                "d-flex align-items-center btn btn-outline-secondary disabled",
-                "d-flex align-items-center btn btn-outline-danger rounded-end disabled",
+                "d-flex align-items-center btn-outline theme-secondary",
+                "d-flex align-items-center btn-outline theme-secondary disabled",
+                "d-flex align-items-center btn-outline theme-danger rounded-end disabled",
             ],
         ),
     )
@@ -757,11 +757,7 @@ class AssayAnswerForm(forms.Form):
                     accepted_field_name = f"accepted_{question.id}"
                     self.fields[accepted_field_name] = forms.BooleanField(
                         widget=forms.CheckboxInput(
-                            attrs={
-                                "class": "form-check-input",
-                                "role": "switch",
-                                "type": "checkbox",
-                            }
+                            attrs={"role": "switch"}
                         ),
                         label="Accepted",
                         required=False,
@@ -1014,11 +1010,11 @@ class WorkspaceForm(forms.ModelForm):
 class WorkspaceMemberForm(forms.Form):
     user = forms.ModelChoiceField(
         queryset=Person.objects.all(),
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
     role = forms.ChoiceField(
         choices=WorkspaceRole.choices,
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
 
     def __init__(self, *args, **kwargs):
@@ -1029,7 +1025,7 @@ class WorkspaceMemberForm(forms.Form):
 class WorkspaceInvestigationForm(forms.Form):
     investigation = forms.ModelChoiceField(
         queryset=Investigation.objects.none(),
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
 
     def __init__(self, *args, user=None, **kwargs):

@@ -5,7 +5,7 @@
 {% block canonical %}<link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'signup' %}">{% endblock %}
 
 {% block content %}
-{% load django_bootstrap5 %}
+{% load bs6 %}
 
 <div class="row justify-content-center px-3">
   <div class="col-lg-4 card my-3 py-2 mx-3 ">
@@ -46,7 +46,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
   // Offer "not in ROR" once the organization matched no ROR record.
   const notInRor = document.getElementById("organization-not-in-ror");
-  const orgField = orgInput.closest(".mb-3");
+  const orgField = orgInput.closest(".form-field");
   if (notInRor && orgField) orgField.after(notInRor);
   orgInput.form.addEventListener("form-errors", function(event) {
     const messages = (event.detail.errors || {}).organization || [];

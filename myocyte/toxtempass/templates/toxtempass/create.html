@@ -3,7 +3,7 @@
 {% block title %}Home Page{% endblock %}
 
 {% block content %}
-{% load django_bootstrap5 %}
+{% load bs6 %}
 <h2>{{title}}</h2>
  <!-- action defines where ajax sends the post to, novalidate to use bootstrap validation markup --> 
 <form method="post" action="{{action}}" novalidate>
@@ -13,8 +13,8 @@
       <div class="alert alert-warning">{{ workspace_creation_warning }}</div>
     {% endif %}
     {% bootstrap_form form layout='floating'%}
-    {% bootstrap_button button_type="submit" content="Save" button_class="btn-primary" %}
-    {% bootstrap_button button_type="link" content="Back" href=back_url button_class="btn-outline-danger" %}
+    {% bootstrap_button button_type="submit" content="Save" button_class="btn-solid theme-primary" %}
+    {% bootstrap_button button_type="link" content="Back" href=back_url button_class="btn-outline theme-danger" %}
 </form>
 {% include "error_handling.html" %}
 

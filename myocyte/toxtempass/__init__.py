@@ -597,7 +597,7 @@ class Config:
                 "Check this box to mark questions for an LLM update. You can select one or multiple questions, then use 'Options' → 'Update selected questions'.",
             ],
             [
-                "#question-content .form-check-input[role='switch']:first-of-type",
+                "#question-content input[role='switch']:first-of-type",
                 "Toggle 'Accepted' when satisfied with an answer. This tracks your progress through the ToxTemp.",
             ],
             [

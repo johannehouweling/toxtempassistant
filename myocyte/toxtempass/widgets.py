@@ -5,9 +5,11 @@ from django.utils.safestring import SafeText, mark_safe
 
 
 class BootstrapSelectWithButtonsWidget(Select):
+    # Tells the bs6 template tags this widget brings its own floating label.
+    renders_own_label = True
     default_btn_label = "Add"
     default_btn_class = (
-        "d-flex align-items-center btn btn-outline-secondary rounded-end"
+        "d-flex align-items-center btn-outline theme-secondary rounded-end"
     )
 
     def __init__(
@@ -72,8 +74,8 @@ class BootstrapSelectWithButtonsWidget(Select):
         html = (
             '<div class="input-group">'
             '<div class="form-floating">'
-            f"{select_html}"
             f'<label for="{attrs.get("id")}">{label_text}</label>'
+            f"{select_html}"
             "</div>"
             f"{''.join(buttons_html)}"
             "</div>"

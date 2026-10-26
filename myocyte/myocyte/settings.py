@@ -97,7 +97,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.humanize",
     "django.contrib.sitemaps",
-    "django_bootstrap5",
     "toxtempass",
     "simple_history",
     "django_extensions",

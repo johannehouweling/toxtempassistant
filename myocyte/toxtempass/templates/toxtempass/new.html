@@ -3,7 +3,7 @@
 {% block title %}Home Page{% endblock %}
 
 {% block content %}
-{% load django_bootstrap5 %}
+{% load bs6 %}
 
 <style>
   .icon-footnote {
@@ -34,7 +34,7 @@
         <div id='non-field-errors'></div>
         {% bootstrap_form form exclude='consent_file_storage' layout='floating' show_label=False %}
 
-        {# render the consent checkbox via django_bootstrap5 #}
+        {# render the consent checkbox via the bs6 tags #}
         <div class="mb-3">
             {% bootstrap_field form.consent_file_storage layout='floating' show_label=False %}
            
@@ -392,7 +392,7 @@
     const filesInput = document.getElementById('id_files');
     if (filesInput) {
       // Find the help text (form-text) for this field
-      const helpText = filesInput.closest('.mb-3')?.querySelector('.form-text');
+      const helpText = filesInput.closest('.form-field')?.querySelector('.form-text');
       if (helpText) {
         // Create popover icon
         const popoverIcon = document.createElement('a');

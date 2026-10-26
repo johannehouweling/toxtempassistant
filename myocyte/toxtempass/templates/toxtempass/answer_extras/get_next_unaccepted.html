@@ -4,8 +4,8 @@
   
     // Function to find and focus on the next unchecked "Accepted" checkbox
     function focusNextUnaccepted() {
-      // Get all the checkboxes with the class 'form-check-input'
-      const checkboxes = document.querySelectorAll('.form-check-input[role="switch"]');
+      // Get all the "Accepted" switches
+      const checkboxes = document.querySelectorAll('input[role="switch"][name^="accepted_"]');
       let foundUnchecked = false;  // Flag to track if an unchecked checkbox is found
       
       // Loop through the checkboxes starting from the next one after the last focused one
