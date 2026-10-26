@@ -215,11 +215,12 @@
         {% if not user.is_authenticated %}
         <footer class="border-top">
             <div class="container px-5 py-7">
-                <nav class="d-flex flex-wrap justify-content-center gap-5 small" aria-label="Site">
+                {# Phones get short labels ("ToxTemp", "Terms") and smaller gaps, so the links fit on one line on most of them. #}
+                <nav class="d-flex flex-wrap justify-content-center gap-3 sm:gap-5 small" aria-label="Site">
                     <a class="fg-secondary" href="{% url 'about' %}">About</a>
-                    <a class="fg-secondary" href="{% url 'toxtemp_questions' %}">ToxTemp questions</a>
+                    <a class="fg-secondary" href="{% url 'toxtemp_questions' %}">ToxTemp<span class="d-none sm:d-inline"> questions</span></a>
                     <a class="fg-secondary" href="{% url 'about' %}#how-to-cite">How to cite</a>
-                    <a class="fg-secondary" href="{% url 'terms_of_service' %}">Terms of Service</a>
+                    <a class="fg-secondary" href="{% url 'terms_of_service' %}">Terms<span class="d-none sm:d-inline"> of Service</span></a>
                     <a class="fg-secondary" href="{% url 'license' %}">License</a>
                     <a class="fg-secondary" href="{{ config.github_repo_url }}" target="_blank" rel="noopener noreferrer">GitHub</a>
                 </nav>
