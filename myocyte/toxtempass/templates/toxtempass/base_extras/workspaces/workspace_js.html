@@ -104,7 +104,7 @@
     col.innerHTML = `
       <div class="card border-0 h-100 workspace-card workspace-list" data-workspace-id="0" data-can-remove="1">
         <div class="card-header d-flex flex-row align-items-center justify-content-between border-0 workspace-card-header">
-          <span class="fw-semibold form-control px-0 border-0 workspace-name" style="font-size:.95rem;" contenteditable="true">New workspace</span>
+          <span class="fw-semibold form-control px-0 border-0 bg-transparent shadow-none workspace-name" style="font-size:.95rem;" contenteditable="true">New workspace</span>
           <div class="d-flex align-items-center gap-3">
             ${settingsButtonHtml(true)}
             <button type="button" class="btn-sm btn-outline theme-danger border-0 workspace-delete-btn" title="Delete workspace" aria-label="Delete workspace">
@@ -207,7 +207,7 @@
     col.innerHTML = `
       <div class="card border-0 h-100 workspace-card workspace-list" data-workspace-id="${pk}" data-can-remove="1">
           <div class="card-header d-flex flex-row align-items-center justify-content-between border-0 workspace-card-header">
-          <span class="fw-semibold form-control px-0 border-0 workspace-name" style="font-size:.95rem;" contenteditable="false">${escapeHtml(name || "New workspace")}</span>
+          <span class="fw-semibold form-control px-0 border-0 bg-transparent shadow-none workspace-name" style="font-size:.95rem;" contenteditable="false">${escapeHtml(name || "New workspace")}</span>
           <div class="d-flex align-items-center gap-3">
             ${settingsButtonHtml(false)}
             <button type="button" class="btn-sm btn-outline theme-danger border-0 workspace-delete-btn" title="Delete workspace" aria-label="Delete workspace">
