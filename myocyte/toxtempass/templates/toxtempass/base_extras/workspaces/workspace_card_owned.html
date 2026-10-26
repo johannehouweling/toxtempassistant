@@ -2,7 +2,7 @@
     data-workspace-id="{{ ws.pk }}"
     {% if ws.owner == request.user %}data-can-remove="1"{% else %}data-can-remove="0"{% endif %}>
 
-    <div class="card-header d-flex align-items-center justify-content-between border-0 workspace-card-header">
+    <div class="card-header d-flex flex-row align-items-center justify-content-between border-0 workspace-card-header">
         <span class="fw-semibold form-control px-0 border-0 workspace-name" style="font-size:.95rem;" contenteditable="false">{{ ws.name }}</span>
 
         {% if ws.owner == request.user %}
@@ -62,7 +62,7 @@
             {% endfor %}
             {% if ws.owner == request.user %}
             <button type="button"
-                    class="btn-sm btn-outline theme-primary btn-add-member round-add-btn"
+                    class="btn-sm btn-outline theme-primary btn-add-member btn-icon rounded-circle"
                     title="Add member"
                     aria-label="Add member">
                 <i class="bi bi-person-plus"></i>
@@ -97,7 +97,7 @@
 
             {% if ws.owner == request.user %}
             <button type="button"
-                    class="btn-sm btn-outline theme-secondary btn-add-assay round-add-btn"
+                    class="btn-sm btn-outline theme-secondary btn-add-assay btn-icon rounded-circle"
                     title="Add investigation"
                     aria-label="Add investigation">
                 <i class="bi bi-plus-circle"></i>

@@ -103,7 +103,7 @@
 
     col.innerHTML = `
       <div class="card border-0 h-100 workspace-card workspace-list" data-workspace-id="0" data-can-remove="1">
-        <div class="card-header d-flex align-items-center justify-content-between border-0 workspace-card-header">
+        <div class="card-header d-flex flex-row align-items-center justify-content-between border-0 workspace-card-header">
           <span class="fw-semibold form-control px-0 border-0 workspace-name" style="font-size:.95rem;" contenteditable="true">New workspace</span>
           <div class="d-flex align-items-center gap-3">
             ${settingsButtonHtml(true)}
@@ -117,7 +117,7 @@
             <div class="text-uppercase fw-semibold mb-3 section-label">Members</div>
             <div class="d-flex flex-wrap align-items-center gap-3 members-wrap">
               ${OWNER_CHIP_HTML}
-              <button type="button" class="btn-sm btn-outline theme-primary btn-add-member round-add-btn" title="Add member" aria-label="Add member">
+              <button type="button" class="btn-sm btn-outline theme-primary btn-add-member btn-icon rounded-circle" title="Add member" aria-label="Add member">
                 <i class="bi bi-person-plus"></i>
               </button>
             </div>
@@ -127,7 +127,7 @@
                 <div class="text-uppercase fw-semibold mb-3 section-label">Shared Investigations</div>
             <div class="d-flex flex-wrap align-items-center gap-3 assays-wrap">
               <span class="fg-secondary small empty-assays">No investigations shared</span>
-              <button type="button" class="btn-sm btn-outline theme-secondary btn-add-assay round-add-btn" title="Add assay" aria-label="Add assay">
+              <button type="button" class="btn-sm btn-outline theme-secondary btn-add-assay btn-icon rounded-circle" title="Add assay" aria-label="Add assay">
                 <i class="bi bi-plus-circle"></i>
               </button>
             </div>
@@ -206,7 +206,7 @@
 
     col.innerHTML = `
       <div class="card border-0 h-100 workspace-card workspace-list" data-workspace-id="${pk}" data-can-remove="1">
-          <div class="card-header d-flex align-items-center justify-content-between border-0 workspace-card-header">
+          <div class="card-header d-flex flex-row align-items-center justify-content-between border-0 workspace-card-header">
           <span class="fw-semibold form-control px-0 border-0 workspace-name" style="font-size:.95rem;" contenteditable="false">${escapeHtml(name || "New workspace")}</span>
           <div class="d-flex align-items-center gap-3">
             ${settingsButtonHtml(false)}
@@ -221,7 +221,7 @@
             <div class="text-uppercase fw-semibold mb-3 section-label">Members</div>
             <div class="d-flex flex-wrap align-items-center gap-3 members-wrap">
               ${OWNER_CHIP_HTML}
-              <button type="button" class="btn-sm btn-outline theme-primary btn-add-member round-add-btn" title="Add member" aria-label="Add member">
+              <button type="button" class="btn-sm btn-outline theme-primary btn-add-member btn-icon rounded-circle" title="Add member" aria-label="Add member">
                 <i class="bi bi-person-plus"></i>
               </button>
             </div>
@@ -231,7 +231,7 @@
             <div class="text-uppercase fw-semibold mb-3 section-label">Shared Investigations</div>
             <div class="d-flex flex-wrap align-items-center gap-3 assays-wrap">
               <span class="fg-secondary small empty-assays">No investigations shared</span>
-              <button type="button" class="btn-sm btn-outline theme-secondary btn-add-assay round-add-btn" title="Add assay" aria-label="Add assay">
+              <button type="button" class="btn-sm btn-outline theme-secondary btn-add-assay btn-icon rounded-circle" title="Add assay" aria-label="Add assay">
                 <i class="bi bi-plus-circle"></i>
               </button>
             </div>
