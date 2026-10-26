@@ -154,7 +154,10 @@ class AssayTable(tables.Table):
         },
         verbose_name="Actions",
         orderable=False,
-        attrs={"th": {"class": "no-link-header"}, "td": {"class": "align-middle"}},
+        attrs={
+            "th": {"class": "no-link-header text-end"},
+            "td": {"class": "align-middle text-end"},
+        },
     )
 
     def render_investigation(self, record) -> SafeText:
@@ -378,7 +381,10 @@ class BetaUserTable(tables.Table):
         """,
         verbose_name="Action",
         orderable=False,
-        attrs={"td": {"class": "align-middle"}, "th": {"class": "no-link-header"}},
+        attrs={
+            "td": {"class": "align-middle text-end"},
+            "th": {"class": "no-link-header text-end"},
+        },
     )
 
     def render_requested_at(self, value, record: Person) -> SafeText:  # noqa: ANN001
