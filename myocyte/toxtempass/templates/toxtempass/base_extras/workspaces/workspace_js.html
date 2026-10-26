@@ -370,7 +370,7 @@
           const cancel = document.createElement("button");
           cancel.type = "button";
           cancel.className =
-            "btn btn-link p-0 m-0 fg-secondary btn-cancel-invitation";
+            "btn btn-link p-0 m-0 min-h-0 lh-1 fg-secondary btn-cancel-invitation";
           cancel.title = "Cancel invitation";
           cancel.setAttribute("aria-label", `Cancel invitation for ${memberEmailRaw}`);
           cancel.innerHTML = '<i class="bi bi-x"></i>';
@@ -506,7 +506,7 @@
           ${
             canRemove
               ? `
-            <button type="button" class="btn btn-link p-0 m-0 fg-secondary btn-remove-assay" data-assay-id="${assayId}"
+            <button type="button" class="btn btn-link p-0 m-0 min-h-0 lh-1 fg-secondary btn-remove-assay" data-assay-id="${assayId}"
                     aria-label="Remove investigation ${escapeHtml(title)}" title="Remove investigation ${escapeHtml(title)}">
               <i class="bi bi-x"></i>
             </button>`
