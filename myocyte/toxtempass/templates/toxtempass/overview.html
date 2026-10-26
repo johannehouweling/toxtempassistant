@@ -151,6 +151,9 @@
 
   {% block extra_css %}
         <style>
+  /* Bootstrap's "custom" layer: after its components, before its utilities,
+     so utility classes still win over these rules. */
+  @layer custom {
         /* only target links inside headers with .no-link-header */
         th.no-link-header a {
           color: inherit;
@@ -172,6 +175,7 @@
           );
           background-size: 1rem 1rem;
         }
+  }
         </style>
   {% endblock %}
 

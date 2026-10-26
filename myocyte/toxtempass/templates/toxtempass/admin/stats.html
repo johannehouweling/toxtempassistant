@@ -25,6 +25,9 @@ CSS variable (--bs-primary-bg, --bs-border-color, ...) so the page follows the t
 {{ chart_data|json_script:"kpiChartData" }}
 
 <style>
+  /* Bootstrap's "custom" layer: after its components, before its utilities,
+     so utility classes still win over these rules. */
+  @layer custom {
   /* Ships only with this page, so the body rule cannot affect the rest of the app. */
   body { background: var(--bs-bg-2); }
 
@@ -139,6 +142,7 @@ CSS variable (--bs-primary-bg, --bs-border-color, ...) so the page follows the t
   .readout .seg a:hover { color: var(--ink); }
   .readout .seg a[aria-current="page"]:hover { color: var(--on-brand); }
   .readout a:focus-visible, .readout .seg a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  }
 </style>
 
 <div class="readout">

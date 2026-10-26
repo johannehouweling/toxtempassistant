@@ -6,6 +6,9 @@
 {% load bs6 %}
 {% load extras %}
   <style>
+  /* Bootstrap's "custom" layer: after its components, before its utilities,
+     so utility classes still win over these rules. */
+  @layer custom {
     .graceful-clip {
 
     }
@@ -64,6 +67,7 @@
       /* Roomier guidance popover (Bootstrap has no width utility — set its own variable); no arrow. */
       .rh-guidance { --bs-popover-max-width: 360px; }
       .popover .popover-arrow { display: none !important; }
+  }
 </style>
 <div class="container-fluid" >
     <div class="row" style="padding-bottom: 102px;">

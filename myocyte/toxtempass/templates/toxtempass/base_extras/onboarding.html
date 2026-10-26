@@ -736,6 +736,9 @@
 </script>
 
 <style>
+  /* Bootstrap's "custom" layer: after its components, before its utilities,
+     so utility classes still win over these rules. */
+  @layer custom {
   /* Additional CSS for spared elements on overlay */
   .spared-element {
     position: relative !important;
@@ -744,5 +747,6 @@
     box-shadow: 0 0 15px 3px #007bff !important;
     border-radius: 4px;
     transition: box-shadow 0.3s ease-in-out;
+  }
   }
 </style>

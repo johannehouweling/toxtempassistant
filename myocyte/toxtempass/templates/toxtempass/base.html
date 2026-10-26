@@ -58,6 +58,9 @@
     })
 </script>
 <style>
+  /* Bootstrap's "custom" layer: after its components, before its utilities,
+     so utility classes still win over these rules. */
+  @layer custom {
     /* Ensure both icon spans are positioned so they overlap, if needed */
     .orcid-icon-container {
       position: relative;
@@ -106,6 +109,7 @@
        otherwise show as a blank line under every preview — drop it on the last
        child so the box hugs the text. */
     .md-preview > :last-child { margin-bottom: 0; }
+  }
   </style>
 <body data-url-name="{{ current_url_name }}">
         <header class="md:sticky-top">
