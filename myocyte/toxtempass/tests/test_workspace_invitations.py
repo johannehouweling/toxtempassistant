@@ -510,7 +510,7 @@ class TestWorkspaceTab:
         WorkspaceFactory(owner=member, name="Mine")
         # Only the server-rendered cards: the script below holds templates of its own.
         html = self._html(member).split("<style>")[0]
-        card = '<div class="card border-0 h-100 workspace-card workspace-list'
+        card = '<div class="card h-100 workspace-card workspace-list'
         wrapped = '<div class="col">\n          ' + card
         assert html.count(card) == 2 and html.count(wrapped) == 2
 

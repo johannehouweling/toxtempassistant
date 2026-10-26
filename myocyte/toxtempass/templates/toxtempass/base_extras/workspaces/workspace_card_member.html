@@ -1,4 +1,4 @@
-<div class="card border-0 h-100 workspace-card workspace-list{% if ws.current_user_role == 'member' %} workspace-muted{% endif %}"
+<div class="card h-100 workspace-card workspace-list{% if ws.current_user_role == 'member' %} workspace-muted{% endif %}"
      data-workspace-id="{{ ws.pk }}"
      {% if ws.current_user_role == "owner" or ws.current_user_role == "admin" %}data-can-remove="1"{% else %}data-can-remove="0"{% endif %}>
 
