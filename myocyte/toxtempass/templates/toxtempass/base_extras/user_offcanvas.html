@@ -44,8 +44,9 @@
                     <i class="bi bi-person fg-secondary" aria-hidden="true"></i>
                     <div class="flex-grow-1">
                         <div class="js-profile-display">
-                            <button type="button" class="btn btn-link p-0 fg-body text-decoration-none text-start js-profile-view" aria-label="Edit name" title="Click to edit">
-                                <span class="js-name-value">{{ user.get_full_name|default:"Add your name" }}</span>
+                            <button type="button" class="btn btn-link p-0 min-h-0 fg-body text-decoration-none text-start js-profile-view" aria-label="Edit name" title="Click to edit">
+                                <span class="js-name-value{% if not user.get_full_name %} fg-secondary{% endif %}" data-placeholder="Add your name">{{ user.get_full_name|default:"Add your name" }}</span>
+                                <i class="bi bi-pencil fs-xs fg-secondary ms-2" aria-hidden="true"></i>
                             </button>
                         </div>
                         <div class="row g-3 js-profile-inputs" hidden>
@@ -62,8 +63,9 @@
                     <i class="bi bi-building fg-secondary" aria-hidden="true"></i>
                     <div class="flex-grow-1">
                         <div class="js-profile-display">
-                            <button type="button" class="btn btn-link p-0 fg-body text-decoration-none text-start js-profile-view" aria-label="Edit organization" title="Click to edit">
-                                <span class="js-organization-value">{{ user.organization }}</span>
+                            <button type="button" class="btn btn-link p-0 min-h-0 fg-body text-decoration-none text-start js-profile-view" aria-label="Edit organization" title="Click to edit">
+                                <span class="js-organization-value{% if not user.organization %} fg-secondary{% endif %}" data-placeholder="Add your organization">{{ user.organization|default:"Add your organization" }}</span>
+                                <i class="bi bi-pencil fs-xs fg-secondary ms-2" aria-hidden="true"></i>
                             </button>
                             {# Like the email badge; hovering or focusing it names the ROR record. #}
                             <span class="badge theme-success ms-1 js-ror-match" tabindex="0" data-bs-toggle="tooltip" title="Matched to {{ user.ror_name }} in the Research Organization Registry"{% if not user.ror_name %} hidden{% endif %}>ROR matched</span>
@@ -600,8 +602,12 @@
               if (request !== latestRequest) return;  // a newer save is under way
               if (data.success) {
                 remember();
-                profile.querySelector('.js-name-value').textContent = data.name || 'Add your name';
-                profile.querySelector('.js-organization-value').textContent = data.organization;
+                profile.querySelectorAll('[data-placeholder]').forEach(function (value) {
+                  // An empty value shows its placeholder, muted, so it reads as a prompt.
+                  const text = value.classList.contains('js-name-value') ? data.name : data.organization;
+                  value.textContent = text || value.dataset.placeholder;
+                  value.classList.toggle('fg-secondary', !text);
+                });
                 const match = profile.querySelector('.js-ror-match');
                 const matchText = 'Matched to ' + data.ror_name + ' in the Research Organization Registry';
                 if (window.bootstrap && bootstrap.Tooltip) {

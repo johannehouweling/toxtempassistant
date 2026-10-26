@@ -192,8 +192,12 @@ def test_your_details_are_text_to_click_and_edit_without_a_save_button(client):
     start = account.index('class="js-profile"')
     details = account[start : account.index("</form>", start)]
 
-    assert '<span class="js-name-value">Ada Lovelace</span>' in details
-    assert '<span class="js-organization-value">RIVM</span>' in details
+    name = 'class="js-name-value" data-placeholder="Add your name">Ada Lovelace<'
+    assert name in details
+    assert (
+        'class="js-organization-value" data-placeholder="Add your organization">RIVM<'
+        in details
+    )
     assert 'aria-label="Edit name"' in details
     assert 'aria-label="Edit organization"' in details
     assert '<div class="row g-3 js-profile-inputs" hidden>' in details
@@ -249,3 +253,16 @@ def test_the_bottom_bar_spans_the_menu_and_is_all_secondary(client):
     assert bar.count("btn-outline theme-secondary") >= 6
     for label in ("GitHub", "About", "How to cite", "Legal", "License"):
         assert f'aria-label="{label}"' in bar
+
+
+def test_empty_details_show_a_muted_prompt_to_add_them(client):
+    user = PersonFactory(first_name="", last_name="", organization="")
+    account = _pane(_menu(client, user), "userMenuAccount")
+    assert (
+        'class="js-name-value fg-secondary" data-placeholder="Add your name">'
+        "Add your name<" in account
+    )
+    assert (
+        'class="js-organization-value fg-secondary"'
+        ' data-placeholder="Add your organization">Add your organization<' in account
+    )
