@@ -2,6 +2,100 @@
 
 <!-- version list -->
 
+## v3.64.0 (2026-10-26)
+
+### Bug Fixes
+
+- **ui**: Align the account details and show what can be edited
+  ([`bed5709`](https://github.com/johannehouweling/toxtempassistant/commit/bed5709cd67c13a1768f727109ba454ce8c71a0f))
+
+- **ui**: Closed dialogs no longer stretch the page
+  ([`a27df58`](https://github.com/johannehouweling/toxtempassistant/commit/a27df58eb0be6d3e4d3b137fbfe4354a487bb4f5))
+
+- **ui**: Floating labels float again, without a second copy
+  ([`d85a459`](https://github.com/johannehouweling/toxtempassistant/commit/d85a4599032ae55b8920cbbb6528ed9ecc3ce83b))
+
+- **ui**: Keep workspace chips to their text height
+  ([`6f21fd5`](https://github.com/johannehouweling/toxtempassistant/commit/6f21fd5f962e89c854fc781d9d63a07ab4417f07))
+
+- **ui**: Long dialogs scroll inside the window
+  ([`3bd2afa`](https://github.com/johannehouweling/toxtempassistant/commit/3bd2afac5cd66df78a15230116b43592913c2562))
+
+- **ui**: No empty scroll in the user menu, no login page inside it
+  ([`b210216`](https://github.com/johannehouweling/toxtempassistant/commit/b21021627912995b94e946b2302ea64619114d3d))
+
+- **ui**: No horizontal scroll in the question navigation
+  ([`f75da15`](https://github.com/johannehouweling/toxtempassistant/commit/f75da157340d466750431932f07748b0c32055a1))
+
+- **ui**: Outline workspace cards and apply their body padding
+  ([`7077bf8`](https://github.com/johannehouweling/toxtempassistant/commit/7077bf865a718a13abd077286c2669d387eaf4a8))
+
+- **ui**: Put page CSS in Bootstrap 6's custom layer
+  ([`4df5380`](https://github.com/johannehouweling/toxtempassistant/commit/4df538017bb4b24c20b95e3dc95e88aa936ee102))
+
+- **ui**: Question navigation, legal dialogs and focus under Bootstrap 6
+  ([`5f5f976`](https://github.com/johannehouweling/toxtempassistant/commit/5f5f976806e6242340884e3dc168cf348f83de7c))
+
+- **ui**: Review dark mode and fix the Bootstrap build
+  ([`cf03de2`](https://github.com/johannehouweling/toxtempassistant/commit/cf03de200371de3bd192ac05268a7df36ba3dc5e))
+
+- **ui**: Round add buttons and one-row header on workspace cards
+  ([`b4bf602`](https://github.com/johannehouweling/toxtempassistant/commit/b4bf6021ddba24e04cb1cbe615c86e6dd29fa201))
+
+- **ui**: Set workspace cards apart from the user menu in dark mode
+  ([`a8c1897`](https://github.com/johannehouweling/toxtempassistant/commit/a8c18970994b1b8f5607c56cb3c96e8182f45922))
+
+### Build System
+
+- **deps**: Bump certifi from 2026.4.22 to 2026.10.19
+  ([`2a121fc`](https://github.com/johannehouweling/toxtempassistant/commit/2a121fc7f5216bd0c154e7a7aab0d8d9309380e9))
+
+- **deps**: Bump pillow from 12.3.0 to 13.0.0
+  ([`0fd4166`](https://github.com/johannehouweling/toxtempassistant/commit/0fd4166c6a31e2e4c9150f1ebb8fcc80b6fa5560))
+
+- **deps-dev**: Bump gitpython from 3.1.59 to 3.2.1
+  ([`e6e5f68`](https://github.com/johannehouweling/toxtempassistant/commit/e6e5f684bef0db5a4f59a99b17acc10be4ab24e4))
+
+### Code Style
+
+- **ui**: Action buttons sit at the right edge of the tables
+  ([`d91d26f`](https://github.com/johannehouweling/toxtempassistant/commit/d91d26fb95e1f63f49b66eaa37d21913935e43f0))
+
+- **ui**: Centre the footer for logged-out visitors
+  ([`9f3444b`](https://github.com/johannehouweling/toxtempassistant/commit/9f3444b29b81a0da2c38722058c781f26506a5c8))
+
+- **ui**: Round the question navigation like the header bar
+  ([`be9e905`](https://github.com/johannehouweling/toxtempassistant/commit/be9e9056f7a7c25a0db17d3174d0ef76d636ba33))
+
+- **ui**: Short footer labels on phones
+  ([`d20ea3e`](https://github.com/johannehouweling/toxtempassistant/commit/d20ea3e67a87f33e0810832edc6b7fc6926edd51))
+
+- **ui**: User menu icon beside the email in the header
+  ([`a654a5e`](https://github.com/johannehouweling/toxtempassistant/commit/a654a5ea829c34fc6f1e8a52671ca4fc961b972b))
+
+### Features
+
+- **ui**: Choose light, dark or system colour mode in Settings
+  ([`84e99bc`](https://github.com/johannehouweling/toxtempassistant/commit/84e99bc485f583780b29618b8744579e85515dbd))
+
+- **ui**: Load Bootstrap 6, built with an orange theme colour
+  ([`442c34d`](https://github.com/johannehouweling/toxtempassistant/commit/442c34d77ada0931c2d7e9f88b27355c5e98f3f8))
+
+- **ui**: Put the readiness breakdown toggle in front of the progress bar
+  ([`4c098ec`](https://github.com/johannehouweling/toxtempassistant/commit/4c098ec625cd884802b0ec08d166a8faa3fdf47c))
+
+### Refactoring
+
+- **forms**: Render forms with local Bootstrap 6 tags instead of django-bootstrap5
+  ([`4b16446`](https://github.com/johannehouweling/toxtempassistant/commit/4b164463f3182c1b856e0effe949f372df1680ce))
+
+- **ui**: Move components to Bootstrap 6 markup
+  ([`1a9ea6f`](https://github.com/johannehouweling/toxtempassistant/commit/1a9ea6f9cb026bf0ebd40386e15ca2e141cdba01))
+
+- **ui**: Rename Bootstrap 5 classes and data attributes to Bootstrap 6
+  ([`b35ba0f`](https://github.com/johannehouweling/toxtempassistant/commit/b35ba0fd40dac9e1074dd86ee8381829eb5b2ed6))
+
+
 ## v3.63.1 (2026-10-19)
 
 ### Bug Fixes
