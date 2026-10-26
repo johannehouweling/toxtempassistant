@@ -35,3 +35,14 @@
     ),
   )
 );
+
+// Bootstrap 6.0.0-alpha.1 hides a closed dialog with visibility instead of
+// display: none, but leaves it in the page at the browser's position: absolute,
+// so every closed dialog stretches the page: you could scroll into empty space
+// below the content. Fixed positioning takes it out of the page's scroll area;
+// an open (modal) dialog is fixed anyway.
+@layer components {
+  .dialog:not([open]) {
+    position: fixed;
+  }
+}
