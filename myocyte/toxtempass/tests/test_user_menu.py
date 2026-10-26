@@ -83,9 +83,10 @@ def test_tabs_are_workspaces_settings_account_privacy(client):
     assert positions == sorted(positions)
 
 
-def test_settings_tab_only_appears_when_it_has_something_to_show(client):
+def test_settings_tab_always_offers_appearance_and_staff_get_the_dashboard(client):
     menu = _menu(client, PersonFactory(), models=1)
-    assert 'id="userMenuSettingsTab"' not in menu
+    assert 'id="userMenuSettingsTab"' in menu
+    assert 'name="color-mode"' in _pane(menu, "userMenuSettings")
 
     staff_menu = _menu(client, PersonFactory(is_staff=True), models=1)
     assert 'id="userMenuSettingsTab"' in staff_menu

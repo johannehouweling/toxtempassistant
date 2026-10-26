@@ -126,7 +126,10 @@ class AssayTable(tables.Table):
                     <span class="ms-1 d-none lg:d-inline">View</span>
                 </a>
             {% endif %}
-            {# Menu before its toggle (Bootstrap finds it as the previous sibling) so the toggle is the group's last child and keeps its rounded right corners. #}
+            {# Menu right after its toggle, as Bootstrap 6 expects: the group then squares the View link's right corners and keeps the toggle's. #}
+            <button type="button" class="btn-sm btn-outline theme-secondary" data-bs-toggle="menu" data-bs-placement="bottom-end" aria-expanded="false" aria-label="More actions">
+                <i class="bi bi-three-dots" aria-hidden="true"></i>
+            </button>
             <div class="menu">
                 {% comment %}Route exports through feedback_export() so the feedback modal gates them here too — same path the editing page (answer.html) uses; the partial is included once on overview.html. The toggle is never disabled: Delete lives in this menu and must stay reachable for errored/busy/scheduled assays, so only the export items are disabled.{% endcomment %}
                 <h6 class="menu-header">Export</h6>
@@ -142,9 +145,6 @@ class AssayTable(tables.Table):
                     <i class="bi bi-trash me-3" aria-hidden="true"></i>Delete
                 </a>
             </div>
-            <button type="button" class="btn-sm btn-outline theme-secondary" data-bs-toggle="menu" data-bs-placement="bottom-end" aria-expanded="false" aria-label="More actions">
-                <i class="bi bi-three-dots" aria-hidden="true"></i>
-            </button>
         </div>
         """,
         extra_context={

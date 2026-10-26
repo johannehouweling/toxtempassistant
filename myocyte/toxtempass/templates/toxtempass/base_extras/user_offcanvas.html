@@ -12,14 +12,11 @@
                     <i class="bi bi-people me-1"></i>Workspaces
                 </button>
             </li>
-            {# Settings only has content with a real model choice, or for staff. #}
-            {% if llm_choices|length > 1 or user.is_staff %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link px-3" id="userMenuSettingsTab" data-bs-toggle="tab" data-bs-target="#userMenuSettings" type="button" role="tab" aria-controls="userMenuSettings" aria-selected="false">
                     <i class="bi bi-sliders me-1"></i>Settings
                 </button>
             </li>
-            {% endif %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link px-3" id="userMenuAccountTab" data-bs-toggle="tab" data-bs-target="#userMenuAccount" type="button" role="tab" aria-controls="userMenuAccount" aria-selected="false">
                     <i class="bi bi-person-vcard me-1"></i>Account
@@ -186,7 +183,6 @@
             </div>
         </div>
 
-        {% if llm_choices|length > 1 or user.is_staff %}
         <div class="tab-pane fade" id="userMenuSettings" role="tabpanel" aria-labelledby="userMenuSettingsTab" tabindex="0">
             {# A single model leaves nothing to choose: the system default is that model. #}
             {% if llm_choices|length > 1 %}
@@ -282,6 +278,46 @@
             </script>
             {% endif %}
 
+            <div class="mb-7">
+                <h5 class="mb-1">Appearance</h5>
+                <p class="mb-3 fg-secondary">Light, dark, or follow your system's setting.</p>
+                <div class="btn-group d-flex w-100" role="radiogroup" aria-label="Colour mode">
+                    {% for value, label, icon in color_mode_choices %}
+                    <label class="btn-check btn-outline theme-secondary btn-sm flex-fill">
+                        <input type="radio" name="color-mode" value="{{ value }}" class="js-color-mode" autocomplete="off"{% if value == color_mode %} checked{% endif %}>
+                        <i class="bi {{ icon }}" aria-hidden="true"></i>{{ label }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <div id="color-mode-alert" class="alert theme-danger mt-3 py-3 px-5 small" role="alert" hidden></div>
+            </div>
+            <script>
+            (function () {
+              const alertBox = document.getElementById('color-mode-alert');
+              let saved = document.documentElement.dataset.colorMode;
+              document.querySelectorAll('.js-color-mode').forEach(function (radio) {
+                radio.addEventListener('change', async function () {
+                  window.setColorMode(radio.value);  // at once; undone if saving fails
+                  alertBox.hidden = true;
+                  const fd = new FormData();
+                  fd.append('mode', radio.value);
+                  fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+                  try {
+                    const r = await fetch('{% url "account_set_color_mode" %}', { method: 'POST', body: fd });
+                    const data = await r.json();
+                    if (!data.success) throw new Error();
+                    saved = radio.value;
+                  } catch (e) {
+                    window.setColorMode(saved);
+                    document.querySelector('.js-color-mode[value="' + saved + '"]').checked = true;
+                    alertBox.textContent = 'Could not save the setting. Please try again.';
+                    alertBox.hidden = false;
+                  }
+                });
+              });
+            })();
+            </script>
+
             {% if user.is_staff %}
             <div class="d-grid mb-7">
                 <a class="btn-outline theme-secondary d-flex align-items-center justify-content-center" href="{% url 'stats_dashboard' %}">
@@ -290,7 +326,6 @@
             </div>
             {% endif %}
         </div>
-        {% endif %}
 
         <div class="tab-pane fade" id="userMenuPrivacy" role="tabpanel" aria-labelledby="userMenuPrivacyTab" tabindex="0">
             <div class="mb-7">

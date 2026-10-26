@@ -498,6 +498,9 @@ class Config:
     # version of a ToxTemp: one submit of the answers page saves every answer, and a
     # drafting run saves them as they finish.
     _version_gap_seconds: Final[int] = 30
+    # Colour modes a user can pick in the Settings tab; "system" (the default)
+    # follows the operating system's light or dark setting.
+    _color_modes: Final[tuple[str, ...]] = ("system", "light", "dark")
     _email_confirmation_required_message: Final[str] = (
         "Please confirm your email address before generating drafts. Use the link "
         "in the email we sent you, or request a new one."

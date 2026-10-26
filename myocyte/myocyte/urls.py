@@ -137,6 +137,7 @@ urlpatterns += [
     path("account/password/", account.change_password, name="account_change_password"),
     path("account/orcid/unlink/", account.unlink_orcid, name="account_unlink_orcid"),
     path("account/credit/", account.set_credit_by_name, name="account_set_credit"),
+    path("account/color-mode/", account.set_color_mode, name="account_set_color_mode"),
     path("account/shared-files/", account.shared_files, name="account_shared_files"),
     path(
         "account/shared-files/stop/", account.stop_sharing, name="account_stop_sharing"

@@ -164,6 +164,7 @@ TEMPLATES = [
                 "toxtempass.context_processors.llm_info",
                 # Switchable email notifications for the offcanvas
                 "toxtempass.context_processors.email_preferences",
+                "toxtempass.context_processors.color_mode",
             ],
         },
     },

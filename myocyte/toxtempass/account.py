@@ -167,6 +167,29 @@ def set_credit_by_name(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"success": True, "credit": agreed})
 
 
+@login_required(login_url="/login/")
+@require_POST
+def set_color_mode(request: HttpRequest) -> JsonResponse:
+    """Remember whether the user wants light, dark, or their system's colour mode."""
+    mode = request.POST.get("mode", "")
+    if mode not in config._color_modes:
+        return JsonResponse(
+            {"success": False, "error": "Unknown colour mode."}, status=400
+        )
+
+    def mutate(prefs: dict) -> bool:
+        if prefs.get("color_mode", "system") == mode:
+            return False
+        if mode == "system":
+            prefs.pop("color_mode", None)
+        else:
+            prefs["color_mode"] = mode
+        return True
+
+    utilities.update_prefs_atomic(request.user, mutate)
+    return JsonResponse({"success": True, "mode": mode})
+
+
 def _shared_files_html(request: HttpRequest) -> str:
     """Render the Privacy tab's list of shared documents."""
     return render_to_string(

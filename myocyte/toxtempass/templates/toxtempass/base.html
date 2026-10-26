@@ -1,7 +1,7 @@
 {% load static %}
 {% load render_table from django_tables2 %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-color-mode="{{ color_mode }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -21,14 +21,22 @@
     <meta name="twitter:card" content="summary_large_image">
     {% block extra_head %}{% endblock %}
     <script>
-      // Bootstrap 6 follows the OS colour scheme through CSS, but a few of its rules
-      // (the <select> chevron) only react to data-bs-theme, so mirror the OS setting
-      // there. Runs before the stylesheet loads, so the page never flashes light.
+      // Light or dark: the user's choice from the Settings tab (data-color-mode), or
+      // the OS setting for "system". Set as data-bs-theme because a few Bootstrap 6
+      // rules (the <select> chevron) only react to the attribute. Runs before the
+      // stylesheet loads, so the page never flashes the wrong mode.
       (function () {
+        const root = document.documentElement;
         const dark = window.matchMedia("(prefers-color-scheme: dark)");
-        const apply = () => document.documentElement.setAttribute("data-bs-theme", dark.matches ? "dark" : "light");
+        const apply = () => {
+          const mode = root.dataset.colorMode;
+          const fixed = mode === "light" || mode === "dark";
+          root.setAttribute("data-bs-theme", fixed ? mode : dark.matches ? "dark" : "light");
+        };
         apply();
         dark.addEventListener("change", apply);
+        // The Settings tab switches the mode in place.
+        window.setColorMode = (mode) => { root.dataset.colorMode = mode; apply(); };
       })();
     </script>
     {# Our build of Bootstrap 6 from scss/bootstrap.scss (adds the "orange" theme colour). #}
