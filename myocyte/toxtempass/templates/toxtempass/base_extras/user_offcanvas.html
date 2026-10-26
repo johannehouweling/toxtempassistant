@@ -135,12 +135,12 @@
                 <div class="collapse" id="accountEmailChange">
                     <form class="js-account-form mb-5" data-url="{% url 'account_request_email_change' %}" novalidate>
                         <div class="form-floating mb-3">
-                            <input type="email" class="form-control" id="account-new-email" name="new_email" placeholder="New email address" autocomplete="email" required>
                             <label for="account-new-email">New email address</label>
+                            <input type="email" class="form-control" id="account-new-email" name="new_email" placeholder="name@example.org" autocomplete="email" required>
                         </div>
                         <div class="form-floating">
-                            <input type="password" class="form-control" id="account-email-password" name="password" placeholder="Current password" autocomplete="current-password" required>
                             <label for="account-email-password">Current password</label>
+                            <input type="password" class="form-control" id="account-email-password" name="password" placeholder=" " autocomplete="current-password" required>
                         </div>
                         <div class="form-text">We send a confirmation link to the new address. You keep using your current address until you follow it.</div>
                         <div class="d-grid mt-3">
@@ -156,16 +156,16 @@
                 <div class="collapse" id="accountPasswordChange">
                     <form class="js-account-form mb-5" data-url="{% url 'account_change_password' %}" data-reset="true" novalidate>
                         <div class="form-floating mb-3">
-                            <input type="password" class="form-control" id="account-old-password" name="old_password" placeholder="Current password" autocomplete="current-password" required>
                             <label for="account-old-password">Current password</label>
+                            <input type="password" class="form-control" id="account-old-password" name="old_password" placeholder=" " autocomplete="current-password" required>
                         </div>
                         <div class="form-floating mb-3">
-                            <input type="password" class="form-control" id="account-new-password1" name="new_password1" placeholder="New password" autocomplete="new-password" required>
                             <label for="account-new-password1">New password</label>
+                            <input type="password" class="form-control" id="account-new-password1" name="new_password1" placeholder=" " autocomplete="new-password" required>
                         </div>
                         <div class="form-floating">
-                            <input type="password" class="form-control" id="account-new-password2" name="new_password2" placeholder="New password again" autocomplete="new-password" required>
                             <label for="account-new-password2">New password again</label>
+                            <input type="password" class="form-control" id="account-new-password2" name="new_password2" placeholder=" " autocomplete="new-password" required>
                         </div>
                         <div class="d-grid mt-3">
                             <button type="submit" class="btn-sm btn-solid theme-primary">Change password</button>

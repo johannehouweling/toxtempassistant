@@ -49,8 +49,9 @@ def test_floating_label_comes_before_its_control():
     )
     floating = html.index('<div class="form-floating">')
     assert floating < html.index("<label") < html.index("<input")
-    # A floating label needs a placeholder to know when to float.
-    assert 'placeholder="Title"' in html
+    # A floating label needs a placeholder to know when to float, but not the
+    # label again: Bootstrap 6 shows it under the floated label on focus.
+    assert 'placeholder=" "' in html
 
 
 def test_checkbox_and_switch():

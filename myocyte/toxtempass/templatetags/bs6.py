@@ -123,10 +123,15 @@ def render_field(
     own_label = getattr(widget, "renders_own_label", False)
     floating = layout == "floating" and _can_float(widget) and not own_label
     if _takes_placeholder(widget) and "placeholder" not in widget.attrs:
-        text = field.label if placeholder is None else placeholder
-        # A floating label shows while the placeholder is shown, so it needs one.
-        if text or floating:
-            attrs["placeholder"] = strip_tags(str(text or field.label))
+        if floating:
+            # Floating needs a placeholder to know when to float, and Bootstrap 6
+            # shows it under the floated label on focus: a hint, or a blank, never
+            # the label again.
+            attrs["placeholder"] = strip_tags(str(placeholder)) if placeholder else " "
+        else:
+            text = field.label if placeholder is None else placeholder
+            if text:
+                attrs["placeholder"] = strip_tags(str(text))
 
     if isinstance(widget, CheckboxInput):
         kind = "switch" if _is_switch(widget) else "check"
