@@ -100,15 +100,15 @@
     .md-preview > :last-child { margin-bottom: 0; }
   </style>
 <body data-url-name="{{ current_url_name }}">
-        <header class="sticky-md-top">
+        <header class="md:sticky-top">
             <div class="card bg-white border-0">
-                <div class="card m-3 border-0 d-flex align-items-center flex-row bg-primary" style="height:100px;"> <!--background-color:var(--bs-indigo);-->           
-                    <h2 class="m-3 text-white fs-2 fs-md-1" id="id_headline"><a href="{%url 'overview'%}" class="text-decoration-none text-white"><i class="bi bi-clipboard-heart me-2"></i><b>ToxTemp</b>Assistant</a></h2>
-                    <span class="badge d-none d-md-block bg-warning text-dark" data-bs-toggle="tooltip" data-bs-custom-class="header-tooltip" title="This app is still in beta. Features may change."><a class="text-decoration-none text-dark" href="https://github.com/johannehouweling/ToxTempAssistant/releases">{{config.version}}</a></span>
+                <div class="card m-5 border-0 d-flex align-items-center flex-row bg-primary" style="height:100px;"> <!--background-color:var(--bs-indigo);-->           
+                    <h2 class="m-5 fg-white fs-3xl" id="id_headline"><a href="{%url 'overview'%}" class="text-decoration-none fg-white"><i class="bi bi-clipboard-heart me-3"></i><b>ToxTemp</b>Assistant</a></h2>
+                    <span class="badge d-none md:d-block theme-warning" data-bs-toggle="tooltip" data-bs-custom-class="header-tooltip" title="This app is still in beta. Features may change."><a class="text-decoration-none fg-black" href="https://github.com/johannehouweling/ToxTempAssistant/releases">{{config.version}}</a></span>
                     {% if user.is_authenticated %} 
-                    <span class="btn orcid-icon-container btn-outline-light ms-auto fs-6 me-3" id="id_user_menu" tabindex="0" role="button" data-bs-toggle="offcanvas" href="#offcanvasUser">
+                    <span class="btn orcid-icon-container btn-outline-light ms-auto fs-md me-5" id="id_user_menu" tabindex="0" role="button" data-bs-toggle="drawer" href="#offcanvasUser">
                         <i class="bi bi-person-badge"></i>
-                        <div class="d-none d-lg-block">
+                        <div class="d-none lg:d-block">
                           {{ user.email }}
                           {% if user.orcid_id%}<br>
                               <div class="position-relative d-inline-block">
@@ -125,9 +125,9 @@
                     </span>
                     {% elif current_url_name == 'about' %}
                     {# Phones only get "Log in", so the button fits next to the logo. #}
-                    <a class="btn btn-outline-light ms-auto me-3" href="{% url 'overview' %}"><span class="d-none d-sm-inline">Sign up / </span>Log in</a>
+                    <a class="btn btn-outline-light ms-auto me-5" href="{% url 'overview' %}"><span class="d-none sm:d-inline">Sign up / </span>Log in</a>
                     {% else %}
-                    <a class="btn btn-outline-light ms-auto me-3" href="{% url 'about' %}">About</a>
+                    <a class="btn btn-outline-light ms-auto me-5" href="{% url 'about' %}">About</a>
                     {%endif%}
                 </div>
             </div>
@@ -141,15 +141,15 @@
          {% endif %}
 
 
-        <div class="container px-3 py-4">
+        <div class="container px-5 py-7">
             {% if user.is_authenticated and not user.has_confirmed_email %}
-            <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2" role="alert">
+            <div class="alert theme-warning d-flex flex-wrap align-items-center gap-3" role="alert">
                 <i class="bi bi-envelope-exclamation"></i>
                 <span class="me-auto">
                     Please confirm your email address with the link we sent to <strong>{{ user.email }}</strong>.
                     You need it to generate drafts{% if user.delete_if_unconfirmed %}, and unconfirmed accounts are deleted after {{ unconfirmed_account_delete_days }} days{% endif %}.
                 </span>
-                <button type="button" class="btn btn-sm btn-outline-dark js-resend-confirmation" data-url="{% url 'resend_confirmation_email' %}">Send the link again</button>
+                <button type="button" class="btn-sm btn-outline theme-inverse js-resend-confirmation" data-url="{% url 'resend_confirmation_email' %}">Send the link again</button>
                 <span class="small w-100 js-resend-confirmation-result" hidden></span>
             </div>
             <script>
@@ -183,17 +183,17 @@
         {# Logged-in users reach these from the user menu; the footer gives visitors and crawlers a path to the public pages. #}
         {% if not user.is_authenticated %}
         <footer class="border-top">
-            <div class="container px-3 py-4">
-                <nav class="d-flex flex-wrap gap-3 small" aria-label="Site">
-                    <a class="link-secondary" href="{% url 'about' %}">About</a>
-                    <a class="link-secondary" href="{% url 'toxtemp_questions' %}">ToxTemp questions</a>
-                    <a class="link-secondary" href="{% url 'about' %}#how-to-cite">How to cite</a>
-                    <a class="link-secondary" href="{% url 'terms_of_service' %}">Terms of Service</a>
-                    <a class="link-secondary" href="{% url 'license' %}">License</a>
-                    <a class="link-secondary" href="{{ config.github_repo_url }}" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <div class="container px-5 py-7">
+                <nav class="d-flex flex-wrap gap-5 small" aria-label="Site">
+                    <a class="fg-secondary" href="{% url 'about' %}">About</a>
+                    <a class="fg-secondary" href="{% url 'toxtemp_questions' %}">ToxTemp questions</a>
+                    <a class="fg-secondary" href="{% url 'about' %}#how-to-cite">How to cite</a>
+                    <a class="fg-secondary" href="{% url 'terms_of_service' %}">Terms of Service</a>
+                    <a class="fg-secondary" href="{% url 'license' %}">License</a>
+                    <a class="fg-secondary" href="{{ config.github_repo_url }}" target="_blank" rel="noopener noreferrer">GitHub</a>
                 </nav>
-                <p class="small text-body-secondary mt-2 mb-0">
-                    ToxTempAssistant is open source (AGPL-3.0) and developed within <a class="text-reset" href="https://vhp4safety.nl/" target="_blank" rel="noopener noreferrer">VHP4Safety</a>. The ToxTemp template is by Krebs et al. (2019).
+                <p class="small fg-secondary mt-3 mb-0">
+                    ToxTempAssistant is open source (AGPL-3.0) and developed within <a class="fg-reset" href="https://vhp4safety.nl/" target="_blank" rel="noopener noreferrer">VHP4Safety</a>. The ToxTemp template is by Krebs et al. (2019).
                 </p>
             </div>
         </footer>
@@ -201,7 +201,7 @@
         <script>
           // Modal bodies with data-lazy-src fetch their content the first time the
           // modal opens, so long documents (terms, license) aren't shipped in every page.
-          document.addEventListener("show.bs.modal", function (event) {
+          document.addEventListener("show.bs.dialog", function (event) {
             const body = event.target.querySelector("[data-lazy-src]");
             if (!body || body.dataset.lazyState) return;
             body.dataset.lazyState = "loading";
@@ -216,7 +216,7 @@
               })
               .catch(function () {
                 delete body.dataset.lazyState;  // try again on the next open
-                body.innerHTML = '<p class="text-danger">Could not load this document. '
+                body.innerHTML = '<p class="fg-danger">Could not load this document. '
                   + '<a href="' + body.dataset.lazyPage + '" target="_blank" rel="noopener">Open it as a page</a>.</p>';
               });
           });

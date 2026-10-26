@@ -297,7 +297,7 @@ class MultipleFileInput(forms.ClearableFileInput):
         # Inline progress bar and filename display (optional inline display)
         inline_progress_html = mark_safe(
             """
-            <div class="progress mt-2" style="height: 20px; display:none;" id="uploadProgressContainer">
+            <div class="progress mt-3" style="height: 20px; display:none;" id="uploadProgressContainer">
               <div
                 class="progress-bar progress-bar-striped progress-bar-animated"
                 role="progressbar"
@@ -317,14 +317,14 @@ class MultipleFileInput(forms.ClearableFileInput):
         # Bootstrap modal for centralized upload progress
         modal_html = mark_safe(
             """
-            <div class="modal fade" id="uploadProgressModal" tabindex="-1" aria-labelledby="uploadProgressModalLabel" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="dialog fade" id="uploadProgressModal" tabindex="-1" aria-labelledby="uploadProgressModalLabel" aria-hidden="true">
+              <div class="modal-dialog" role="document">
                 <div class="modal-content">
-                  <div class="modal-header">
-                    <h5 class="modal-title" id="uploadProgressModalLabel">File Upload Progress</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  <div class="dialog-header">
+                    <h5 class="dialog-title" id="uploadProgressModalLabel">File Upload Progress</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
                   </div>
-                  <div class="modal-body">
+                  <div class="dialog-body">
                     <div class="progress" style="height: 25px;">
                       <div
                         class="progress-bar progress-bar-striped progress-bar-animated"
@@ -337,7 +337,7 @@ class MultipleFileInput(forms.ClearableFileInput):
                         0%
                       </div>
                     </div>
-                    <div id="uploadProgressFilenameModal" class="small mt-2 text-truncate"></div>
+                    <div id="uploadProgressFilenameModal" class="small mt-3 text-truncate"></div>
                   </div>
                 </div>
               </div>
@@ -457,7 +457,7 @@ class StartingForm(forms.Form):
             """
         Optional: allow the development team to use your uploaded context files to
          benchmark and improve automated pre-population of ToxTemp questionnaires.
-        <a class="link-secondary"
+        <a class="fg-secondary"
            data-bs-toggle="collapse"
            href="#consentDetails"
            role="button"

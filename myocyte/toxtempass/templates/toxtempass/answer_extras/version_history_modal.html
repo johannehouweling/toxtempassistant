@@ -1,19 +1,19 @@
 <!-- Version History Modal -->
-<div class="modal fade" id="versionHistoryModal" tabindex="-1" aria-labelledby="versionHistoryLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
+<div class="dialog fade" id="versionHistoryModal" tabindex="-1" aria-labelledby="versionHistoryLabel" aria-hidden="true">
+    <div class="modal-dialog dialog-xl">
       <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="versionHistoryLabel">Version History</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="dialog-header">
+          <h5 class="dialog-title" id="versionHistoryLabel">Version History</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
         </div>
-        <div class="modal-body">
+        <div class="dialog-body">
           <!-- Content will be loaded dynamically via AJAX -->
           <div id="modal-body-content">
             <p>Loading version history...</p>
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <div class="dialog-footer">
+          <button type="button" class="btn-solid theme-secondary" data-bs-dismiss="dialog">Close</button>
         </div>
       </div>
     </div>
@@ -26,7 +26,7 @@
       var modalBody = document.getElementById('modal-body-content');
   
       // Add event listener to the modal to fire when it is about to be shown
-      modal.addEventListener('show.bs.modal', function (event) {
+      modal.addEventListener('show.bs.dialog', function (event) {
         // Button that triggered the modal
         var button = event.relatedTarget;
         // Extract model_id, assay_id, and question_id from data-* attributes

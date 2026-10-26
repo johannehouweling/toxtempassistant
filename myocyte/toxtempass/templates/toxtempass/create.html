@@ -10,7 +10,7 @@
     <div id="non-field-errors"></div>
     {% csrf_token %}
     {% if workspace_creation_warning %}
-      <div class="alert alert-warning">{{ workspace_creation_warning }}</div>
+      <div class="alert theme-warning">{{ workspace_creation_warning }}</div>
     {% endif %}
     {% bootstrap_form form layout='floating'%}
     {% bootstrap_button button_type="submit" content="Save" button_class="btn-solid theme-primary" %}

@@ -30,31 +30,31 @@ function feedback_export(export_url,assay_id){
 </script>
 
 <!-- Feedback Modal -->
-<div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
+<div class="dialog fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
     <div class="modal-dialog">
       <form id="feedbackForm" class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="feedbackModalLabel">Submit Feedback Before Export </h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="dialog-header">
+          <h5 class="dialog-title" id="feedbackModalLabel">Submit Feedback Before Export </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
         </div>
-        <div class="modal-body">
-            <p class="text-muted small mb-4 d-flex align-items-start">
-                <i class="bi bi-info-circle-fill me-2 text-primary" aria-hidden="true"></i>
+        <div class="dialog-body">
+            <p class="fg-secondary small mb-7 d-flex align-items-start">
+                <i class="bi bi-info-circle-fill me-3 fg-primary" aria-hidden="true"></i>
                 <span>
                   Prior to exporting your ToxTemp draft, we ask you to provide brief feedback.
                   Your input contributes to the refinement of both the LLM-generated content and the ToxTempAssistant as documentation support tool for toxicologists.
                 </span>
             </p>
 
-            <div class="mb-3">
+            <div class="mb-5">
                 <label for="feedbackText" class="form-label">What did you think of the LLM-generated responses? </label>
                 <div class="form-text"> 
                     Please comment on its usefulness, clarity, scientific accuracy, or anything else that stood out, including what worked well or what needs improvement.
                 </div>
-                <textarea class="form-control mt-2 exclude-autoResizeTextarea" id="feedbackText" name="feedback" rows="10" required style="height: 150px !important;"></textarea>
+                <textarea class="form-control mt-3 exclude-autoResizeTextarea" id="feedbackText" name="feedback" rows="10" required style="height: 150px !important;"></textarea>
               </div>
               
-              <div class="mb-3">
+              <div class="mb-5">
                 <label for= "usefulnessRating" class="form-label">How would you rate the usefulness of the LLM-generated ToxTemp draft?</label>
                 <div class="form-text">
                     “Useful” refers to whether the draft helped you get started, saved time, or provided relevant structure or content.
@@ -62,7 +62,7 @@ function feedback_export(export_url,assay_id){
                 <!-- Slider -->
                 <input 
                     type="range" 
-                    class="form-range mt-3" 
+                    class="form-range mt-5" 
                     id="usefulnessRating"  
                     min="1" max="5" step="0.1" value="3"
                     name="usefulness_rating" 
@@ -70,12 +70,12 @@ function feedback_export(export_url,assay_id){
                     oninput="document.getElementById('ratingValue').textContent = this.value"
                 />
                 <!-- Tick labels below slider -->
-                <div class="d-flex justify-content-between text-muted small px-1 mt-0">
+                <div class="d-flex justify-content-between fg-secondary small px-1 mt-0">
                     <div class="text-start"><em>Not useful</em></div>
                     <div class="text-end"><em>Very useful</em></div>
                 </div>            
                 <!-- Value display -->
-                <div class="form-text mt-3">
+                <div class="form-text mt-5">
                     Selected rating: <strong id="ratingValue">3</strong / 5
                 </div>
             </div>
@@ -85,8 +85,8 @@ function feedback_export(export_url,assay_id){
 
           <input type="hidden" id="assayIdInput" name="assay_id" />
         </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-primary">Submit Feedback</button>
+        <div class="dialog-footer">
+          <button type="submit" class="btn-solid theme-primary">Submit Feedback</button>
         </div>
       </form>
     </div>
@@ -96,7 +96,7 @@ function feedback_export(export_url,assay_id){
     const FEEDBACK_USER_ID = parseInt('{{ request.user.id }}', 10);
 
     function openFeedbackModal(export_url, assay_id) {
-        const modal = new bootstrap.Modal(document.getElementById('feedbackModal'));
+        const modal = new bootstrap.Dialog(document.getElementById('feedbackModal'));
         document.getElementById('assayIdInput').value = assay_id;
         window.pending_export_url = export_url;
         modal.show();
@@ -141,7 +141,7 @@ function feedback_export(export_url,assay_id){
                 localStorage.removeItem(storageKey);
 
                 alert("Feedback submitted successfully!");
-                bootstrap.Modal.getInstance(document.getElementById('feedbackModal')).hide();
+                bootstrap.Dialog.getInstance(document.getElementById('feedbackModal')).hide();
                 form.reset();
                 
                 // Continue to export

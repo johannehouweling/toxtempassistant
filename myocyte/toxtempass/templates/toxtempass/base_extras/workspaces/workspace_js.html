@@ -15,11 +15,11 @@
       // If moving fails, still attempt to show modal in place
     }
 
-    const modal = new bootstrap.Modal(modalEl);
+    const modal = new bootstrap.Dialog(modalEl);
 
     // Ensure the modal and its backdrop render above the offcanvas
     modalEl.addEventListener(
-      "shown.bs.modal",
+      "shown.bs.dialog",
       function () {
         const backdrop = document.querySelector(".modal-backdrop");
         // Give the modal and its backdrop a high z-index so they render above the offcanvas.
@@ -30,7 +30,7 @@
     );
 
     modalEl.addEventListener(
-      "hidden.bs.modal",
+      "hidden.bs.dialog",
       function () {
         // cleanup inline styles
         modalEl.style.zIndex = "";
@@ -57,7 +57,7 @@
     const container = document.getElementById("ownedWorkspacesContainer");
     if (!container) return;
     const placeholders = Array.from(
-      container.querySelectorAll(".col > .text-muted"),
+      container.querySelectorAll(".col > .fg-secondary"),
     );
     for (const el of placeholders) {
       if (
@@ -75,10 +75,10 @@
     const container = document.getElementById("ownedWorkspacesContainer");
     if (!container) return;
     // If there are any workspace cards (or the placeholder), don't add another
-    if (container.querySelector(".workspace-list, .col > .text-muted")) return;
+    if (container.querySelector(".workspace-list, .col > .fg-secondary")) return;
     const col = document.createElement("div");
     col.className = "col";
-    col.innerHTML = `<div class="text-muted">You don't own any workspace yet.</div>`;
+    col.innerHTML = `<div class="fg-secondary">You don't own any workspace yet.</div>`;
     container.appendChild(col);
   }
 
@@ -123,13 +123,12 @@
   const CURRENT_USER_ID = "{{ request.user.id }}";
   const CURRENT_USER_EMAIL = "{{ request.user.email|escapejs }}";
   const OWNER_CHIP_HTML =
-    '<span class="d-inline-flex align-items-center bg-success-subtle member-row member-chip" data-user-id="' +
+    '<span class="d-inline-flex align-items-center bg-subtle-success member-row member-chip" data-user-id="' +
     CURRENT_USER_ID +
-    '"><span class="d-inline-flex align-items-center justify-content-center bg-success fw-bold text-white member-avatar"><i class="bi bi-key-fill"></i></span><span class="member-text">You</span></span>';
+    '"><span class="d-inline-flex align-items-center justify-content-center bg-success fw-bold fg-white member-avatar"><i class="bi bi-key-fill"></i></span><span class="member-text">You</span></span>';
   function settingsButtonHtml(hidden) {
     return (
-      '<button type="button" class="btn btn-sm btn-outline-secondary border-0 btn-api-tokens' +
-      (hidden ? " d-none" : "") +
+      '<button type="button" class="btn-sm btn-outline theme-secondary border-0 btn-api-tokens' + (hidden ?" d-none" : "") +
       '" title="Workspace settings" aria-label="Workspace settings"><i class="bi bi-gear"></i></button>'
     );
   }
@@ -148,29 +147,29 @@
       <div class="card border-0 h-100 workspace-card workspace-list" data-workspace-id="0" data-can-remove="1">
         <div class="card-header d-flex align-items-center justify-content-between border-0 workspace-card-header">
           <span class="fw-semibold form-control px-0 border-0 workspace-name" style="font-size:.95rem;" contenteditable="true">New workspace</span>
-          <div class="d-flex align-items-center gap-2">
+          <div class="d-flex align-items-center gap-3">
             ${settingsButtonHtml(true)}
-            <button type="button" class="btn btn-sm btn-outline-danger border-0 workspace-delete-btn" title="Delete workspace" aria-label="Delete workspace">
+            <button type="button" class="btn-sm btn-outline theme-danger border-0 workspace-delete-btn" title="Delete workspace" aria-label="Delete workspace">
               <i class="bi bi-trash"></i>
             </button>
           </div>
         </div>
         <div class="card-body workspace-card-body pt-0">
-          <div class="mb-3">
-            <div class="text-uppercase fw-semibold mb-2 section-label">Members</div>
-            <div class="d-flex flex-wrap align-items-center gap-2 members-wrap">
+          <div class="mb-5">
+            <div class="text-uppercase fw-semibold mb-3 section-label">Members</div>
+            <div class="d-flex flex-wrap align-items-center gap-3 members-wrap">
               ${OWNER_CHIP_HTML}
-              <button type="button" class="btn btn-sm btn-outline-primary btn-add-member round-add-btn" title="Add member" aria-label="Add member">
+              <button type="button" class="btn-sm btn-outline theme-primary btn-add-member round-add-btn" title="Add member" aria-label="Add member">
                 <i class="bi bi-person-plus"></i>
               </button>
             </div>
           </div>
           <div>
 
-                <div class="text-uppercase fw-semibold mb-2 section-label">Shared Investigations</div>
-            <div class="d-flex flex-wrap align-items-center gap-2 assays-wrap">
-              <span class="text-muted small empty-assays">No investigations shared</span>
-              <button type="button" class="btn btn-sm btn-outline-secondary btn-add-assay round-add-btn" title="Add assay" aria-label="Add assay">
+                <div class="text-uppercase fw-semibold mb-3 section-label">Shared Investigations</div>
+            <div class="d-flex flex-wrap align-items-center gap-3 assays-wrap">
+              <span class="fg-secondary small empty-assays">No investigations shared</span>
+              <button type="button" class="btn-sm btn-outline theme-secondary btn-add-assay round-add-btn" title="Add assay" aria-label="Add assay">
                 <i class="bi bi-plus-circle"></i>
               </button>
             </div>
@@ -251,30 +250,30 @@
       <div class="card border-0 h-100 workspace-card workspace-list" data-workspace-id="${pk}" data-can-remove="1">
           <div class="card-header d-flex align-items-center justify-content-between border-0 workspace-card-header">
           <span class="fw-semibold form-control px-0 border-0 workspace-name" style="font-size:.95rem;" contenteditable="false">${escapeHtml(name || "New workspace")}</span>
-          <div class="d-flex align-items-center gap-2">
+          <div class="d-flex align-items-center gap-3">
             ${settingsButtonHtml(false)}
-            <button type="button" class="btn btn-sm btn-outline-danger border-0 workspace-delete-btn" title="Delete workspace" aria-label="Delete workspace">
+            <button type="button" class="btn-sm btn-outline theme-danger border-0 workspace-delete-btn" title="Delete workspace" aria-label="Delete workspace">
               <i class="bi bi-trash"></i>
             </button>
           </div>
         </div>
 
         <div class="card-body workspace-card-body pt-0">
-          <div class="mb-3">
-            <div class="text-uppercase fw-semibold mb-2 section-label">Members</div>
-            <div class="d-flex flex-wrap align-items-center gap-2 members-wrap">
+          <div class="mb-5">
+            <div class="text-uppercase fw-semibold mb-3 section-label">Members</div>
+            <div class="d-flex flex-wrap align-items-center gap-3 members-wrap">
               ${OWNER_CHIP_HTML}
-              <button type="button" class="btn btn-sm btn-outline-primary btn-add-member round-add-btn" title="Add member" aria-label="Add member">
+              <button type="button" class="btn-sm btn-outline theme-primary btn-add-member round-add-btn" title="Add member" aria-label="Add member">
                 <i class="bi bi-person-plus"></i>
               </button>
             </div>
           </div>
 
           <div>
-            <div class="text-uppercase fw-semibold mb-2 section-label">Shared Investigations</div>
-            <div class="d-flex flex-wrap align-items-center gap-2 assays-wrap">
-              <span class="text-muted small empty-assays">No investigations shared</span>
-              <button type="button" class="btn btn-sm btn-outline-secondary btn-add-assay round-add-btn" title="Add assay" aria-label="Add assay">
+            <div class="text-uppercase fw-semibold mb-3 section-label">Shared Investigations</div>
+            <div class="d-flex flex-wrap align-items-center gap-3 assays-wrap">
+              <span class="fg-secondary small empty-assays">No investigations shared</span>
+              <button type="button" class="btn-sm btn-outline theme-secondary btn-add-assay round-add-btn" title="Add assay" aria-label="Add assay">
                 <i class="bi bi-plus-circle"></i>
               </button>
             </div>
@@ -319,7 +318,7 @@
         .then((data) => {
           if (data.success) {
             insertWorkspaceIntoDOM(data, name);
-            bootstrap.Modal.getInstance(
+            bootstrap.Dialog.getInstance(
               document.getElementById("createWorkspaceModal"),
             ).hide();
           } else {
@@ -384,7 +383,7 @@
             return;
           }
 
-          bootstrap.Modal.getInstance(modalEl).hide();
+          bootstrap.Dialog.getInstance(modalEl).hide();
 
           const workspaceEl = document.querySelector(
             `.workspace-list[data-workspace-id='${gid}']`,
@@ -400,12 +399,12 @@
           const memberEmailRaw = (data.member_email || email).trim();
           const chip = document.createElement("span");
           chip.className =
-            "d-inline-flex align-items-center member-chip invite-row text-muted";
+            "d-inline-flex align-items-center member-chip invite-row fg-secondary";
           chip.dataset.invitationId = data.invitation_id || "";
           chip.title = "Invitation sent, not accepted yet";
           const avatar = document.createElement("span");
           avatar.className =
-            "d-inline-flex align-items-center justify-content-center fw-bold text-white member-avatar";
+            "d-inline-flex align-items-center justify-content-center fw-bold fg-white member-avatar";
           avatar.innerHTML = '<i class="bi bi-patch-question-fill"></i>';
           const text = document.createElement("span");
           text.className = "member-text";
@@ -413,7 +412,7 @@
           const cancel = document.createElement("button");
           cancel.type = "button";
           cancel.className =
-            "btn btn-link p-0 m-0 text-secondary btn-cancel-invitation";
+            "btn btn-link p-0 m-0 fg-secondary btn-cancel-invitation";
           cancel.title = "Cancel invitation";
           cancel.setAttribute("aria-label", `Cancel invitation for ${memberEmailRaw}`);
           cancel.innerHTML = '<i class="bi bi-x"></i>';
@@ -518,7 +517,7 @@
             return;
           }
 
-          bootstrap.Modal.getInstance(modalEl).hide();
+          bootstrap.Dialog.getInstance(modalEl).hide();
 
           const workspaceEl = document.querySelector(
             `.workspace-list[data-workspace-id='${gid}']`,
@@ -549,7 +548,7 @@
           ${
             canRemove
               ? `
-            <button type="button" class="btn btn-link p-0 m-0 text-secondary btn-remove-assay" data-assay-id="${assayId}"
+            <button type="button" class="btn btn-link p-0 m-0 fg-secondary btn-remove-assay" data-assay-id="${assayId}"
                     aria-label="Remove investigation ${escapeHtml(title)}" title="Remove investigation ${escapeHtml(title)}">
               <i class="bi bi-x"></i>
             </button>`
@@ -777,7 +776,7 @@
           chip.title = `API token "${t.name}": an external server can read the investigations shared in this workspace`;
           const avatar = document.createElement("span");
           avatar.className =
-            "d-inline-flex align-items-center justify-content-center fw-bold text-white member-avatar";
+            "d-inline-flex align-items-center justify-content-center fw-bold fg-white member-avatar";
           const icon = document.createElement("i");
           icon.className = "bi bi-hdd-network-fill";
           avatar.appendChild(icon);
@@ -791,7 +790,7 @@
       listEl.replaceChildren();
       if (!tokens.length) {
         const none = document.createElement("div");
-        none.className = "text-muted small";
+        none.className = "fg-secondary small";
         none.textContent = "No active tokens.";
         listEl.appendChild(none);
         return;
@@ -804,7 +803,7 @@
         info.textContent = `${t.name} (${t.prefix}…) · expires ${new Date(t.expires_at).toLocaleDateString()} · last used ${used}`;
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "btn btn-sm btn-outline-danger";
+        btn.className = "btn-sm btn-outline theme-danger";
         btn.textContent = "Revoke";
         btn.addEventListener("click", () => {
           fetch(`/workspace/${gid()}/tokens/${t.id}/revoke/`, {

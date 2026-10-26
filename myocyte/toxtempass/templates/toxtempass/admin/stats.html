@@ -144,10 +144,10 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
 <div class="readout">
 
   {# ── Masthead ─────────────────────────────────────────────────────────── #}
-  <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 pb-3 mb-4"
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-5 pb-5 mb-7"
        style="border-bottom: 1px solid var(--rule)">
     <h1 class="h4 mb-0" style="letter-spacing:-.02em">Usage stats</h1>
-    <div class="d-flex flex-wrap align-items-center gap-3">
+    <div class="d-flex flex-wrap align-items-center gap-5">
       <div class="seg d-flex">
         {% for key, label in stats.ranges %}
         <a href="?range={{ key }}" {% if key == stats.range.key %}aria-current="page"{% endif %}>{{ label }}</a>
@@ -159,7 +159,7 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
           <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
         </a>
       </div>
-      <div class="d-flex gap-3">
+      <div class="d-flex gap-5">
         <a class="note text-decoration-underline" href="{% url 'stats_export_csv' %}?range={{ stats.range.key }}">Download CSV</a>
         <a class="note text-decoration-underline" href="{% url 'stats_data' %}?range={{ stats.range.key }}" target="_blank" rel="noopener">JSON</a>
       </div>
@@ -170,13 +170,13 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
   {% comment %} The inked card carries the headline count; the four beside it are the
      numbers a reader who has never seen the app can still weigh. Hierarchy is
      fill and scale — every card has the same border, radius and no shadow. {% endcomment %}
-  <div class="row g-3 mb-4">
-    <div class="col-12 col-lg-5">
+  <div class="row g-5 mb-7">
+    <div class="col-12 lg:col-5">
       <div class="stat stat-brand">
         <div class="fig fig-hero">{{ stats.headline.assays.period|intcomma }}</div>
         <div class="stat-label">ToxTemps created</div>
 
-        <div class="mt-auto pt-4">
+        <div class="mt-auto pt-7">
           <div class="bar bar-tall" role="img"
                aria-label="{{ stats.headline.completed_assays.period }} complete, {{ stats.headline.assays.in_progress }} in progress, {{ stats.headline.assays.untouched }} not started">
             <i class="b1" style="width: {{ stats.headline.completed_assays.pct }}%"></i>
@@ -185,7 +185,7 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
           </div>
           {% comment %} Every band gets a key: with one omitted the numbers look like they
              do not add up, because the reader has nothing to subtract. {% endcomment %}
-          <div class="d-flex flex-wrap gap-4 mt-3">
+          <div class="d-flex flex-wrap gap-7 mt-5">
             <span class="key b1"><span><b>{{ stats.headline.completed_assays.period|intcomma }}</b> complete</span></span>
             <span class="key b2"><span><b>{{ stats.headline.assays.in_progress|intcomma }}</b> in progress</span></span>
             <span class="key b3"><span><b>{{ stats.headline.assays.untouched|intcomma }}</b> not started</span></span>
@@ -194,8 +194,8 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
       </div>
     </div>
 
-    <div class="col-12 col-lg-7">
-      <div class="row g-3">
+    <div class="col-12 lg:col-7">
+      <div class="row g-5">
         <div class="col-6">
           <div class="stat">
             <div class="fig fig-lg">{{ stats.headline.organisations.period|intcomma }}</div>
@@ -226,19 +226,19 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
             {% comment %} Each key states its own band; the big figure is the accepted
                band, so only the other three need a key. The same four labels are
                used in the section bars below. {% endcomment %}
-            <div class="bar mt-3" role="img"
+            <div class="bar mt-5" role="img"
                  aria-label="{{ p.accepted }} percent accepted by an expert, {{ p.drafted }} percent drafted, {{ p.not_found }} percent answer not found, {{ p.empty }} percent empty">
               <i class="b1" style="width: {{ p.accepted }}%"></i>
               <i class="b2" style="width: {{ p.drafted }}%"></i>
               <i class="bn" style="width: {{ p.not_found }}%"></i>
               <i class="b3" style="width: {{ p.empty }}%"></i>
             </div>
-            <div class="d-flex flex-wrap gap-3 mt-2">
+            <div class="d-flex flex-wrap gap-5 mt-3">
               <span class="key b2"><span><b>{{ p.drafted }}%</b> drafted</span></span>
               <span class="key bn"><span><b>{{ p.not_found }}%</b> answer not found</span></span>
               <span class="key b3"><span><b>{{ p.empty }}%</b> empty</span></span>
             </div>
-            <div class="note mt-2">Average over the {{ p.assays|intcomma }} ToxTemp{{ p.assays|pluralize }} with answers{% if p.without_answers %}; {{ p.without_answers|intcomma }} of the {{ stats.headline.assays.period|intcomma }} created have none yet, because no documents were uploaded{% endif %}.</div>
+            <div class="note mt-3">Average over the {{ p.assays|intcomma }} ToxTemp{{ p.assays|pluralize }} with answers{% if p.without_answers %}; {{ p.without_answers|intcomma }} of the {{ stats.headline.assays.period|intcomma }} created have none yet, because no documents were uploaded{% endif %}.</div>
           </div>
           {% endwith %}
         </div>
@@ -269,7 +269,7 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
       <h2>Institutions using ToxTempAssistant</h2>
     </div>
     <div class="row g-0">
-      <div class="col-12 col-lg-8">
+      <div class="col-12 lg:col-8">
         <div class="panel-bd">
           <table class="table table-sm align-middle mb-0">
             <thead class="small">
@@ -296,7 +296,7 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
         </div>
       </div>
 
-      <div class="col-12 col-lg-4 split">
+      <div class="col-12 lg:col-4 split">
         <div class="panel-bd">
           <div class="fig fig-md">{{ stats.collaboration.shared_workspaces|intcomma }}</div>
           <div class="unit" data-bs-toggle="tooltip"
@@ -304,9 +304,9 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
             shared workspaces <i class="bi bi-info-circle" aria-hidden="true"></i>
           </div>
           {% if stats.collaboration.workspaces %}
-          <ul class="list-group list-group-flush small mt-3 mb-0">
+          <ul class="list-group list-group-flush small mt-5 mb-0">
             {% for workspace in stats.collaboration.workspaces %}
-            <li class="list-group-item px-0 py-2 text-break">{{ workspace.name }}</li>
+            <li class="list-group-item px-0 py-3 text-break">{{ workspace.name }}</li>
             {% endfor %}
           </ul>
           {% endif %}
@@ -320,7 +320,7 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
     <div class="panel-hd">
       <h2>Progress by section
         {% if stats.section_progress.question_set %}
-        <i class="bi bi-info-circle fs-6 text-secondary" tabindex="0" data-bs-toggle="tooltip"
+        <i class="bi bi-info-circle fs-md fg-secondary" tabindex="0" data-bs-toggle="tooltip"
            aria-label="How the section bars are calculated"
            title="Each drafted ToxTemp is scored on its own answers, then those scores are averaged. So a bar reads: of this section's questions, this is the share a typical ToxTemp has in each state. ToxTemp {{ stats.section_progress.question_set }}, averaged over {{ stats.section_progress.assays|intcomma }} drafted ToxTemp{{ stats.section_progress.assays|pluralize }} using that version."></i>
         {% endif %}
@@ -328,7 +328,7 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
     </div>
     <div class="panel-bd">
       {% if stats.section_progress.sections %}
-      <div class="d-flex flex-wrap gap-4 mb-4">
+      <div class="d-flex flex-wrap gap-7 mb-7">
         <span class="key b1"><span>accepted by an expert</span></span>
         <span class="key b2"><span>drafted</span></span>
         <span class="key bn"><span>answer not found</span></span>
@@ -336,18 +336,18 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
       </div>
       {% comment %} A column header, so the trailing figure is not read as the whole
          coloured extent of the bar — it is the accepted band alone. {% endcomment %}
-      <div class="row align-items-end g-3 mb-2">
-        <div class="col-12 col-md-4 small fw-semibold">Section</div>
-        <div class="col-10 col-md-7 small fw-semibold">Answer states, averaged over ToxTemps</div>
-        <div class="col-2 col-md-1 text-end small fw-semibold">Accepted</div>
+      <div class="row align-items-end g-5 mb-3">
+        <div class="col-12 md:col-4 small fw-semibold">Section</div>
+        <div class="col-10 md:col-7 small fw-semibold">Answer states, averaged over ToxTemps</div>
+        <div class="col-2 md:col-1 text-end small fw-semibold">Accepted</div>
       </div>
       {% for section in stats.section_progress.sections %}
-      <div class="row align-items-center g-3 mb-3">
-        <div class="col-12 col-md-4">
+      <div class="row align-items-center g-5 mb-5">
+        <div class="col-12 md:col-4">
           {{ section.title }}
           <span class="note d-block">{{ section.questions|intcomma }} question{{ section.questions|pluralize }}</span>
         </div>
-        <div class="col-10 col-md-7">
+        <div class="col-10 md:col-7">
           <div class="bar" role="img"
                aria-label="{{ section.title }}: {{ section.accepted }} percent accepted by an expert, {{ section.drafted }} percent drafted, {{ section.not_found }} percent answer not found, {{ section.empty }} percent empty">
             <i class="b1" style="width: {{ section.accepted }}%"></i>
@@ -356,7 +356,7 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
             <i class="b3" style="width: {{ section.empty }}%"></i>
           </div>
         </div>
-        <div class="col-2 col-md-1 text-end val">{{ section.accepted|floatformat:0 }}%</div>
+        <div class="col-2 md:col-1 text-end val">{{ section.accepted|floatformat:0 }}%</div>
       </div>
       {% endfor %}
       {% else %}
@@ -377,10 +377,10 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
       {% endif %}
     </div>
     <div class="row g-0">
-      <div class="col-12 col-lg-7">
+      <div class="col-12 lg:col-7">
         <div class="panel-bd">
           {% with c=stats.completeness %}
-          <div class="row g-4">
+          <div class="row g-7">
             <div class="col-6">
               <div class="fig fig-md">{% if stats.grounding.median_documents is None %}—{% else %}{{ stats.grounding.median_documents|floatformat:0 }}{% endif %}</div>
               <div class="unit">median nr of context documents per ToxTemp, over {{ stats.grounding.assays|intcomma }} drafted ToxTemp{{ stats.grounding.assays|pluralize }}</div>
@@ -398,22 +398,22 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
             </div>
           </div>
           {% if c.assays %}
-          <div class="unit mt-4 mb-2">Average completeness by number of context documents</div>
+          <div class="unit mt-7 mb-3">Average completeness by number of context documents</div>
           <div style="height:160px"><canvas id="chartCompleteness"></canvas></div>
           {% else %}
-          <p class="note mt-4 mb-0">No drafted ToxTemps in this period.</p>
+          <p class="note mt-7 mb-0">No drafted ToxTemps in this period.</p>
           {% endif %}
           {% endwith %}
         </div>
       </div>
 
-      <div class="col-12 col-lg-5 split">
+      <div class="col-12 lg:col-5 split">
         <div class="panel-bd">
           {% if stats.feedback.rated %}
           <p class="mb-1">
             User rating <span class="val">{{ stats.feedback.mean }}</span><span class="unit"> / 5</span>
           </p>
-          <p class="note mb-3">{{ stats.feedback.rated|intcomma }} ratings given on export{% if stats.feedback.response_rate %}, from {{ stats.feedback.response_rate }}% of ToxTemps{% endif %}.</p>
+          <p class="note mb-5">{{ stats.feedback.rated|intcomma }} ratings given on export{% if stats.feedback.response_rate %}, from {{ stats.feedback.response_rate }}% of ToxTemps{% endif %}.</p>
           <div style="height:130px"><canvas id="chartRatings"></canvas></div>
           {% else %}
           <p class="note mb-0">No usefulness ratings submitted in this period.</p>
@@ -427,7 +427,7 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
   <div class="panel">
     <div class="panel-hd"><h2>LLM costs</h2></div>
     <div class="row g-0">
-      <div class="col-12 col-lg-8">
+      <div class="col-12 lg:col-8">
         <div class="panel-bd">
           {% if stats.llm.by_model %}
           {% comment %} No chart here: with a handful of models the bar repeated the table
@@ -437,18 +437,18 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
               <tr>
                 <th scope="col">Model</th>
                 <th scope="col" class="text-end text-nowrap">Tokens read</th>
-                <th scope="col" class="text-end text-nowrap">Of which cached <i class="bi bi-info-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" aria-label="About cached tokens" title="Prompt tokens served from the provider's cache, billed at the lower cache price. Counted since cache tracking began."></i></th>
+                <th scope="col" class="text-end text-nowrap">Of which cached <i class="bi bi-info-circle fg-secondary" tabindex="0" data-bs-toggle="tooltip" aria-label="About cached tokens" title="Prompt tokens served from the provider's cache, billed at the lower cache price. Counted since cache tracking began."></i></th>
                 <th scope="col" class="text-end text-nowrap">Tokens written</th>
-                <th scope="col" class="text-end text-nowrap">Total cost <i class="bi bi-info-circle text-secondary" tabindex="0" data-bs-toggle="tooltip" aria-label="About missing costs" title="A model showing tokens but no cost is missing its price tag in the deployment config."></i></th>
+                <th scope="col" class="text-end text-nowrap">Total cost <i class="bi bi-info-circle fg-secondary" tabindex="0" data-bs-toggle="tooltip" aria-label="About missing costs" title="A model showing tokens but no cost is missing its price tag in the deployment config."></i></th>
               </tr>
             </thead>
             <tbody>
               {% for row in stats.llm.by_model %}
               <tr>
                 <td class="text-break">{{ row.model }}</td>
-                <td class="text-end text-nowrap text-body-secondary">{{ row.input_tokens|intcomma }}</td>
-                <td class="text-end text-nowrap text-body-secondary">{{ row.cache_read_tokens|intcomma }}</td>
-                <td class="text-end text-nowrap text-body-secondary">{{ row.output_tokens|intcomma }}</td>
+                <td class="text-end text-nowrap fg-secondary">{{ row.input_tokens|intcomma }}</td>
+                <td class="text-end text-nowrap fg-secondary">{{ row.cache_read_tokens|intcomma }}</td>
+                <td class="text-end text-nowrap fg-secondary">{{ row.output_tokens|intcomma }}</td>
                 <td class="text-end text-nowrap fw-semibold">{{ row.cost_total|cost:stats.llm.currency }}</td>
               </tr>
               {% endfor %}
@@ -471,11 +471,11 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
           {% endif %}
         </div>
       </div>
-      <div class="col-12 col-lg-4 split">
+      <div class="col-12 lg:col-4 split">
         {% comment %} Totals live in the table on the left; this column carries only what
            is not already there. {% endcomment %}
         <div class="panel-bd">
-          <div class="mb-4">
+          <div class="mb-7">
             <div class="fig fig-lg">{{ stats.llm.cost_per_assay|default:0|cost:stats.llm.currency }}</div>
             <div class="unit">per ToxTemp drafted</div>
           </div>
@@ -483,9 +483,9 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
             <div class="fig fig-md">{{ stats.files.megabytes|intcomma }}<span class="unit"> MB</span></div>
             <div class="unit">of context documents stored</div>
             {% if stats.files.by_type %}
-            <ul class="list-unstyled note mt-2 mb-0">
+            <ul class="list-unstyled note mt-3 mb-0">
               {% for entry in stats.files.by_type %}
-              <li class="d-flex justify-content-between gap-3">
+              <li class="d-flex justify-content-between gap-5">
                 <span class="text-break">{{ entry.content_type }}</span>
                 <span class="val">{{ entry.count|intcomma }}</span>
               </li>

@@ -167,7 +167,7 @@
     // so footnotes here are hover-only unless the answer text carries an inline URL/DOI.
     document.querySelectorAll('textarea[name^="question_"]').forEach(function (ta) {
         var preview = document.createElement('div');
-        preview.className = 'md-preview border rounded p-2 mb-2 bg-light';
+        preview.className = 'md-preview border rounded p-3 mb-3 bg-2';
         preview.setAttribute('role', 'button');
         preview.setAttribute('tabindex', '0');
         preview.title = 'Click to edit';
@@ -182,7 +182,7 @@
             var v = (ta.value || '').trim();
             preview.innerHTML = v
                 ? renderCitations(v)
-                : '<span class="text-secondary fst-italic">Empty — click to edit</span>';
+                : '<span class="fg-secondary fst-italic">Empty — click to edit</span>';
             initTooltips(preview);
             ta.classList.add('d-none');
             preview.classList.remove('d-none');

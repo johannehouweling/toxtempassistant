@@ -3,13 +3,13 @@
      {% if ws.current_user_role == "owner" or ws.current_user_role == "admin" %}data-can-remove="1"{% else %}data-can-remove="0"{% endif %}>
 
   <div class="card-header d-flex align-items-center justify-content-between border-0 workspace-card-header">
-    <span class="fw-semibold form-control px-0 border-0 workspace-name{% if ws.current_user_role == 'member' %} text-muted{% endif %}" style="font-size: .95rem;" contenteditable="false">{{ ws.name }}</span>
+    <span class="fw-semibold form-control px-0 border-0 workspace-name{% if ws.current_user_role == 'member' %} fg-secondary{% endif %}" style="font-size: .95rem;" contenteditable="false">{{ ws.name }}</span>
 
     {% if ws.current_user_role == 'owner' or ws.current_user_role == 'admin' %}
-      <div class="d-flex align-items-center gap-2">
-        <button type="button" class="btn btn-sm btn-outline-secondary border-0 btn-api-tokens" title="Workspace settings" aria-label="Workspace settings"><i class="bi bi-gear"></i></button>
+      <div class="d-flex align-items-center gap-3">
+        <button type="button" class="btn-sm btn-outline theme-secondary border-0 btn-api-tokens" title="Workspace settings" aria-label="Workspace settings"><i class="bi bi-gear"></i></button>
         {% if ws.owner == request.user %}
-        <button type="button" class="btn btn-sm btn-outline-danger border-0 workspace-delete-btn" title="Delete workspace" aria-label="Delete workspace {{ ws.name }}">
+        <button type="button" class="btn-sm btn-outline theme-danger border-0 workspace-delete-btn" title="Delete workspace" aria-label="Delete workspace {{ ws.name }}">
           <i class="bi bi-trash"></i>
         </button>
         {% endif %}
@@ -18,14 +18,14 @@
   </div>
 
   <div class="card-body workspace-card-body pt-0">
-    <div class="mb-3">
-      <div class="text-uppercase fw-semibold mb-2 section-label">Members</div>
+    <div class="mb-5">
+      <div class="text-uppercase fw-semibold mb-3 section-label">Members</div>
 
-      <div class="d-flex flex-wrap align-items-center gap-2 members-wrap">
+      <div class="d-flex flex-wrap align-items-center gap-3 members-wrap">
         {% for membership in ws.memberships.all %}
           {% with u=membership.user r=membership.role %}
-            <span class="d-inline-flex align-items-center {% if r == 'owner' %}bg-success-subtle{% endif %} member-row member-chip" data-user-id="{{ u.id }}">
-              <span class="d-inline-flex align-items-center justify-content-center {% if r == 'owner' %}bg-success{% endif %} fw-bold text-white member-avatar">
+            <span class="d-inline-flex align-items-center {% if r == 'owner' %}bg-subtle-success{% endif %} member-row member-chip" data-user-id="{{ u.id }}">
+              <span class="d-inline-flex align-items-center justify-content-center {% if r == 'owner' %}bg-success{% endif %} fw-bold fg-white member-avatar">
                 {% if r == 'admin' or r == 'owner' %}<i class="bi bi-key-fill"></i>{% else %}{{ u.email|slice:":1"|upper }}{% endif %}
               </span>
               {% if u == request.user %}<span class="member-text" data-bs-email="{{ u.email }}">You</span>{% else %}<span class="member-text" data-bs-email="{{ u.email }}">{{ u.email }}</span>{% endif %}
@@ -37,52 +37,52 @@
               {% endcomment %}
               {% if u == request.user %}
                 {% if r != 'owner' %}
-                  <button type="button" class="btn btn-link p-0 m-0 text-secondary btn-remove-member" aria-label="Remove {{ u.email }}" title="Remove {{ u.email }}"><i class="bi bi-x"></i></button>
+                  <button type="button" class="btn btn-link p-0 m-0 fg-secondary btn-remove-member" aria-label="Remove {{ u.email }}" title="Remove {{ u.email }}"><i class="bi bi-x"></i></button>
                 {% endif %}
               {% else %}
                 {% if ws.current_user_role == 'owner' and u != ws.owner %}
-                  <button type="button" class="btn btn-link p-0 m-0 text-secondary btn-remove-member" aria-label="Remove {{ u.email }}" title="Remove {{ u.email }}"><i class="bi bi-x"></i></button>
+                  <button type="button" class="btn btn-link p-0 m-0 fg-secondary btn-remove-member" aria-label="Remove {{ u.email }}" title="Remove {{ u.email }}"><i class="bi bi-x"></i></button>
                 {% elif ws.current_user_role == 'admin' and r != 'owner' %}
-                  <button type="button" class="btn btn-link p-0 m-0 text-secondary btn-remove-member" aria-label="Remove {{ u.email }}" title="Remove {{ u.email }}"><i class="bi bi-x"></i></button>
+                  <button type="button" class="btn btn-link p-0 m-0 fg-secondary btn-remove-member" aria-label="Remove {{ u.email }}" title="Remove {{ u.email }}"><i class="bi bi-x"></i></button>
                 {% endif %}
               {% endif %}
             </span>
           {% endwith %}
         {% empty %}
-          <span class="text-muted small empty-members">No members yet</span>
+          <span class="fg-secondary small empty-members">No members yet</span>
         {% endfor %}
 
-        {% for t in ws.active_api_tokens %}<span class="d-inline-flex align-items-center member-chip api-access-chip" data-token-name="{{ t.name }}" title="API token &quot;{{ t.name }}&quot;: an external server can read the investigations shared in this workspace"><span class="d-inline-flex align-items-center justify-content-center fw-bold text-white member-avatar"><i class="bi bi-hdd-network-fill"></i></span><span class="member-text">{{ t.name }}</span></span>{% endfor %}
+        {% for t in ws.active_api_tokens %}<span class="d-inline-flex align-items-center member-chip api-access-chip" data-token-name="{{ t.name }}" title="API token &quot;{{ t.name }}&quot;: an external server can read the investigations shared in this workspace"><span class="d-inline-flex align-items-center justify-content-center fw-bold fg-white member-avatar"><i class="bi bi-hdd-network-fill"></i></span><span class="member-text">{{ t.name }}</span></span>{% endfor %}
             {% for inv in ws.pending_invitations %}
-            <span class="d-inline-flex align-items-center member-chip invite-row text-muted" data-invitation-id="{{ inv.pk }}" title="Invitation sent, not accepted yet">
-                <span class="d-inline-flex align-items-center justify-content-center fw-bold text-white member-avatar"><i class="bi bi-patch-question-fill"></i></span>
+            <span class="d-inline-flex align-items-center member-chip invite-row fg-secondary" data-invitation-id="{{ inv.pk }}" title="Invitation sent, not accepted yet">
+                <span class="d-inline-flex align-items-center justify-content-center fw-bold fg-white member-avatar"><i class="bi bi-patch-question-fill"></i></span>
                 <span class="member-text">{{ inv.user.email }} (invited)</span>
-                <button type="button" class="btn btn-link p-0 m-0 text-secondary btn-cancel-invitation" aria-label="Cancel invitation for {{ inv.user.email }}" title="Cancel invitation"><i class="bi bi-x"></i></button>
+                <button type="button" class="btn btn-link p-0 m-0 fg-secondary btn-cancel-invitation" aria-label="Cancel invitation for {{ inv.user.email }}" title="Cancel invitation"><i class="bi bi-x"></i></button>
             </span>
             {% endfor %}
         {% if ws.current_user_role == 'owner' or ws.current_user_role == 'admin' %}
-          <button type="button" class="btn btn-sm btn-outline-primary btn-add-member round-add-btn" title="Add member" aria-label="Add member"><i class="bi bi-person-plus"></i></button>
+          <button type="button" class="btn-sm btn-outline theme-primary btn-add-member round-add-btn" title="Add member" aria-label="Add member"><i class="bi bi-person-plus"></i></button>
         {% endif %}
       </div>
     </div>
 
     <div>
-      <div class="text-uppercase fw-semibold mb-2 section-label">Shared Investigations</div>
+      <div class="text-uppercase fw-semibold mb-3 section-label">Shared Investigations</div>
 
-      <div class="d-flex flex-wrap align-items-center gap-2 assays-wrap">
+      <div class="d-flex flex-wrap align-items-center gap-3 assays-wrap">
         {% for gi in ws.shared_investigations.all %}
           <span class="d-inline-flex align-items-center assay-row assay-pill" data-assay-id="{{ gi.investigation.id }}" data-workspace-assay-id="{{ gi.id }}">
             <span class="assay-text">{{ gi.investigation.title }}</span>
             {% if ws.current_user_role == 'owner' or ws.current_user_role == 'admin' %}
-              <button type="button" class="btn btn-link p-0 m-0 text-secondary btn-remove-assay" data-assay-id="{{ gi.investigation.id }}" aria-label="Remove investigation {{ gi.investigation.title }}" title="Remove investigation {{ gi.investigation.title }}"><i class="bi bi-x"></i></button>
+              <button type="button" class="btn btn-link p-0 m-0 fg-secondary btn-remove-assay" data-assay-id="{{ gi.investigation.id }}" aria-label="Remove investigation {{ gi.investigation.title }}" title="Remove investigation {{ gi.investigation.title }}"><i class="bi bi-x"></i></button>
             {% endif %}
           </span>
         {% empty %}
-          <span class="text-muted small empty-assays">No investigations shared</span>
+          <span class="fg-secondary small empty-assays">No investigations shared</span>
         {% endfor %}
 
         {% if ws.current_user_role == 'owner' or ws.current_user_role == 'admin' %}
-          <button type="button" class="btn btn-sm btn-outline-secondary btn-add-assay round-add-btn" title="Add investigation" aria-label="Add investigation"><i class="bi bi-plus-circle"></i></button>
+          <button type="button" class="btn-sm btn-outline theme-secondary btn-add-assay round-add-btn" title="Add investigation" aria-label="Add investigation"><i class="bi bi-plus-circle"></i></button>
         {% endif %}
       </div>
     </div>

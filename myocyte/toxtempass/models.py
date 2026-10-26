@@ -162,8 +162,8 @@ class Person(AbstractUser):
         blank=False,
         verbose_name="I have read, understood and accept the terms of service.",
         help_text=(
-            "<button type='button' class='btn btn-sm btn-outline-secondary'"
-            " data-bs-toggle='modal' data-bs-target='#termsModal'>"
+            "<button type='button' class='btn-sm btn-outline theme-secondary'"
+            " data-bs-toggle='dialog' data-bs-target='#termsModal'>"
             "Terms of service</button>"
         ),
     )

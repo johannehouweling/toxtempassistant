@@ -1,25 +1,25 @@
 {% block content %}
 <div class="container px-0">
   {# The tab above already says "Workspaces", so no heading here. #}
-  <div class="mb-3">
-    <div class="text-muted">Share investigations with others via workspaces.</div>
+  <div class="mb-5">
+    <div class="fg-secondary">Share investigations with others via workspaces.</div>
   </div>
 
   {% for inv in my_invitations %}
-  <div class="alert alert-info d-flex align-items-center justify-content-between gap-2 py-2">
-    <span class="fs-7">
+  <div class="alert theme-info d-flex align-items-center justify-content-between gap-3 py-3">
+    <span class="fs-sm">
       <i class="bi bi-envelope-open"></i>
       You are invited to <strong>{{ inv.workspace.name }}</strong>{% if inv.invited_by %} by {{ inv.invited_by.get_full_name|default:inv.invited_by.email }}{% endif %}.
     </span>
-    <a class="btn btn-sm btn-primary" href="{% url 'workspace_invitation' inv.pk %}">Review</a>
+    <a class="btn-sm btn-solid theme-primary" href="{% url 'workspace_invitation' inv.pk %}">Review</a>
   </div>
   {% endfor %}
 
-  <div class="d-flex gap-2 mb-3">
-    <button id="btnNewWorkspace" class="btn btn-outline-primary">New Workspace</button>
+  <div class="d-flex gap-3 mb-5">
+    <button id="btnNewWorkspace" class="btn-outline theme-primary">New Workspace</button>
   </div>
 
-  <div id="ownedWorkspacesContainer" class="row row-cols-1 g-3" data-current-user="{{ request.user.email }}">
+  <div id="ownedWorkspacesContainer" class="row row-cols-1 g-5" data-current-user="{{ request.user.email }}">
     {% if owned_workspaces %}
       {% for ws in owned_workspaces %}
         <div class="col">
@@ -38,7 +38,7 @@
 
     {% if not owned_workspaces and not member_workspaces %}
       <div class="col">
-        <div class="text-muted">You don't own any workspace yet.</div>
+        <div class="fg-secondary">You don't own any workspace yet.</div>
       </div>
     {% endif %}
   </div>

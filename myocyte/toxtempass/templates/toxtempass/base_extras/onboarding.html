@@ -358,14 +358,14 @@
 
         toastEl.innerHTML = `
         <div class="toast-header">
-          <i class="bi bi-info-circle me-2" aria-hidden="true"></i>
+          <i class="bi bi-info-circle me-3" aria-hidden="true"></i>
           <strong class="me-auto">Guided Tour</strong>
-          <small class="text-body-secondary">${i + 1}/${messages.length}</small>
+          <small class="fg-secondary">${i + 1}/${messages.length}</small>
           <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
         <div class="toast-body">${messages[i]}</div>
-        <div class="toast-footer d-flex justify-content-end pe-2 pb-2">
-          <button type="button" class="btn btn-primary" aria-label="Next">Next</button>
+        <div class="toast-footer d-flex justify-content-end pe-3 pb-3">
+          <button type="button" class="btn-solid theme-primary" aria-label="Next">Next</button>
         </div>
       `;
 
@@ -385,7 +385,7 @@
 
       const finishedBtn = document.createElement("button");
       finishedBtn.type = "button";
-      finishedBtn.className = "btn btn-primary";
+      finishedBtn.className = "btn-solid theme-primary";
       finishedBtn.setAttribute("aria-label", "Finish");
       finishedBtn.textContent = "Finish";
       finishedBtn.setAttribute("data-bs-dismiss", "toast");
@@ -650,7 +650,7 @@
         btn.addEventListener("click", () => {
           const offcanvasEl = document.getElementById("offcanvasUser");
           if (offcanvasEl && offcanvasEl.classList.contains("show")) {
-            const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
+            const offcanvas = bootstrap.Drawer.getInstance(offcanvasEl);
             if (offcanvas) offcanvas.hide();
           }
           window.startOnboarding();

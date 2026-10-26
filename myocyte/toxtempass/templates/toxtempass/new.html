@@ -15,16 +15,16 @@
 <h1>
   <span class="d-inline-block">
     Select Investigation, Study & Assay
-    <a tabindex="0" class="text-dark small align-top" style="margin-left: -0.2rem;" role="button"
+    <a tabindex="0" class="fg-black small align-top" style="margin-left: -0.2rem;" role="button"
        data-bs-toggle="popover"
        data-bs-trigger="focus"
        title="ISA"
        data-bs-html="true"
-       data-bs-content="ToxTempAssistant follows the <a href='https://isa-tools.org/format/specification.html' class='link-underline link-underline-opacity-0 link-underline-opacity-75-hover' target='_blank'>ISA format</a> to organize generated ToxTemps.<br>
+       data-bs-content="ToxTempAssistant follows the <a href='https://isa-tools.org/format/specification.html' class=' link-underline-opacity-0 link-underline-opacity-75-hover' target='_blank'>ISA format</a> to organize generated ToxTemps.<br>
 &bull; <strong>Investigations</strong>: High level concept to link related studies. <br>
 &bull; <strong>Studies</strong>: Central unit, containing information on the subject under study its characteristics and any treatments applied. A study has associated assays.<br>
 &bull; <strong>Assays</strong>: Test perfomed either on material taken from the subject or on the whole subject, which produces data. ToxTemps decribe assays.<br>">
-      <i class="bi fs-6 text-secondary bi-question-circle icon-footnote"></i>
+      <i class="bi fs-md fg-secondary bi-question-circle icon-footnote"></i>
     </a>
   </span>
 </h1>
@@ -35,11 +35,11 @@
         {% bootstrap_form form exclude='consent_file_storage' layout='floating' show_label=False %}
 
         {# render the consent checkbox via the bs6 tags #}
-        <div class="mb-3">
+        <div class="mb-5">
             {% bootstrap_field form.consent_file_storage layout='floating' show_label=False %}
            
-            <div class="collapse mt-2" id="consentDetails">
-            <div class="ms-4 alert alert-info">
+            <div class="collapse mt-3" id="consentDetails">
+            <div class="ms-7 alert theme-info">
                 If you consent, the development team may review the uploaded context files to benchmark the system's pre-population performance and to improve the automated extraction of information used to pre-populate ToxTemp questionnaires.
                 This may include creating derived evaluation data, such as ground-truth annotations or performance metrics, based on the uploaded files.
                 You can withdraw this consent at any time with Stop sharing under Privacy in the user menu, or by emailing {{ config.maintainer_email }}.
@@ -50,27 +50,27 @@
             </div>
         </div>
        
-        <button id="startButton" class="btn btn-primary" type="submit">
-            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" id="startButtonSpinner"></span>
+        <button id="startButton" class="btn-solid theme-primary" type="submit">
+            <span class="spinner-border spinner-sm d-none" role="status" aria-hidden="true" id="startButtonSpinner"></span>
             <span id="startButtonText">Create draft</span> 
         </button>
-        <a class="btn btn-outline-danger" href="{% url 'overview' %}">Back</a>
+        <a class="btn-outline theme-danger" href="{% url 'overview' %}">Back</a>
 
     </form>
 
     <!-- Demo Lock Modal -->
-    <div class="modal fade" id="demoLockedModal" tabindex="-1" aria-labelledby="demoLockedModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="dialog fade" id="demoLockedModal" tabindex="-1" aria-labelledby="demoLockedModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="demoLockedModalLabel">Demo Assay</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="dialog-header">
+                    <h5 class="dialog-title" id="demoLockedModalLabel">Demo Assay</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
+                <div class="dialog-body">
                     This demo assay is read-only and cannot be regenerated. Create a new assay to explore the workflow with your own documents.
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                <div class="dialog-footer">
+                    <button type="button" class="btn-solid theme-primary" data-bs-dismiss="dialog">OK</button>
                 </div>
             </div>
         </div>
@@ -413,7 +413,7 @@
           JSON, CSV, XLSX<br><br>
           <em>Examples:</em> publications, SOPs, protocols, certificates, figures, diagrams, data tables
         `);
-        popoverIcon.innerHTML = '<i class="bi fs-6 text-secondary bi-question-circle"></i>';
+        popoverIcon.innerHTML = '<i class="bi fs-md fg-secondary bi-question-circle"></i>';
         helpText.appendChild(popoverIcon);
       }
     }

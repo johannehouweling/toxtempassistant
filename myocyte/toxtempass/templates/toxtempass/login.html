@@ -41,13 +41,13 @@
 <div>
   <div class="row">
     <div class="col-12">
-      <h1 class="fs-3 mb-2">Draft ToxTemp test method descriptions from your documents</h1>
-      <p class="text-body-secondary mb-0">LLM-assisted drafting for cell-based toxicological test methods (OECD GD211): upload your protocols and publications, review the draft answers, export the ToxTemp.</p>
+      <h1 class="fs-2xl mb-3">Draft ToxTemp test method descriptions from your documents</h1>
+      <p class="fg-secondary mb-0">LLM-assisted drafting for cell-based toxicological test methods (OECD GD211): upload your protocols and publications, review the draft answers, export the ToxTemp.</p>
     </div>
   </div>
   <div class="row justify-content-center">
-    <div class = "col-md-4">
-      <div class="card mt-3">
+    <div class = "md:col-4">
+      <div class="card mt-5">
         <div class="card-body">
           <div class="card-title">
           <h5 class="">Login</h5>
@@ -58,31 +58,31 @@
             {# Render the form using the bs6 tags #}
             {% bootstrap_form form %}
             <div class="d-flex">
-              <button type="submit" class="btn btn-primary">Login</button>
-              <a class="btn ms-auto btn-outline-secondary position-relative" role="button" href="{% url 'signup' %}">Sign-up
-                <div class="position-absolute top-0 start-50 translate-middle badge rounded-pill bg-warning text-dark">beta
+              <button type="submit" class="btn-solid theme-primary">Login</button>
+              <a class="ms-auto btn-outline theme-secondary position-relative" role="button" href="{% url 'signup' %}">Sign-up
+                <div class="position-absolute top-0 start-50 translate-middle badge rounded-pill theme-warning">beta
                 </div>
               </a>
             </div>
           </form>
 
-          <div class="text-center mt-2">
+          <div class="text-center mt-3">
             <a class="small" href="{% url 'password_reset' %}">Forgot your password?</a>
           </div>
       
           <hr>
           <p class="text-center">Or login using your ORCID account:</p>
-          <div class="d-grid gap-2">
-            <a class="btn d-flex align-items-center justify-content-center btn-outline-secondary" href="{% url 'orcid_login' %}">
-              <img class="h-75 pe-2" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="ORCID" >
+          <div class="d-grid gap-3">
+            <a class="d-flex align-items-center justify-content-center btn-outline theme-secondary" href="{% url 'orcid_login' %}">
+              <img class="h-75 pe-3" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="ORCID" >
               Login with ORCID
             </a>
           </div>
         </div>
       </div>
     </div>
-    <div class="col-md-4">
-      <div class=" card mt-3">
+    <div class="md:col-4">
+      <div class="card mt-5">
         <div class="card-img-top overflow-hidden" style="aspect-ratio: 21/9;">
           <img
             src="{% static 'toxtempass/img/splashscreen.webp' %}"
@@ -92,7 +92,7 @@
             style="object-fit: cover; object-position: top;">
         </div>
         <div class="card-body">
-          <h2 class="card-title fs-5">About ToxTempAssistant</h2>
+          <h2 class="card-title fs-lg">About ToxTempAssistant</h2>
           <p class="card-text">
             ToxTempAssistant<a href="https://doi.org/10.1080/2833373X.2026.2638036" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><sup>1</sup></a> helps scientists document cell-based toxicological test methods more efficiently. 
             Based on the ToxTemp template<a href="https://doi.org/10.14573/altex.1909271" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><sup>2</sup></a> from OECD Guidance Document 211, the tool guides users through <a href="{% url 'toxtemp_questions' %}">77 structured questions</a> to create clear, standardised test method descriptions.
@@ -108,18 +108,18 @@
             If you use ToxTempAssistant and find it useful, we would appreciate a citation.<a href="https://doi.org/10.1080/2833373X.2026.2638036" target="_blank" rel="noopener noreferrer" class="text-decoration-none"><sup>1</sup></a>
             See <a href="{% url 'about' %}#how-to-cite">How to cite</a>.
           </p>
-          <p class="card-text small text-muted">
+          <p class="card-text small fg-secondary">
             <span id="footnote1"><sup>1</sup> <a href="https://doi.org/10.1080/2833373X.2026.2638036" target="_blank" rel="noopener noreferrer">doi:10.1080/2833373X.2026.2638036</a></span><br>
             <span id="footnote2"><sup>2</sup> <a href="https://doi.org/10.14573/altex.1909271" target="_blank" rel="noopener noreferrer">doi:10.14573/altex.1909271</a></span>
           </p>
         </div>
       </div>
     </div>
-    <div class="col-md-4">
-      <div class="card mt-3 mb-3">
+    <div class="md:col-4">
+      <div class="card mt-5 mb-5">
         <div class="card-body">
           <h5 class="card-title">Supported by</h5>
-          <div id="carouselExampleAutoplaying" class="carousel slide mt-3" data-bs-ride="carousel" data-bs-interval="3000">
+          <div id="carouselExampleAutoplaying" class="carousel slide mt-5" data-bs-autoplay="true" data-bs-interval="3000">
             <div class="carousel-inner">
               <div class="carousel-item active">
                 <div class="d-flex justify-content-center align-items-center" style="height: 150px;">
@@ -158,11 +158,11 @@
               </div> {% endcomment %}
             </div>
             <button class="carousel-control-prev" type="button" data-bs-target="#carouselExampleAutoplaying" data-bs-slide="prev">
-              <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+              <span class="carousel-icon-prev" aria-hidden="true"></span>
               <span class="visually-hidden">Previous</span>
             </button>
             <button class="carousel-control-next" type="button" data-bs-target="#carouselExampleAutoplaying" data-bs-slide="next">
-              <span class="carousel-control-next-icon" aria-hidden="true"></span>
+              <span class="carousel-icon-next" aria-hidden="true"></span>
               <span class="visually-hidden">Next</span>
             </button>
           </div>

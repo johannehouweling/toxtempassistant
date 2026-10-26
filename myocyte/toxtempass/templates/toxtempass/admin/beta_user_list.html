@@ -2,9 +2,9 @@
 {% load django_tables2 %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container mt-7">
   <h2>Beta signup requests</h2>
-  <p class="alert alert-info">Admitting someone emails them automatically. Revoking sends nothing, so tell them yourself if needed.</p>
+  <p class="alert theme-info">Admitting someone emails them automatically. Revoking sends nothing, so tell them yourself if needed.</p>
   
 
   {% render_table table %}
@@ -68,8 +68,8 @@
         }
 
         btn.setAttribute('data-admit', nowAdmitted ? '0' : '1');
-        btn.classList.toggle('btn-success', !nowAdmitted);
-        btn.classList.toggle('btn-danger', nowAdmitted);
+        btn.classList.toggle('theme-success', !nowAdmitted);
+        btn.classList.toggle('theme-danger', nowAdmitted);
         btn.textContent = nowAdmitted ? 'Revoke' : 'Admit';
       } catch (err) {
         console.error('Failed to toggle beta admit:', err);
