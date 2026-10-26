@@ -56,12 +56,12 @@ react (e.g. refresh a Save button).
             list.innerHTML = '';
             Array.from(accumulator.files).forEach(function(f) {
                 var tag = document.createElement('span');
-                tag.className = 'badge bg-secondary me-1 mb-1 d-inline-flex align-items-center gap-1';
+                tag.className = 'badge theme-secondary me-1 mb-1 d-inline-flex align-items-center gap-1';
                 var nameSpan = document.createElement('span');
                 nameSpan.textContent = f.name;
                 var btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = 'btn-close btn-close-white scale-75';
+                btn.className = 'btn-close scale-75';
                 btn.setAttribute('aria-label', 'Remove ' + f.name);
                 btn.addEventListener('click', function() { removeFile(f); });
                 tag.appendChild(nameSpan);

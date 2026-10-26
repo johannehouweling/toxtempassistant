@@ -1,40 +1,37 @@
 {% load static%}
-<div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasUser" aria-labelledby="offcanvasUserLabel">
+<dialog class="drawer drawer-end" id="offcanvasUser" aria-labelledby="offcanvasUserLabel">
     {# No side padding on the header: the tab bar's bottom line then spans the full width, like the footer's top line. #}
-    <div class="offcanvas-header flex-column align-items-stretch p-0">
-        <div class="d-flex align-items-center px-3 pt-3 mb-3">
-            <h5 class="offcanvas-title text-truncate me-auto" id="offcanvasUserLabel"><i class="bi bi-person-badge"></i> {{user.email}}</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    <div class="drawer-header flex-column align-items-stretch p-0">
+        <div class="d-flex align-items-center px-5 pt-5 mb-5">
+            <h5 class="drawer-title text-truncate me-auto" id="offcanvasUserLabel"><i class="bi bi-person-badge"></i> {{user.email}}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="drawer" aria-label="Close"></button>
         </div>
-        <ul class="nav nav-tabs px-3" id="userMenuTabs" role="tablist">
+        <ul class="nav nav-tabs px-5" id="userMenuTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active px-2" id="userMenuWorkspacesTab" data-bs-toggle="tab" data-bs-target="#userMenuWorkspaces" type="button" role="tab" aria-controls="userMenuWorkspaces" aria-selected="true">
+                <button class="nav-link active px-3" id="userMenuWorkspacesTab" data-bs-toggle="tab" data-bs-target="#userMenuWorkspaces" type="button" role="tab" aria-controls="userMenuWorkspaces" aria-selected="true">
                     <i class="bi bi-people me-1"></i>Workspaces
                 </button>
             </li>
-            {# Settings only has content with a real model choice, or for staff. #}
-            {% if llm_choices|length > 1 or user.is_staff %}
             <li class="nav-item" role="presentation">
-                <button class="nav-link px-2" id="userMenuSettingsTab" data-bs-toggle="tab" data-bs-target="#userMenuSettings" type="button" role="tab" aria-controls="userMenuSettings" aria-selected="false">
+                <button class="nav-link px-3" id="userMenuSettingsTab" data-bs-toggle="tab" data-bs-target="#userMenuSettings" type="button" role="tab" aria-controls="userMenuSettings" aria-selected="false">
                     <i class="bi bi-sliders me-1"></i>Settings
                 </button>
             </li>
-            {% endif %}
             <li class="nav-item" role="presentation">
-                <button class="nav-link px-2" id="userMenuAccountTab" data-bs-toggle="tab" data-bs-target="#userMenuAccount" type="button" role="tab" aria-controls="userMenuAccount" aria-selected="false">
+                <button class="nav-link px-3" id="userMenuAccountTab" data-bs-toggle="tab" data-bs-target="#userMenuAccount" type="button" role="tab" aria-controls="userMenuAccount" aria-selected="false">
                     <i class="bi bi-person-vcard me-1"></i>Account
-                    {% if not user.has_confirmed_email %}<i class="bi bi-exclamation-circle-fill text-warning ms-1" role="img" aria-label="Email address not confirmed"></i>{% endif %}
+                    {% if not user.has_confirmed_email %}<i class="bi bi-exclamation-circle-fill fg-warning ms-1" role="img" aria-label="Email address not confirmed"></i>{% endif %}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link px-2" id="userMenuPrivacyTab" data-bs-toggle="tab" data-bs-target="#userMenuPrivacy" type="button" role="tab" aria-controls="userMenuPrivacy" aria-selected="false">
+                <button class="nav-link px-3" id="userMenuPrivacyTab" data-bs-toggle="tab" data-bs-target="#userMenuPrivacy" type="button" role="tab" aria-controls="userMenuPrivacy" aria-selected="false">
                     <i class="bi bi-shield-lock me-1"></i>Privacy
                 </button>
             </li>
         </ul>
     </div>
 
-    <div class="offcanvas-body tab-content">
+    <div class="drawer-body tab-content">
         <div class="tab-pane fade show active" id="userMenuWorkspaces" role="tabpanel" aria-labelledby="userMenuWorkspacesTab" tabindex="0">
             {% include "toxtempass/base_extras/workspaces/workspace_list_partial.html" %}
         </div>
@@ -43,15 +40,16 @@
             {# Who you are first, one row each with a small icon instead of a heading; the buttons below change it. #}
             {# Name and organization are text, like workspace names: click one to edit it; it saves when you click away. #}
             <form class="js-profile" data-url="{% url 'account_update_profile' %}" novalidate>
-                <div class="d-flex gap-2 mb-2 js-profile-field">
-                    <i class="bi bi-person text-body-secondary" aria-hidden="true"></i>
+                <div class="d-flex gap-3 mb-3 js-profile-field">
+                    <i class="bi bi-person fg-secondary" aria-hidden="true"></i>
                     <div class="flex-grow-1">
                         <div class="js-profile-display">
-                            <button type="button" class="btn btn-link p-0 text-body text-decoration-none text-start js-profile-view" aria-label="Edit name" title="Click to edit">
-                                <span class="js-name-value">{{ user.get_full_name|default:"Add your name" }}</span>
+                            <button type="button" class="btn btn-link p-0 min-h-0 fg-body text-decoration-none text-start js-profile-view" aria-label="Edit name" title="Click to edit">
+                                <span class="js-name-value{% if not user.get_full_name %} fg-secondary{% endif %}" data-placeholder="Add your name">{{ user.get_full_name|default:"Add your name" }}</span>
+                                <i class="bi bi-pencil fs-xs fg-secondary ms-2" aria-hidden="true"></i>
                             </button>
                         </div>
-                        <div class="row g-2 js-profile-inputs" hidden>
+                        <div class="row g-3 js-profile-inputs" hidden>
                             <div class="col-6">
                                 <input class="form-control form-control-sm" id="account-first-name" name="first_name" value="{{ user.first_name }}" placeholder="First name" aria-label="First name" autocomplete="given-name">
                             </div>
@@ -61,49 +59,50 @@
                         </div>
                     </div>
                 </div>
-                <div class="d-flex gap-2 mb-2 js-profile-field">
-                    <i class="bi bi-building text-body-secondary" aria-hidden="true"></i>
+                <div class="d-flex gap-3 mb-3 js-profile-field">
+                    <i class="bi bi-building fg-secondary" aria-hidden="true"></i>
                     <div class="flex-grow-1">
                         <div class="js-profile-display">
-                            <button type="button" class="btn btn-link p-0 text-body text-decoration-none text-start js-profile-view" aria-label="Edit organization" title="Click to edit">
-                                <span class="js-organization-value">{{ user.organization }}</span>
+                            <button type="button" class="btn btn-link p-0 min-h-0 fg-body text-decoration-none text-start js-profile-view" aria-label="Edit organization" title="Click to edit">
+                                <span class="js-organization-value{% if not user.organization %} fg-secondary{% endif %}" data-placeholder="Add your organization">{{ user.organization|default:"Add your organization" }}</span>
+                                <i class="bi bi-pencil fs-xs fg-secondary ms-2" aria-hidden="true"></i>
                             </button>
                             {# Like the email badge; hovering or focusing it names the ROR record. #}
-                            <span class="badge text-bg-success ms-1 js-ror-match" tabindex="0" data-bs-toggle="tooltip" title="Matched to {{ user.ror_name }} in the Research Organization Registry"{% if not user.ror_name %} hidden{% endif %}>ROR matched</span>
+                            <span class="badge theme-success ms-1 js-ror-match" tabindex="0" data-bs-toggle="tooltip" title="Matched to {{ user.ror_name }} in the Research Organization Registry"{% if not user.ror_name %} hidden{% endif %}>ROR matched</span>
                         </div>
                         <div class="js-profile-inputs" hidden>
                             <input class="form-control form-control-sm" id="account-organization" name="organization" value="{{ user.organization }}" placeholder="Organization" aria-label="Organization" list="account-ror-suggestions" autocomplete="organization" required>
                             <datalist id="account-ror-suggestions"></datalist>
                             {# Organization errors show here, above the "not in ROR" box they refer to. #}
-                            <div class="small text-danger mt-1 js-organization-error" hidden></div>
+                            <div class="small fg-danger mt-1 js-organization-error" hidden></div>
                             {# Shown once a new organization matched no ROR record. #}
-                            <div class="form-check mt-1 js-not-in-ror" hidden>
-                                <input class="form-check-input" type="checkbox" id="account-organization-not-in-ror" name="organization_not_in_ror">
-                                <label class="form-check-label small" for="account-organization-not-in-ror">My organization is not in <a href="{{ config.ror_website_url }}" target="_blank" rel="noopener noreferrer">ROR</a></label>
+                            <div class="form-field mt-1 js-not-in-ror" hidden>
+                                <input class="check" type="checkbox" id="account-organization-not-in-ror" name="organization_not_in_ror">
+                                <label class="small" for="account-organization-not-in-ror">My organization is not in <a href="{{ config.ror_website_url }}" target="_blank" rel="noopener noreferrer">ROR</a></label>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="small mb-2 js-profile-status" hidden></div>
+                <div class="small mb-3 js-profile-status" hidden></div>
             </form>
 
-            <div class="d-flex gap-2 mb-2">
-                <i class="bi bi-envelope text-body-secondary" aria-hidden="true"></i>
+            <div class="d-flex gap-3 mb-3">
+                <i class="bi bi-envelope fg-secondary" aria-hidden="true"></i>
                 <div class="flex-grow-1 text-break">
                     {{ user.email }}
                     {% if user.has_confirmed_email %}
-                    <span class="badge text-bg-success ms-1">Confirmed</span>
+                    <span class="badge theme-success ms-1">Confirmed</span>
                     {% else %}
-                    <span class="badge text-bg-warning ms-1">Not confirmed</span>
+                    <span class="badge theme-warning ms-1">Not confirmed</span>
                     {# base.html's script looks for the result next to the button. #}
-                    <div class="small text-body-secondary">
+                    <div class="small fg-secondary">
                         Confirm it with the link we emailed you to generate drafts.
                         <button type="button" class="btn btn-link btn-sm p-0 align-baseline js-resend-confirmation" data-url="{% url 'resend_confirmation_email' %}">Send the link again</button>
                         <div class="js-resend-confirmation-result" hidden></div>
                     </div>
                     {% endif %}
                     {% if user.pending_email %}
-                    <div class="small text-body-secondary">
+                    <div class="small fg-secondary">
                         Changes to <strong>{{ user.pending_email }}</strong> once you follow the link we sent there.
                         <button type="button" class="btn btn-link btn-sm p-0 align-baseline js-account-action" data-url="{% url 'account_cancel_email_change' %}">Cancel this change</button>
                     </div>
@@ -112,94 +111,93 @@
             </div>
 
             {% if user.orcid_id %}
-            <div class="d-flex align-items-center gap-2 mb-2">
+            <div class="d-flex align-items-center gap-3 mb-3">
                 <a class="d-flex" href="https://orcid.org/{{ user.orcid_id }}" target="_blank" rel="noopener noreferrer" title="Open your ORCID record"><img style="height:16px" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="Open your ORCID record"></a>
                 <span>{{ user.orcid_id }}</span>
-                <button type="button" class="btn btn-link btn-sm p-0 ms-auto text-body-secondary js-account-action" data-url="{% url 'account_unlink_orcid' %}" data-confirm="Unlink your ORCID iD from this account?">Unlink</button>
+                <button type="button" class="btn btn-link btn-sm p-0 ms-auto fg-secondary js-account-action" data-url="{% url 'account_unlink_orcid' %}" data-confirm="Unlink your ORCID iD from this account?">Unlink</button>
             </div>
             {% endif %}
 
             {# Then what you can do, as buttons as wide as the tab. #}
-            <div class="mt-3">
+            <div class="mt-5">
                 {% if not user.orcid_id %}
-                <div class="d-grid mb-2">
-                    <a class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center" href="{% url 'orcid_login' %}">
+                <div class="d-grid mb-3">
+                    <a class="btn-sm btn-outline theme-secondary d-flex align-items-center justify-content-center" href="{% url 'orcid_login' %}">
                         <img class="me-1" style="height:16px" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="">
                         Link ORCID
                     </a>
                 </div>
                 {% endif %}
 
-                <div class="d-grid mb-2">
-                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#accountEmailChange" aria-expanded="false" aria-controls="accountEmailChange">Change email address</button>
+                <div class="d-grid mb-3">
+                    <button class="btn-sm btn-outline theme-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#accountEmailChange" aria-expanded="false" aria-controls="accountEmailChange">Change email address</button>
                 </div>
                 <div class="collapse" id="accountEmailChange">
-                    <form class="js-account-form mb-3" data-url="{% url 'account_request_email_change' %}" novalidate>
-                        <div class="form-floating mb-2">
-                            <input type="email" class="form-control" id="account-new-email" name="new_email" placeholder="New email address" autocomplete="email" required>
+                    <form class="js-account-form mb-5" data-url="{% url 'account_request_email_change' %}" novalidate>
+                        <div class="form-floating mb-3">
                             <label for="account-new-email">New email address</label>
+                            <input type="email" class="form-control" id="account-new-email" name="new_email" placeholder="name@example.org" autocomplete="email" required>
                         </div>
                         <div class="form-floating">
-                            <input type="password" class="form-control" id="account-email-password" name="password" placeholder="Current password" autocomplete="current-password" required>
                             <label for="account-email-password">Current password</label>
+                            <input type="password" class="form-control" id="account-email-password" name="password" placeholder=" " autocomplete="current-password" required>
                         </div>
                         <div class="form-text">We send a confirmation link to the new address. You keep using your current address until you follow it.</div>
-                        <div class="d-grid mt-2">
-                            <button type="submit" class="btn btn-sm btn-primary">Send confirmation link</button>
+                        <div class="d-grid mt-3">
+                            <button type="submit" class="btn-sm btn-solid theme-primary">Send confirmation link</button>
                         </div>
-                        <div class="small mt-2 js-form-result" hidden></div>
+                        <div class="small mt-3 js-form-result" hidden></div>
                     </form>
                 </div>
 
-                <div class="d-grid mb-2">
-                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#accountPasswordChange" aria-expanded="false" aria-controls="accountPasswordChange">Change password</button>
+                <div class="d-grid mb-3">
+                    <button class="btn-sm btn-outline theme-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#accountPasswordChange" aria-expanded="false" aria-controls="accountPasswordChange">Change password</button>
                 </div>
                 <div class="collapse" id="accountPasswordChange">
-                    <form class="js-account-form mb-3" data-url="{% url 'account_change_password' %}" data-reset="true" novalidate>
-                        <div class="form-floating mb-2">
-                            <input type="password" class="form-control" id="account-old-password" name="old_password" placeholder="Current password" autocomplete="current-password" required>
+                    <form class="js-account-form mb-5" data-url="{% url 'account_change_password' %}" data-reset="true" novalidate>
+                        <div class="form-floating mb-3">
                             <label for="account-old-password">Current password</label>
+                            <input type="password" class="form-control" id="account-old-password" name="old_password" placeholder=" " autocomplete="current-password" required>
                         </div>
-                        <div class="form-floating mb-2">
-                            <input type="password" class="form-control" id="account-new-password1" name="new_password1" placeholder="New password" autocomplete="new-password" required>
+                        <div class="form-floating mb-3">
                             <label for="account-new-password1">New password</label>
+                            <input type="password" class="form-control" id="account-new-password1" name="new_password1" placeholder=" " autocomplete="new-password" required>
                         </div>
                         <div class="form-floating">
-                            <input type="password" class="form-control" id="account-new-password2" name="new_password2" placeholder="New password again" autocomplete="new-password" required>
                             <label for="account-new-password2">New password again</label>
+                            <input type="password" class="form-control" id="account-new-password2" name="new_password2" placeholder=" " autocomplete="new-password" required>
                         </div>
-                        <div class="d-grid mt-2">
-                            <button type="submit" class="btn btn-sm btn-primary">Change password</button>
+                        <div class="d-grid mt-3">
+                            <button type="submit" class="btn-sm btn-solid theme-primary">Change password</button>
                         </div>
-                        <div class="small mt-2 js-form-result" hidden></div>
+                        <div class="small mt-3 js-form-result" hidden></div>
                     </form>
                 </div>
 
-                <div class="d-grid mb-2">
-                    <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#accountDeletion" aria-expanded="false" aria-controls="accountDeletion">Delete account</button>
+                <div class="d-grid mb-3">
+                    <button class="btn-sm btn-outline theme-danger" type="button" data-bs-toggle="collapse" data-bs-target="#accountDeletion" aria-expanded="false" aria-controls="accountDeletion">Delete account</button>
                 </div>
                 <div class="collapse" id="accountDeletion">
-                    <div class="mb-2" id="accountDeletionContainer" data-url="{% url 'account_delete_panel' %}">
-                        <div class="text-muted small">Loading…</div>
+                    <div class="mb-3" id="accountDeletionContainer" data-url="{% url 'account_delete_panel' %}">
+                        <div class="fg-secondary small">Loading…</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        {% if llm_choices|length > 1 or user.is_staff %}
         <div class="tab-pane fade" id="userMenuSettings" role="tabpanel" aria-labelledby="userMenuSettingsTab" tabindex="0">
             {# A single model leaves nothing to choose: the system default is that model. #}
             {% if llm_choices|length > 1 %}
-            <div class="mb-4">
+            <div class="mb-7">
                 <h5 class="mb-1">Model choice</h5>
-                <p class="mb-2 text-muted">Choose the large language model used to draft answers. Leave on system default if unsure.</p>
-                <select id="llm-model-select" class="form-select form-select-sm" aria-label="LLM model">
+                <p class="mb-3 fg-secondary">Choose the large language model used to draft answers. Leave on system default if unsure.</p>
+                <select id="llm-model-select" class="form-control form-control-sm" aria-label="LLM model">
                     <option value="">— use system default —</option>
                     {% for value, label in llm_choices %}
                     <option value="{{ value }}" {% if value == llm_current %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
-                <div id="llm-model-alert" class="alert mt-2 py-2 px-3 small d-none" role="alert"></div>
+                <div id="llm-model-alert" class="alert mt-3 py-3 px-5 small d-none" role="alert"></div>
             </div>
             <script>
             (function () {
@@ -208,7 +206,7 @@
               if (!sel) return;
 
               function showAlert(variant, html) {
-                alertBox.className = 'alert alert-' + variant + ' mt-2 py-2 px-3 small d-flex align-items-center';
+                alertBox.className = 'alert theme-' + variant + ' mt-3 py-3 px-5 small d-flex align-items-center';
                 alertBox.innerHTML = html;
               }
 
@@ -253,7 +251,7 @@
               }
 
               function hideAlert() {
-                alertBox.className = 'alert mt-2 py-2 px-3 small d-none';
+                alertBox.className = 'alert mt-3 py-3 px-5 small d-none';
                 alertBox.innerHTML = '';
               }
 
@@ -269,12 +267,12 @@
                     updateBadge(data.signature);
                   } else {
                     showAlert('danger',
-                      '<i class="bi bi-exclamation-triangle me-2"></i>'
+                      '<i class="bi bi-exclamation-triangle me-3"></i>'
                       + '<div>' + htmlEscape(data.error || 'Unknown error') + '</div>');
                   }
                 } catch (e) {
                   showAlert('danger',
-                    '<i class="bi bi-exclamation-triangle me-2"></i>'
+                    '<i class="bi bi-exclamation-triangle me-3"></i>'
                     + '<div>Network error.</div>');
                 }
               });
@@ -282,26 +280,65 @@
             </script>
             {% endif %}
 
+            <div class="mb-7">
+                <h5 class="mb-1">Appearance</h5>
+                <p class="mb-3 fg-secondary">Light, dark, or follow your system's setting.</p>
+                <div class="btn-group d-flex w-100" role="radiogroup" aria-label="Colour mode">
+                    {% for value, label, icon in color_mode_choices %}
+                    <label class="btn-check btn-outline theme-secondary btn-sm flex-fill">
+                        <input type="radio" name="color-mode" value="{{ value }}" class="js-color-mode" autocomplete="off"{% if value == color_mode %} checked{% endif %}>
+                        <i class="bi {{ icon }}" aria-hidden="true"></i>{{ label }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <div id="color-mode-alert" class="alert theme-danger mt-3 py-3 px-5 small" role="alert" hidden></div>
+            </div>
+            <script>
+            (function () {
+              const alertBox = document.getElementById('color-mode-alert');
+              let saved = document.documentElement.dataset.colorMode;
+              document.querySelectorAll('.js-color-mode').forEach(function (radio) {
+                radio.addEventListener('change', async function () {
+                  window.setColorMode(radio.value);  // at once; undone if saving fails
+                  alertBox.hidden = true;
+                  const fd = new FormData();
+                  fd.append('mode', radio.value);
+                  fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+                  try {
+                    const r = await fetch('{% url "account_set_color_mode" %}', { method: 'POST', body: fd });
+                    const data = await r.json();
+                    if (!data.success) throw new Error();
+                    saved = radio.value;
+                  } catch (e) {
+                    window.setColorMode(saved);
+                    document.querySelector('.js-color-mode[value="' + saved + '"]').checked = true;
+                    alertBox.textContent = 'Could not save the setting. Please try again.';
+                    alertBox.hidden = false;
+                  }
+                });
+              });
+            })();
+            </script>
+
             {% if user.is_staff %}
-            <div class="d-grid mb-4">
-                <a class="btn btn-outline-secondary d-flex align-items-center justify-content-center" href="{% url 'stats_dashboard' %}">
-                    <i class="bi bi-graph-up-arrow me-2"></i> KPI dashboard
+            <div class="d-grid mb-7">
+                <a class="btn-outline theme-secondary d-flex align-items-center justify-content-center" href="{% url 'stats_dashboard' %}">
+                    <i class="bi bi-graph-up-arrow me-3"></i> KPI dashboard
                 </a>
             </div>
             {% endif %}
         </div>
-        {% endif %}
 
         <div class="tab-pane fade" id="userMenuPrivacy" role="tabpanel" aria-labelledby="userMenuPrivacyTab" tabindex="0">
-            <div class="mb-4">
+            <div class="mb-7">
                 <h5 class="mb-1">Authorship</h5>
-                <p class="mb-2 text-muted">When an owner or admin gives an outside server API access to a workspace you belong to, that server can read the ToxTemps you created or edited there.</p>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" role="switch" id="credit-by-name"{% if credit_by_name %} checked{% endif %}>
-                    <label class="form-check-label" for="credit-by-name">Credit me by name (name, org, ORCID)</label>
+                <p class="mb-3 fg-secondary">When an owner or admin gives an outside server API access to a workspace you belong to, that server can read the ToxTemps you created or edited there.</p>
+                <div class="form-field">
+                    <div class="switch"><input type="checkbox" role="switch" switch id="credit-by-name"{% if credit_by_name %} checked{% endif %}></div>
+                    <label for="credit-by-name">Credit me by name (name, org, ORCID)</label>
                 </div>
-                <p class="mb-0 mt-1 text-muted small">On by default. Applies to all your workspaces and takes effect at once. Never your email address. Switched off, you appear as "Contributor (not named)".</p>
-                <div id="credit-by-name-alert" class="alert alert-danger mt-2 py-2 px-3 small" role="alert" hidden></div>
+                <p class="mb-0 mt-1 fg-secondary small">On by default. Applies to all your workspaces and takes effect at once. Never your email address. Switched off, you appear as "Contributor (not named)".</p>
+                <div id="credit-by-name-alert" class="alert theme-danger mt-3 py-3 px-5 small" role="alert" hidden></div>
             </div>
             <script>
             (function () {
@@ -326,16 +363,16 @@
             </script>
 
             {% if email_settings %}
-            <div class="mb-4">
+            <div class="mb-7">
                 <h5 class="mb-1">Email notifications</h5>
-                <p class="mb-2 text-muted">Emails about your account, like confirmations and password changes, are always sent.</p>
+                <p class="mb-3 fg-secondary">Emails about your account, like confirmations and password changes, are always sent.</p>
                 {% for setting in email_settings %}
-                <div class="form-check form-switch">
-                    <input class="form-check-input js-email-setting" type="checkbox" role="switch" id="email-setting-{{ setting.kind }}" data-kind="{{ setting.kind }}"{% if setting.enabled %} checked{% endif %}>
-                    <label class="form-check-label" for="email-setting-{{ setting.kind }}">{{ setting.label }}</label>
+                <div class="form-field">
+                    <div class="switch"><input class="js-email-setting" type="checkbox" role="switch" switch id="email-setting-{{ setting.kind }}" data-kind="{{ setting.kind }}"{% if setting.enabled %} checked{% endif %}></div>
+                    <label for="email-setting-{{ setting.kind }}">{{ setting.label }}</label>
                 </div>
                 {% endfor %}
-                <div id="email-setting-alert" class="alert alert-danger mt-2 py-2 px-3 small" role="alert" hidden></div>
+                <div id="email-setting-alert" class="alert theme-danger mt-3 py-3 px-5 small" role="alert" hidden></div>
             </div>
             <script>
             (function () {
@@ -362,25 +399,25 @@
             </script>
             {% endif %}
 
-            <div class="mb-4">
+            <div class="mb-7">
                 <h5 class="mb-1">
                     Shared documents
-                    <i class="bi bi-info-circle text-muted fs-6 ms-1" tabindex="0" role="img" aria-label="What Stop sharing does" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Stop sharing applies from that moment on: the file is no longer used to improve ToxTempAssistant, and the stored copy is deleted after {{ file_withdrawal_grace_hours }} hours (until then you can undo). We improve the tool from many documents together, so what a single file contributed is hard to pin down; should it have played a part in earlier improvements, those stay in place. Your ToxTemp answers are not changed. Copies in our backups expire within {{ backup_retention_days }} days and are not used either."></i>
+                    <i class="bi bi-info-circle fg-secondary fs-md ms-1" tabindex="0" role="img" aria-label="What Stop sharing does" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Stop sharing applies from that moment on: the file is no longer used to improve ToxTempAssistant, and the stored copy is deleted after {{ file_withdrawal_grace_hours }} hours (until then you can undo). We improve the tool from many documents together, so what a single file contributed is hard to pin down; should it have played a part in earlier improvements, those stay in place. Your ToxTemp answers are not changed. Copies in our backups expire within {{ backup_retention_days }} days and are not used either."></i>
                 </h5>
-                <p class="mb-2 text-muted">Documents you allowed the development team to keep to improve ToxTempAssistant.</p>
+                <p class="mb-3 fg-secondary">Documents you allowed the development team to keep to improve ToxTempAssistant.</p>
                 <div id="sharedFilesContainer" data-url="{% url 'account_shared_files' %}" data-stop-url="{% url 'account_stop_sharing' %}" data-undo-url="{% url 'account_undo_stop_sharing' %}">
-                    <div class="text-muted small">Loading…</div>
+                    <div class="fg-secondary small">Loading…</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="border-top px-3 pt-3">
-        <div class="d-flex justify-content-between mb-3">
-            <button id="startOnboardingBtn" class="btn btn-outline-primary">
+    <div class="border-top px-5 pt-5">
+        <div class="d-flex justify-content-between mb-5">
+            <button id="startOnboardingBtn" class="btn-outline theme-primary">
                 <i class="bi bi-question-circle me-1"></i> Guided Tour
             </button>
-            <a class="btn btn-secondary" role="button" href="{% url 'logout'%}">Logout</a>
+            <a class="btn-solid theme-secondary" role="button" href="{% url 'logout'%}">Logout</a>
         </div>
         <script>
           // Each icon below names itself in a tooltip, like the model badge. Legal and
@@ -395,22 +432,22 @@
             });
           });
         </script>
-        <div class="pb-3">
+        <div class="pb-5">
             <div class="btn-group d-flex w-100" role="group">
-                <a class="btn btn-sm btn-outline-secondary d-flex align-items-center js-footer-tooltip" href="{{ config.github_repo_url }}" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub">
+                <a class="btn-sm btn-outline theme-secondary d-flex align-items-center js-footer-tooltip" href="{{ config.github_repo_url }}" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub">
                     <i class="bi bi-github"></i>
                     {% if config.git_hash %}
-                        <span class="ms-1 small text-muted">{{ config.git_hash|slice:":7" }}</span>
+                        <span class="ms-1 small fg-secondary">{{ config.git_hash|slice:":7" }}</span>
                     {% endif %}
                 </a>
-                <a class="btn btn-sm btn-outline-secondary js-footer-tooltip" href="{% url 'about' %}" title="About" aria-label="About"><i class="bi bi-info-circle"></i></a>
-                <a class="btn btn-sm btn-outline-secondary js-footer-tooltip" href="{% url 'about' %}#how-to-cite" title="How to cite" aria-label="How to cite"><i class="bi bi-chat-left-quote"></i></a>
-                <a class="btn btn-sm btn-outline-secondary js-footer-tooltip" href="mailto:{{config.maintainer_email}}?subject=%5BToxTempAssistant%5D%20%3CEnter%20Subject%20Here%3E" title="Contact via Email" aria-label="Contact via Email"><i class="bi bi-envelope-paper-heart"></i></a>
-                <button class="btn btn-sm btn-outline-secondary js-footer-tooltip" type="button" data-bs-target="#termsModal" data-bs-toggle="modal" title="Legal" aria-label="Legal"><i class="bi bi-book"></i></button>
-                <button class="btn btn-sm btn-outline-secondary js-footer-tooltip" type="button" data-bs-target="#copyrightModal" data-bs-toggle="modal" title="License" aria-label="License"><i class="bi bi-c-circle"></i></button>
+                <a class="btn-sm btn-outline theme-secondary js-footer-tooltip" href="{% url 'about' %}" title="About" aria-label="About"><i class="bi bi-info-circle"></i></a>
+                <a class="btn-sm btn-outline theme-secondary js-footer-tooltip" href="{% url 'about' %}#how-to-cite" title="How to cite" aria-label="How to cite"><i class="bi bi-chat-left-quote"></i></a>
+                <a class="btn-sm btn-outline theme-secondary js-footer-tooltip" href="mailto:{{config.maintainer_email}}?subject=%5BToxTempAssistant%5D%20%3CEnter%20Subject%20Here%3E" title="Contact via Email" aria-label="Contact via Email"><i class="bi bi-envelope-paper-heart"></i></a>
+                <button class="btn-sm btn-outline theme-secondary js-footer-tooltip js-open-dialog" type="button" data-bs-target="#termsModal" title="Legal" aria-label="Legal"><i class="bi bi-book"></i></button>
+                <button class="btn-sm btn-outline theme-secondary js-footer-tooltip js-open-dialog" type="button" data-bs-target="#copyrightModal" title="License" aria-label="License"><i class="bi bi-c-circle"></i></button>
                 {% if llm_signature %}
                 <a id="llm-signature-badge"
-                      class="btn btn-sm btn-outline-secondary d-flex align-items-center"
+                      class="btn-sm btn-outline theme-secondary d-flex align-items-center"
                       href="https://ai.azure.com/catalog/models/{{ llm_signature.model_id }}"
                       target="_blank"
                       rel="noopener noreferrer"
@@ -431,28 +468,29 @@
             </div>
         </div>
     </div>
-</div>
+</dialog>
+
+{# The workspace dialogs sit outside the menu: a closed Bootstrap 6 dialog keeps #}
+{# its place in the layout (it is only made invisible), so inside the menu's     #}
+{# scrolling body they would give it a scrollbar with nothing to scroll to.      #}
+{% include "toxtempass/base_extras/workspaces/workspace_modals.html" %}
 
 <!-- Modal -->
-<div class="modal fade" id="copyrightModal" tabindex="-1" aria-labelledby="copyrightModalLabel" aria-hidden="true" style="z-index: 1200;">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="copyrightModalLabel">Copyright</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<dialog class="dialog dialog-scrollable dialog-lg" id="copyrightModal" aria-labelledby="copyrightModalLabel">
+            <div class="dialog-header">
+                <h5 class="dialog-title" id="copyrightModalLabel">Copyright</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
             </div>
-            <div class="modal-body" data-lazy-src="{% url 'license' %}?partial=1" data-lazy-page="{% url 'license' %}">
-                <div class="d-flex justify-content-center py-5">
-                    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading…</span></div>
+            <div class="dialog-body" data-lazy-src="{% url 'license' %}?partial=1" data-lazy-page="{% url 'license' %}">
+                <div class="d-flex justify-content-center py-12">
+                    <div class="spinner-border fg-primary" role="status"><span class="visually-hidden">Loading…</span></div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="dialog-footer">
                 <a class="btn btn-link me-auto" href="{% url 'license' %}" target="_blank" rel="noopener">Open as page</a>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn-solid theme-secondary" data-bs-dismiss="dialog">Close</button>
             </div>
-        </div>
-    </div>
-</div>
+</dialog>
 
 {% include "terms_of_service_modal.html" %}
 
@@ -466,7 +504,7 @@
           }
 
           function showResult(element, ok, text) {
-            element.className = 'small mt-2 js-form-result ' + (ok ? 'text-success' : 'text-danger');
+            element.className = 'small mt-3 js-form-result ' + (ok ? 'fg-success' : 'fg-danger');
             element.textContent = text;
             element.hidden = false;
           }
@@ -541,7 +579,7 @@
               notInRorBox.checked = false;
             };
             const showStatus = function (ok, text) {
-              status.className = 'small mt-1 js-profile-status ' + (ok ? 'text-success' : 'text-danger');
+              status.className = 'small mt-1 js-profile-status ' + (ok ? 'fg-success' : 'fg-danger');
               status.textContent = text;
               status.hidden = false;
               clearTimeout(statusTimer);
@@ -569,8 +607,12 @@
               if (request !== latestRequest) return;  // a newer save is under way
               if (data.success) {
                 remember();
-                profile.querySelector('.js-name-value').textContent = data.name || 'Add your name';
-                profile.querySelector('.js-organization-value').textContent = data.organization;
+                profile.querySelectorAll('[data-placeholder]').forEach(function (value) {
+                  // An empty value shows its placeholder, muted, so it reads as a prompt.
+                  const text = value.classList.contains('js-name-value') ? data.name : data.organization;
+                  value.textContent = text || value.dataset.placeholder;
+                  value.classList.toggle('fg-secondary', !text);
+                });
                 const match = profile.querySelector('.js-ror-match');
                 const matchText = 'Matched to ' + data.ror_name + ' in the Research Organization Registry';
                 if (window.bootstrap && bootstrap.Tooltip) {
@@ -681,26 +723,28 @@
           let loaded = false;
 
           function render(html) {
-            const openPanels = Array.from(container.querySelectorAll('.accordion-collapse.show')).map(function (panel) { return panel.id; });
+            const openPanels = Array.from(container.querySelectorAll('details.accordion-item[open]')).map(function (panel) { return panel.id; });
             container.innerHTML = html;
             openPanels.forEach(function (id) {
               const panel = document.getElementById(id);
-              const toggle = container.querySelector('[data-bs-target="#' + id + '"]');
-              if (!panel || !toggle) return;
-              panel.classList.add('show');
-              toggle.classList.remove('collapsed');
-              toggle.setAttribute('aria-expanded', 'true');
+              if (panel) panel.open = true;
             });
           }
 
           async function load() {
             try {
               const response = await fetch(container.dataset.url);
+              // Logged out, the view redirects to the login page; fetch follows
+              // it, and that whole page must not end up inside the menu.
+              if (response.redirected) {
+                container.innerHTML = '<p class="fg-danger small mb-0">Your session has ended. Please reload the page and log in again.</p>';
+                return;
+              }
               if (!response.ok) throw new Error(response.statusText);
               render(await response.text());
               loaded = true;
             } catch (error) {
-              container.innerHTML = '<p class="text-danger small mb-0">Could not load your shared documents.</p>';
+              container.innerHTML = '<p class="fg-danger small mb-0">Could not load your shared documents.</p>';
             }
           }
 
@@ -742,11 +786,15 @@
             if (loaded) return;
             try {
               const response = await fetch(container.dataset.url);
+              if (response.redirected) {  // logged out: the login page, see above
+                container.innerHTML = '<p class="fg-danger small mb-0">Your session has ended. Please reload the page and log in again.</p>';
+                return;
+              }
               if (!response.ok) throw new Error(response.statusText);
               container.innerHTML = await response.text();
               loaded = true;
             } catch (error) {
-              container.innerHTML = '<p class="text-danger small mb-0">Could not load this section.</p>';
+              container.innerHTML = '<p class="fg-danger small mb-0">Could not load this section.</p>';
             }
           });
 
@@ -778,7 +826,7 @@
             } catch (error) {
               result.textContent = 'Network error. Please try again.';
             }
-            result.className = 'small mt-2 js-form-result text-danger';
+            result.className = 'small mt-3 js-form-result fg-danger';
             result.hidden = false;
             button.disabled = false;
           });
@@ -789,7 +837,7 @@
             // table) starts on Workspaces. Re-opening it from code after a modal has
             // no relatedTarget, so the tab the user was on stays.
             const userMenu = document.getElementById("offcanvasUser");
-            userMenu.addEventListener("show.bs.offcanvas", function (event) {
+            userMenu.addEventListener("show.bs.drawer", function (event) {
                 if (event.relatedTarget) {
                     bootstrap.Tab.getOrCreateInstance(
                         document.getElementById("userMenuWorkspacesTab")
@@ -801,63 +849,26 @@
             // deliberate one-off actions, so re-opening the menu later should not
             // land on an expanded password or delete-account form. Done once the
             // menu is hidden, so the folding is never seen.
-            userMenu.addEventListener("hidden.bs.offcanvas", function () {
+            userMenu.addEventListener("hidden.bs.drawer", function () {
                 ["accountEmailChange", "accountPasswordChange", "accountDeletion"]
                     .forEach(function (id) {
                         const section = document.getElementById(id);
                         if (!section) return;
-                        // toggle: false, or creating the instance opens a closed section.
-                        bootstrap.Collapse
-                            .getOrCreateInstance(section, { toggle: false })
-                            .hide();
+                        bootstrap.Collapse.getOrCreateInstance(section).hide();
                     });
             });
 
-            // More robust: wait for the offcanvas "hidden" event before showing modal
-            document.querySelectorAll("[data-bs-toggle='modal']").forEach((btn) => {
+            // Legal and License open on top of the user menu, which stays open
+            // underneath (both are <dialog>s in the browser's top layer). Not
+            // data-bs-toggle="dialog": from inside an open drawer Bootstrap would
+            // swap the menu out instead.
+            document.querySelectorAll("#offcanvasUser .js-open-dialog").forEach((btn) => {
                 btn.addEventListener("click", function () {
-                    const offcanvasEl = document.querySelector(".offcanvas.show");
-                    const targetModal = document.querySelector(btn.getAttribute("data-bs-target"));
-
-                    if (!targetModal) return;
-
-                    if (offcanvasEl) {
-                        // Ensure we have an Offcanvas instance
-                        const ocInstance = bootstrap.Offcanvas.getInstance(offcanvasEl) || new bootstrap.Offcanvas(offcanvasEl);
-
-                        // When the offcanvas is fully hidden, show the modal
-                        const onHidden = () => {
-                            const modal = new bootstrap.Modal(targetModal);
-                            modal.show();
-
-                            // After the modal is hidden, restore the offcanvas once the backdrop is gone
-                            targetModal.addEventListener('hidden.bs.modal', function () {
-                                const tryRestore = () => {
-                                    const backdrop = document.querySelector('.modal-backdrop');
-                                    if (!backdrop) {
-                                        const oc = new bootstrap.Offcanvas(offcanvasEl);
-                                        oc.show();
-                                    } else {
-                                        setTimeout(tryRestore, 50);
-                                    }
-                                };
-                                tryRestore();
-                            }, { once: true });
-                        };
-
-                        offcanvasEl.addEventListener('hidden.bs.offcanvas', onHidden, { once: true });
-                        ocInstance.hide();
-                    }
-                });
-            });
-
-            // Also remove any lingering backdrops when any modal is fully hidden
-            document.querySelectorAll('.modal').forEach(modalEl => {
-                modalEl.addEventListener('hidden.bs.modal', () => {
-                    const lingeringBackdrop = document.querySelector('.modal-backdrop');
-                    if (lingeringBackdrop) {
-                        lingeringBackdrop.parentNode.removeChild(lingeringBackdrop);
-                    }
+                    const target = document.querySelector(btn.dataset.bsTarget);
+                    if (!target) return;
+                    // Back to the button on close, so focus (and Escape) is in the menu again.
+                    target.addEventListener("hidden.bs.dialog", () => btn.focus(), { once: true });
+                    bootstrap.Dialog.getOrCreateInstance(target).show(btn);
                 });
             });
 

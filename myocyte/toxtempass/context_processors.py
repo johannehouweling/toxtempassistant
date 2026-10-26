@@ -183,6 +183,23 @@ def llm_info(request) -> dict:
     }
 
 
+def color_mode(request: HttpRequest) -> dict:
+    """Expose the user's colour mode ("system", "light" or "dark") for base.html."""
+    user = getattr(request, "user", None)
+    mode = "system"
+    if user and getattr(user, "is_authenticated", False):
+        mode = (user.preferences or {}).get("color_mode", "system")
+    return {
+        "color_mode": mode if mode in config._color_modes else "system",
+        # The Settings tab's switch: (value, label, Bootstrap icon).
+        "color_mode_choices": [
+            ("system", "System", "bi-circle-half"),
+            ("light", "Light", "bi-sun"),
+            ("dark", "Dark", "bi-moon-stars"),
+        ],
+    }
+
+
 def email_preferences(request: HttpRequest) -> dict:
     """Expose the email notifications the user can switch off, for the offcanvas."""
     user = getattr(request, "user", None)

@@ -510,7 +510,7 @@ class TestWorkspaceTab:
         WorkspaceFactory(owner=member, name="Mine")
         # Only the server-rendered cards: the script below holds templates of its own.
         html = self._html(member).split("<style>")[0]
-        card = '<div class="card border-0 h-100 workspace-card workspace-list'
+        card = '<div class="card h-100 workspace-card workspace-list'
         wrapped = '<div class="col">\n          ' + card
         assert html.count(card) == 2 and html.count(wrapped) == 2
 
@@ -534,7 +534,7 @@ class TestWorkspaceTab:
         assert f'const CURRENT_USER_ID = "{owner.pk}"' in script
         chip = script[script.index("const OWNER_CHIP_HTML") :]
         chip = chip[: chip.index("function settingsButtonHtml")]
-        assert "bi-key-fill" in chip and "bg-success-subtle" in chip
+        assert "bi-key-fill" in chip and "bg-subtle-success" in chip
         assert "member-row member-chip" in chip and ">You<" in chip
         # Both cards the script builds get the owner chip and the settings cogwheel.
         assert script.count("${OWNER_CHIP_HTML}") == 2
@@ -566,7 +566,14 @@ class TestWorkspaceTab:
     def test_the_dialogs_do_not_promise_anonymity_and_link_the_docs(
         self, owner, workspace
     ):
-        html = self._html(owner)
+        # The dialogs are rendered outside the workspace list, next to the menu.
+        request = RequestFactory().get("/")
+        request.user = owner
+        html = render_to_string(
+            "toxtempass/base_extras/workspaces/workspace_modals.html",
+            ws_views.get_workspace_list(request),
+            request=request,
+        )
         assert "without naming any person" not in html
         flat = " ".join(html.split())
         assert "They see the authors of its ToxTemps by name" in flat
@@ -617,7 +624,7 @@ class TestWorkspaceTab:
         html = self._html(owner)
         start = html.index("invite-row")
         chip = html[start : html.index("(invited)", start)]
-        assert "bi-patch-question-fill" in chip and "text-white" in chip
+        assert "bi-patch-question-fill" in chip and "fg-white" in chip
         assert "hourglass" not in html
         script = (
             Path(ws_views.__file__).parent
@@ -626,7 +633,7 @@ class TestWorkspaceTab:
         assert "hourglass" not in script
         start = script.index("invite-row")
         added = script[start : script.index("bi-patch-question-fill")]
-        assert "text-white member-avatar" in added
+        assert "fg-white member-avatar" in added
 
     def test_the_invitation_page_and_email_say_credit_is_on_by_default(
         self, client, owner, workspace, invitee

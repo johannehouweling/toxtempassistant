@@ -1,13 +1,16 @@
 <!-- Scrollspy Auto Scroll Script -->
 <script>
-    // let the full body be target (otherwise we need to put vh-100 onto question-content)
-    var scrollSpy = new bootstrap.ScrollSpy(document.body, {
-      target: '#navbar-questions'
+    // let the full body be target (otherwise we need to put vh-100 onto question-content).
+    // Bootstrap loads as a module, so it exists from DOMContentLoaded on. topMargin puts
+    // the activation line below the sticky header (see .compensate-sticky-header).
+    document.addEventListener('DOMContentLoaded', function () {
+      bootstrap.ScrollSpy.getOrCreateInstance(document.body, {
+        target: '#navbar-questions',
+        smoothScroll: true,
+        topMargin: '130px',
+      });
+      document.body.setAttribute('tabindex', '0');
     });
-    document.body.setAttribute('data-bs-spy', 'scroll');
-    document.body.setAttribute('data-bs-target', '#navbar-questions');
-    document.body.setAttribute('data-bs-smooth-scroll', 'true');
-    document.body.setAttribute('tabindex', '0');
   
     // make sure the highlihgtted element in the scrollspy nav bar is always visibkle
 

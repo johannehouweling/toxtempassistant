@@ -16,15 +16,15 @@ document.addEventListener('DOMContentLoaded', function() {
     let modalProgressFilename = null;
 
     // Initialize Bootstrap modal instance if modal element exists
-    if (uploadModalEl && window.bootstrap && window.bootstrap.Modal) {
-        uploadModal = new bootstrap.Modal(uploadModalEl, {backdrop: 'static', keyboard: false});
+    if (uploadModalEl && window.bootstrap && window.bootstrap.Dialog) {
+        uploadModal = new bootstrap.Dialog(uploadModalEl, {backdrop: 'static', keyboard: false});
         modalProgressBar = uploadModalEl.querySelector('#uploadProgressBarModal');
         modalProgressFilename = uploadModalEl.querySelector('#uploadProgressFilenameModal');
     }
 
     const demoLockedModalEl = document.getElementById('demoLockedModal');
-    const demoLockedModal = demoLockedModalEl && window.bootstrap && window.bootstrap.Modal
-        ? new bootstrap.Modal(demoLockedModalEl)
+    const demoLockedModal = demoLockedModalEl && window.bootstrap && window.bootstrap.Dialog
+        ? new bootstrap.Dialog(demoLockedModalEl)
         : null;
 
     form.addEventListener('submit', function(event) {
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Handle non-field errors
                     if (response.errors.__all__) {
                         const nonFieldErrorsContainer = document.getElementById('non-field-errors');
-                        nonFieldErrorsContainer.innerHTML = `<div class="alert alert-danger">${response.errors.__all__.join('<br>')}</div>`;
+                        nonFieldErrorsContainer.innerHTML = `<div class="alert theme-danger"><div>${response.errors.__all__.join('<br>')}</div></div>`;
                         if (demoLockedModal && response.errors.__all__.some(msg => msg.includes('Demo assays cannot be regenerated'))) {
                             demoLockedModal.show();
                         }

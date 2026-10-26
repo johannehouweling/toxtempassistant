@@ -97,7 +97,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.humanize",
     "django.contrib.sitemaps",
-    "django_bootstrap5",
     "toxtempass",
     "simple_history",
     "django_extensions",
@@ -165,6 +164,7 @@ TEMPLATES = [
                 "toxtempass.context_processors.llm_info",
                 # Switchable email notifications for the offcanvas
                 "toxtempass.context_processors.email_preferences",
+                "toxtempass.context_processors.color_mode",
             ],
         },
     },

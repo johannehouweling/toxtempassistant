@@ -1,0 +1,48 @@
+// ============================================================================
+// ToxTempAssistant's build of Bootstrap 6.
+//
+// Bootstrap 6 is customised by configuring its Sass maps (`@use ... with`), not
+// by adding CSS on top. We add one theme colour: the RISK-HUNT3R readiness
+// breakdown needs "orange" (Level 3). Registering it in `$theme-colors` makes
+// Bootstrap generate everything a built-in theme gets: `.theme-orange`,
+// `.bg-orange`, `.fg-orange`, `.border-orange`, light and dark values.
+// The entry follows the shape of Bootstrap's own "warning" entry.
+//
+// Tokens are written unprefixed here; build:css runs Bootstrap's PostCSS step,
+// which adds the `--bs-` prefix the CDN build has (Bootstrap's JS reads them).
+//
+// Compiled with Dart Sass + PostCSS (dev/CI only; the committed CSS is copied
+// into the Docker image, so no Node at runtime). Regenerate after editing, or
+// when bumping the bootstrap version in package.json, from myocyte/:
+//   npm install        # first time only
+//   npm run build:css  # -> toxtempass/static/toxtempass/bootstrap.min.css (committed)
+// The JS still comes from the CDN; keep its version in base.html equal to the
+// one in package.json.
+// ============================================================================
+
+@use "bootstrap/scss/bootstrap" with (
+  $theme-colors: (
+    "orange": (
+      "base": var(--orange-500),
+      "fg": light-dark(var(--orange-700), var(--orange-400)),
+      "fg-emphasis": light-dark(var(--orange-800), var(--orange-300)),
+      "bg": var(--orange-500),
+      "bg-subtle": light-dark(var(--orange-100), var(--orange-900)),
+      "bg-muted": light-dark(var(--orange-200), var(--orange-800)),
+      "border": light-dark(var(--orange-300), var(--orange-600)),
+      "focus-ring": light-dark(color-mix(in oklch, var(--orange-500) 50%, var(--bg-body)), color-mix(in oklch, var(--orange-400) 85%, var(--bg-body))),
+      "contrast": var(--gray-900)
+    ),
+  )
+);
+
+// Bootstrap 6.0.0-alpha.1 hides a closed dialog with visibility instead of
+// display: none, but leaves it in the page at the browser's position: absolute,
+// so every closed dialog stretches the page: you could scroll into empty space
+// below the content. Fixed positioning takes it out of the page's scroll area;
+// an open (modal) dialog is fixed anyway.
+@layer components {
+  .dialog:not([open]) {
+    position: fixed;
+  }
+}

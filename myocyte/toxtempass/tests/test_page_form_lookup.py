@@ -15,6 +15,8 @@ from django.urls import reverse
 from toxtempass.tests.fixtures.factories import PersonFactory
 
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
+# The user menu is a <dialog> (a Bootstrap drawer) holding <div>s.
+CONTAINERS = ("div", "dialog")
 
 
 class _Forms(HTMLParser):
@@ -28,7 +30,7 @@ class _Forms(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        if tag == "div":
+        if tag in CONTAINERS:
             self.div_depth += 1
             if attrs.get("id") == "offcanvasUser":
                 self.menu_depth = self.div_depth
@@ -36,7 +38,7 @@ class _Forms(HTMLParser):
             self.forms.append((attrs, self.menu_depth is not None))
 
     def handle_endtag(self, tag):
-        if tag == "div":
+        if tag in CONTAINERS:
             if self.menu_depth == self.div_depth:
                 self.menu_depth = None
             self.div_depth -= 1

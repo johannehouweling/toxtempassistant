@@ -108,8 +108,8 @@ class Config:
     # breakdown so a method still in development sees progress on the lower levels
     # it CAN fill (Basic/Level 1) and isn't dragged down by the more mature levels
     # it cannot yet complete. ORDER is the readiness gradient; css_class maps to
-    # stock Bootstrap contextual colours except "orange" (Level 3), which is added
-    # to the recompiled theme.css via scss/theme.scss. Labels are the DB's level
+    # stock Bootstrap contextual colours except "orange" (Level 3), which our
+    # Bootstrap build adds as a theme colour (scss/bootstrap.scss). Labels are the DB's level
     # names — change the copy here if the official RISK-HUNT3R legend differs.
     RISKHUNT3R_LABEL_ORDER = ("blue", "green", "yellow", "orange", "red")
     RISKHUNT3R_LABEL_META = {
@@ -301,7 +301,7 @@ class Config:
 
     # ── /stats visual language ────────────────────────────────────────────────
     # Colours and fonts are not configured here: stats.html uses Bootstrap's own
-    # CSS variables (--bs-primary, --bs-font-monospace, ...) so the page follows
+    # CSS variables (--bs-primary-bg, --bs-font-mono, ...) so the page follows
     # the app theme.
 
     license_url = "https://www.gnu.org/licenses/agpl-3.0.html"
@@ -498,6 +498,9 @@ class Config:
     # version of a ToxTemp: one submit of the answers page saves every answer, and a
     # drafting run saves them as they finish.
     _version_gap_seconds: Final[int] = 30
+    # Colour modes a user can pick in the Settings tab; "system" (the default)
+    # follows the operating system's light or dark setting.
+    _color_modes: Final[tuple[str, ...]] = ("system", "light", "dark")
     _email_confirmation_required_message: Final[str] = (
         "Please confirm your email address before generating drafts. Use the link "
         "in the email we sent you, or request a new one."
@@ -597,7 +600,7 @@ class Config:
                 "Check this box to mark questions for an LLM update. You can select one or multiple questions, then use 'Options' → 'Update selected questions'.",
             ],
             [
-                "#question-content .form-check-input[role='switch']:first-of-type",
+                "#question-content input[role='switch']:first-of-type",
                 "Toggle 'Accepted' when satisfied with an answer. This tracks your progress through the ToxTemp.",
             ],
             [

@@ -3,9 +3,12 @@
 {% block title %}Home Page{% endblock %}
 
 {% block content %}
-{% load django_bootstrap5 %}
+{% load bs6 %}
 {% load extras %}
   <style>
+  /* Bootstrap's "custom" layer: after its components, before its utilities,
+     so utility classes still win over these rules. */
+  @layer custom {
     .graceful-clip {
 
     }
@@ -17,7 +20,7 @@
       right: 0;
       width: 16px; /* Width of the fade */
       height: 100%;
-      background: var(--bs-light);   /* Match bg-light */
+      background: var(--bs-bg-2);   /* Match bg-2 */
       pointer-events: none; /* Allows clicks to pass through */
     }
     /* Target the scrollbar track */
@@ -30,25 +33,25 @@
     }
     
     ::-webkit-scrollbar-thumb {
-        background: rgba(0, 0, 0, 0.5); /* Semi-transparent thumb */
+        background: color-mix(in oklab, var(--bs-fg-body) 50%, transparent); /* Semi-transparent thumb */
         border-radius: 4px; /* Rounded corners for thumb */
     }
     
     ::-webkit-scrollbar-thumb:hover {
-        background: rgba(0, 0, 0, 0.7); /* Darker thumb on hover */
+        background: color-mix(in oklab, var(--bs-fg-body) 70%, transparent); /* Darker thumb on hover */
     }
     
     /* Custom styles to ensure active state overrides any other text classes */
     .nav-pills .nav-link.active {
         color: white !important; /* Ensure active text is white */
-        background-color: var(--bs-primary); /* Default background color for active state */
+        background-color: var(--bs-primary-bg); /* Default background color for active state */
     }
 
     .compensate-sticky-header{
       scroll-margin-top: 130px; /* Adjust this value to match your sticky header height */
     	}
 
-    @media (min-width: 992px) {
+    @media (min-width: 1024px) { /* Bootstrap 6 lg */
       .bd-sidebar {
           position:-webkit-sticky;
           position: sticky;
@@ -61,30 +64,31 @@
           }
       }
       
-      @media (max-width: 991.98px) {
-          .bd-sidebar .offcanvas-lg {
-              border-right-color:var(--bs-border-color);
-              box-shadow: var(--bs-box-shadow-lg)
-          }
-      }
+      /* The breakdown toggle points at the bar, and down at the breakdown while open. */
+      .riskhunt3r-toggle .bi { display: inline-block; transition: transform .15s ease-in-out; }
+      .riskhunt3r-toggle[aria-expanded="true"] .bi { transform: rotate(90deg); }
+      @media (prefers-reduced-motion: reduce) { .riskhunt3r-toggle .bi { transition: none; } }
 
       /* Roomier guidance popover (Bootstrap has no width utility — set its own variable); no arrow. */
       .rh-guidance { --bs-popover-max-width: 360px; }
       .popover .popover-arrow { display: none !important; }
+  }
 </style>
 <div class="container-fluid" >
     <div class="row" style="padding-bottom: 102px;">
         <!-- Scrollspy Sidebar -->
-        <aside class="col-lg-4">
+        <aside class="lg:col-4">
 
             <div class="bd-sidebar">
-                <nav id="navbar-questions" class="flex-column offcanvas-lg offcanvas-start align-items-stretch border-end overflow-y-auto">
-                    <nav class="nav nav-pills flex-column offcanvas-body">
+                {# Hidden below lg (nothing opens it there), inline from lg up; it never opens #}
+                {# as a drawer, so it stays a <nav> rather than a <dialog>.                  #}
+                <nav id="navbar-questions" class="flex-column lg:drawer drawer-start align-items-stretch border-end overflow-y-auto">
+                    <nav class="nav nav-pills nav-pills-vertical drawer-body">
                         {% for section in sections %}
-                            <a class="nav-link p-1 px-3 m-0 mt-3 fs-5{% if section.all_answers_accepted %} text-secondary {% endif %}" href="#section-{{ section.id }}">{{ section.title }}</a>
-                            <nav class="nav nav-pills text-secondary flex-column">
+                            <a class="nav-link justify-content-start text-start text-wrap rounded-7 p-1 px-5 m-0 mt-5 fs-lg{% if section.all_answers_accepted %} fg-secondary {% endif %}" href="#section-{{ section.id }}">{{ section.title }}</a>
+                            <nav class="nav nav-pills-vertical fg-secondary ms-7">
                                 {% for subsection in section.subsections.all %}
-                                    <a class="nav-link ms-4 p-1 px-3{% if subsection.all_answers_accepted %} text-secondary {% endif %}" href="#subsection-{{ subsection.id }}">{{ subsection.title }}</a>
+                                    <a class="nav-link justify-content-start text-start text-wrap rounded-7 p-1 px-5{% if subsection.all_answers_accepted %} fg-secondary {% endif %}" href="#subsection-{{ subsection.id }}">{{ subsection.title }}</a>
                                 {% endfor %}
                             </nav>
                         {% endfor %}
@@ -95,16 +99,16 @@
             
 
         <!-- Content Area for Questions -->
-        <main class="col-lg-8" >
+        <main class="lg:col-8" >
           <div>
             <h1> Test method: {{ assay.title }}</h1>
           </div>
           {% if assay.user_alerts %}
           <div id="user-alerts-container">
             {% for alert in assay.user_alerts %}
-            <div class="alert alert-{{ alert.level|default:'warning' }} alert-dismissible fade show"
-                 role="alert">
-              <i class="bi bi-exclamation-triangle me-2"></i>{{ alert.message }}
+            <div class="alert theme-{{ alert.level|default:'warning' }}" role="alert">
+              <i class="bi bi-exclamation-triangle"></i>
+              <div class="me-auto">{{ alert.message }}</div>
               <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             {% endfor %}
@@ -115,43 +119,43 @@
                 <div id="non-field-errors"></div>
                 <div id="question-content">
                     {% for section in sections %}
-                        <div id="section-{{ section.id }}" class="p-1 mt-5 compensate-sticky-header">
-                            <h4>{{ section.title }}{% with help=section.title|question_help %}{% if help %}<a tabindex="0" role="button" class="text-primary text-decoration-none align-baseline" data-bs-toggle="popover" data-bs-html="true" data-bs-custom-class="rh-guidance" data-bs-placement="bottom" data-bs-trigger="hover" data-bs-content="{{ help }}" aria-label="Section note from the ToxTemp"><i class="bi bi-question" style="-webkit-text-stroke:0.4px"></i></a>{% endif %}{% endwith %}</h4>
+                        <div id="section-{{ section.id }}" class="p-1 mt-12 compensate-sticky-header">
+                            <h4>{{ section.title }}{% with help=section.title|question_help %}{% if help %}<a tabindex="0" role="button" class="fg-primary text-decoration-none align-baseline" data-bs-toggle="popover" data-bs-html="true" data-bs-custom-class="rh-guidance" data-bs-placement="bottom" data-bs-trigger="hover" data-bs-content="{{ help }}" aria-label="Section note from the ToxTemp"><i class="bi bi-question" style="-webkit-text-stroke:0.4px"></i></a>{% endif %}{% endwith %}</h4>
                             {% for subsection in section.subsections.all %}
-                                <div id="subsection-{{ subsection.id }}" class="mt-3 compensate-sticky-header">
+                                <div id="subsection-{{ subsection.id }}" class="mt-5 compensate-sticky-header">
                                     <h5>{{ subsection.title }}</h5>
                                     {% for question in subsection.questions.all %}
                                       <div class="row">
-                                        <div class="col-md-10"> 
-                                          <div class="mb-3 has-validation">
-                                                <label for="id_question_{{ question.id }}" class="form-label">{{ question.question_text }}{% if not question.parent_question %}{% with help=subsection.title|question_help %}{% if help %}<a tabindex="0" role="button" class="text-primary text-decoration-none align-baseline" data-bs-toggle="popover" data-bs-html="true" data-bs-custom-class="rh-guidance" data-bs-placement="bottom" data-bs-trigger="hover" data-bs-content="{{ help }}" aria-label="Example or note from the ToxTemp"><i class="bi bi-question" style="-webkit-text-stroke:0.4px"></i></a>{% endif %}{% endwith %}{% endif %}</label>
+                                        <div class="md:col-10"> 
+                                          <div class="mb-5">
+                                                <label for="id_question_{{ question.id }}" class="form-label">{{ question.question_text }}{% if not question.parent_question %}{% with help=subsection.title|question_help %}{% if help %}<a tabindex="0" role="button" class="fg-primary text-decoration-none align-baseline" data-bs-toggle="popover" data-bs-html="true" data-bs-custom-class="rh-guidance" data-bs-placement="bottom" data-bs-trigger="hover" data-bs-content="{{ help }}" aria-label="Example or note from the ToxTemp"><i class="bi bi-question" style="-webkit-text-stroke:0.4px"></i></a>{% endif %}{% endwith %}{% endif %}</label>
                                                 {% with quest_num='question_'|add_asstring:question.id %}
                                                 {% bootstrap_field form|form_field:quest_num placeholder="" show_label=False %}
                                                 {% endwith %}
                                           </div>
                                         </div>  
-                                        <div class="col-md-2 align-self-end">  
-                                          <div class="has-validation">
+                                        <div class="md:col-2 align-self-end">  
+                                          <div class="">
                                               {% with earmark_num='earmarked_'|add_asstring:question.id %}
-                                              {% bootstrap_field form|form_field:earmark_num placeholder="" wrapper_class="mb-2"%}
+                                              {% bootstrap_field form|form_field:earmark_num placeholder="" wrapper_class="mb-3" %}
                                               {% endwith %}
                                           </div>
                                           <div class="btn-group" role="group">
 
-                                            <button type="button" class="btn px-1 py-0 btn-sm btn-outline-primary mb-2" id="openHistoryModalButton"
-                                                    data-bs-toggle="modal"
+                                            <button type="button" class="px-1 py-0 btn-sm btn-outline theme-primary mb-3" id="openHistoryModalButton"
+                                                    data-bs-toggle="dialog"
                                                     data-bs-target="#versionHistoryModal"
                                                     data-assay-id="{{ assay.id }}"
                                                     data-question-id="{{question.id}}">
-                                                    <i class="bi fs-5 bi-clock-history"></i>
+                                                    <i class="bi fs-lg bi-clock-history"></i>
 
                                             </button>
 
                                             
                                           </div>
-                                          <div class="mb-3 has-validation">
+                                          <div class="mb-5">
                                             {% with accepted_num='accepted_'|add_asstring:question.id %}
-                                            {% bootstrap_field form|form_field:accepted_num placeholder="" wrapper_class="form-check form-switch ps-3" %}
+                                            {% bootstrap_field form|form_field:accepted_num placeholder="" wrapper_class="mb-0" %}
                                             {% endwith %}
                                           </div>
                                         </div>
@@ -166,93 +170,98 @@
 
             </form>
         </main>
-        <nav class="fixed-bottom card border-0 bg-white" style="z-index: unset;">
+        <nav class="fixed-bottom card border-0 bg-body" style="z-index: unset;">
           <div class="container">
             <!-- Progress bar -->
-            {% with percentanswers=assay.get_n_accepted_answers|intdivperc:assay.get_n_answers %}
-            {% with percent_draft_unaccepted=assay.number_answers_found_but_not_accepted|intdivperc:assay.get_n_answers  %}
-            <div id="progress border bg-white" class="progress mt-3" role="progressbar" aria-label="Example with label" aria-valuenow="{{assay.get_n_accepted_answers}}" aria-valuemin="0" aria-valuemax="{{assay.get_n_answers}}">
-              <div  class="progress-bar bg-primary"  role="progressbar" style="width: {{percentanswers}}%;" aria-valuenow="{{percentanswers}}" aria-valuemin="0" aria-valuemax="100" data-bs-toggle="tooltip" title="{{assay.get_n_accepted_answers}} answer(s) accepted">{{percentanswers}} %</div>
-              <div  class="progress-bar-striped bg-primary opacity-50"  role="progressbar" style="width: {{percent_draft_unaccepted}}%;" aria-valuenow="{{percent_draft_unaccepted}}" aria-valuemin="0" aria-valuemax="100" data-bs-toggle="tooltip" title="{{assay.number_answers_found_but_not_accepted}} unaccepted draft answer(s)"></div>
-
-            </div>
-            {% endwith %}
-            {% endwith %}
-
             <!-- Optional per-category breakdown: hidden by default (it makes the
                  footer busy); revealed on click. Shows, per RISK-HUNT3R readiness
                  colour, how many answers are accepted — so an early-stage method
                  still sees progress on the parts it can complete. -->
             {% with segs=assay.accepted_by_riskhunt3r_label %}
-            {% if segs %}
-            <div class="mt-1">
-              <a id="riskhunt3rBreakdownToggle" class="link-secondary fs-6 text-decoration-none lh-1 d-inline-block"
+            {# The toggle sits in front of the bar and points at it; opened, it points down at the #}
+            {# breakdown, which shares the bar's column so the two line up.                       #}
+            <div class="d-flex align-items-start gap-3 mt-5">
+              {% if segs %}
+              <a id="riskhunt3rBreakdownToggle" class="fg-secondary fs-md text-decoration-none lh-1 riskhunt3r-toggle"
                  data-bs-toggle="collapse" href="#riskhunt3rBreakdown" role="button"
                  aria-expanded="false" aria-controls="riskhunt3rBreakdown"
                  aria-label="Questions per NAM readiness level" title="Questions per NAM readiness level">
-                <i class="bi bi-caret-down-fill"></i>
+                <i class="bi bi-caret-right-fill"></i>
               </a>
-            </div>
-            {# 5 equal rounded NAM-readiness bars side by side, together spanning the main bar's width. Each mirrors the main bar: accepted (solid) + drafted-but-not-accepted (striped). Levels/colours as adapted from the RISK-HUNT3R test-method DB. Decorative — the #progress bar above conveys overall progress; per-bar tooltips give the level counts. #}
-            <div class="collapse" id="riskhunt3rBreakdown">
-              <div class="d-flex gap-1 mt-2" aria-hidden="true">
-                {% for seg in segs %}
-                <div class="progress flex-fill rounded-pill"
-                     data-bs-toggle="tooltip" title="{{ seg.label }}: {{ seg.accepted }}/{{ seg.total }} accepted">
-                  <div class="progress-bar {{ seg.css_class }}" style="width: {{ seg.pct }}%;"></div>
-                  <div class="progress-bar progress-bar-striped {{ seg.css_class }} opacity-50" style="width: {{ seg.draft_pct }}%;"></div>
+              {% endif %}
+              <div class="flex-fill">
+                {% with percentanswers=assay.get_n_accepted_answers|intdivperc:assay.get_n_answers %}
+                {% with percent_draft_unaccepted=assay.number_answers_found_but_not_accepted|intdivperc:assay.get_n_answers  %}
+                <div class="progress" role="progressbar" aria-label="Example with label" aria-valuenow="{{assay.get_n_accepted_answers}}" aria-valuemin="0" aria-valuemax="{{assay.get_n_answers}}">
+                  <div  class="progress-bar bg-primary"  role="progressbar" style="width: {{percentanswers}}%;" aria-valuenow="{{percentanswers}}" aria-valuemin="0" aria-valuemax="100" data-bs-toggle="tooltip" title="{{assay.get_n_accepted_answers}} answer(s) accepted">{{percentanswers}} %</div>
+                  <div  class="progress-bar-striped bg-primary opacity-50"  role="progressbar" style="width: {{percent_draft_unaccepted}}%;" aria-valuenow="{{percent_draft_unaccepted}}" aria-valuemin="0" aria-valuemax="100" data-bs-toggle="tooltip" title="{{assay.number_answers_found_but_not_accepted}} unaccepted draft answer(s)"></div>
+
                 </div>
-                {% endfor %}
+                {% endwith %}
+                {% endwith %}
+                {% if segs %}
+                {# 5 equal rounded NAM-readiness bars side by side, together spanning the main bar's width. Each mirrors the main bar: accepted (solid) + drafted-but-not-accepted (striped). Levels/colours as adapted from the RISK-HUNT3R test-method DB. Decorative — the #progress bar above conveys overall progress; per-bar tooltips give the level counts. #}
+                <div class="collapse" id="riskhunt3rBreakdown">
+                  <div class="d-flex gap-1 mt-3" aria-hidden="true">
+                    {% for seg in segs %}
+                    <div class="progress flex-fill rounded-pill"
+                         data-bs-toggle="tooltip" title="{{ seg.label }}: {{ seg.accepted }}/{{ seg.total }} accepted">
+                      <div class="progress-bar {{ seg.css_class }}" style="width: {{ seg.pct }}%;"></div>
+                      <div class="progress-bar progress-bar-striped {{ seg.css_class }} opacity-50" style="width: {{ seg.draft_pct }}%;"></div>
+                    </div>
+                    {% endfor %}
+                  </div>
+                  <a class="fg-secondary small text-decoration-none"
+                     href="https://risk-hunt3r.net/test-methods/" target="_blank" rel="noopener">
+                    NAM readiness levels as adapted from RISK-HUNT3R <i class="bi bi-box-arrow-up-right"></i>
+                  </a>
+                </div>
+                {% endif %}
               </div>
-              <a class="link-secondary small text-decoration-none"
-                 href="https://risk-hunt3r.net/test-methods/" target="_blank" rel="noopener">
-                NAM readiness levels as adapted from RISK-HUNT3R <i class="bi bi-box-arrow-up-right"></i>
-              </a>
             </div>
-            {% endif %}
             {% endwith %}
 
             <!-- Buttons -->
 
-            <div class="my-3 d-flex">
-              {% bootstrap_button button_type="link" content="Back" href=back_url button_class="btn-outline-danger"  %}
-              {% bootstrap_button button_type="submit" content="Save" button_class="btn-primary ms-auto" form="QuestionsForm" %}
+            <div class="my-5 d-flex">
+              {% bootstrap_button button_type="link" content="Back" href=back_url button_class="btn-outline theme-danger"  %}
+              {% bootstrap_button button_type="submit" content="Save" button_class="btn-solid theme-primary ms-auto" form="QuestionsForm" %}
               
               <div class="btn-group mx-1">
-                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <button type="button" class="btn-outline theme-secondary" data-bs-toggle="menu" aria-expanded="false">
                   Options
                 </button>
-                <ul class="dropdown-menu">
+                <div class="menu">
                   {% with id=assay.id %}
-                  <li><a class="dropdown-item" href="#" type="button" id="btn_next_unaccepted">Next unaccepted</a></li>
-                  <li><a 
-                    class="dropdown-item" 
+                  <a class="menu-item" href="#" type="button" id="btn_next_unaccepted">Next unaccepted</a>
+                  <a 
+                    class="menu-item" 
                     type="button" 
-                    data-bs-toggle="modal" 
+                    data-bs-toggle="dialog" 
                     data-bs-target="#updateModal"
                     >
                     Update selected questions
-                  </a></li>
-                  <li><a class="dropdown-item" href="#" type="button" id="btn_mark_open_gpt_update">Mark all open for &#39;LLM Update&#39;</a></li>
+                  </a>
+                  <a class="menu-item" href="#" type="button" id="btn_mark_open_gpt_update">Mark all open for &#39;LLM Update&#39;</a>
                   {% endwith %}
-                </ul>
+                </div>
               </div>
 
               <div class="btn-group">
-                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <button type="button" class="btn-outline theme-secondary" data-bs-toggle="menu" aria-expanded="false">
                   Export
                 </button>
-                <ul class="dropdown-menu">
+                <div class="menu">
                   {% with id=assay.id %}
-                  <li><a class="dropdown-item" onclick=feedback_export("{{export_json_url}}",{{id}})>JSON</a></li>
-                  <li><a class="dropdown-item" onclick=feedback_export("{{export_md_url}}",{{id}})>MD</a></li>
-                  <li><a class="dropdown-item" onclick=feedback_export("{{export_pdf_url}}",{{id}})>PDF</a></li>
-                  <li><a class="dropdown-item" onclick=feedback_export("{{export_xml_url}}",{{id}})>XML</a></li>
-                  <li><a class="dropdown-item" onclick=feedback_export("{{export_docx_url}}",{{id}})>DOCX</a></li>
-                  <li><a class="dropdown-item" onclick=feedback_export("{{export_html_url}}",{{id}})>HTML</a></li>
-                  <li><a class="dropdown-item" onclick=feedback_export("{{export_tex_url}}",{{id}})>TEX</a></li>
+                  <a class="menu-item" onclick=feedback_export("{{export_json_url}}",{{id}})>JSON</a>
+                  <a class="menu-item" onclick=feedback_export("{{export_md_url}}",{{id}})>MD</a>
+                  <a class="menu-item" onclick=feedback_export("{{export_pdf_url}}",{{id}})>PDF</a>
+                  <a class="menu-item" onclick=feedback_export("{{export_xml_url}}",{{id}})>XML</a>
+                  <a class="menu-item" onclick=feedback_export("{{export_docx_url}}",{{id}})>DOCX</a>
+                  <a class="menu-item" onclick=feedback_export("{{export_html_url}}",{{id}})>HTML</a>
+                  <a class="menu-item" onclick=feedback_export("{{export_tex_url}}",{{id}})>TEX</a>
                   {% endwith %}
-                </ul>
+                </div>
               </div>
             </div>
           </div>

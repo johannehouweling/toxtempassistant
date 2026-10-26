@@ -18,7 +18,7 @@ def test_legal_document_page(url_name, title):
     html = Client().get(url).content.decode()
     assert html.count("<title>") == 1
     assert f"<title>{title} | ToxTempAssistant</title>" in html
-    assert f'<h1 class="fs-3">{title}</h1>' in html
+    assert f'<h1 class="fs-2xl">{title}</h1>' in html
     assert f'<link rel="canonical" href="http://testserver{url}">' in html
 
 

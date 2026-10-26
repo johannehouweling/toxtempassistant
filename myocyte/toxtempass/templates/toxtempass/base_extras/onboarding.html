@@ -358,14 +358,14 @@
 
         toastEl.innerHTML = `
         <div class="toast-header">
-          <i class="bi bi-info-circle me-2" aria-hidden="true"></i>
+          <i class="bi bi-info-circle me-3" aria-hidden="true"></i>
           <strong class="me-auto">Guided Tour</strong>
-          <small class="text-body-secondary">${i + 1}/${messages.length}</small>
+          <small class="fg-secondary">${i + 1}/${messages.length}</small>
           <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
         <div class="toast-body">${messages[i]}</div>
-        <div class="toast-footer d-flex justify-content-end pe-2 pb-2">
-          <button type="button" class="btn btn-primary" aria-label="Next">Next</button>
+        <div class="toast-footer d-flex justify-content-end pe-3 pb-3">
+          <button type="button" class="btn-solid theme-primary" aria-label="Next">Next</button>
         </div>
       `;
 
@@ -385,12 +385,12 @@
 
       const finishedBtn = document.createElement("button");
       finishedBtn.type = "button";
-      finishedBtn.className = "btn btn-primary";
+      finishedBtn.className = "btn-solid theme-primary";
       finishedBtn.setAttribute("aria-label", "Finish");
       finishedBtn.textContent = "Finish";
       finishedBtn.setAttribute("data-bs-dismiss", "toast");
       steps[steps.length - 1].toastEl
-        .querySelector(".btn.btn-primary")
+        .querySelector(".btn-solid.theme-primary")
         ?.replaceWith(finishedBtn);
 
       let currentStep = 0;
@@ -571,7 +571,7 @@
 
       // Wire "Next"
       steps.forEach((step, idx) => {
-        const nextBtn = step.toastEl.querySelector(".btn.btn-primary");
+        const nextBtn = step.toastEl.querySelector(".btn-solid.theme-primary");
         if (nextBtn) {
           nextBtn.addEventListener("click", () => {
             if (idx + 1 < steps.length) {
@@ -618,9 +618,9 @@
             left: "50%",
             transform: "translateX(-50%)",
             padding: "15px 25px",
-            backgroundColor: "#f8d7da",
-            color: "#842029",
-            border: "1px solid #f5c2c7",
+            backgroundColor: "var(--bs-danger-bg-subtle)",
+            color: "var(--bs-danger-fg)",
+            border: "1px solid var(--bs-danger-border)",
             borderRadius: "4px",
             zIndex: "7000",
             fontSize: "16px",
@@ -649,8 +649,8 @@
       if (btn) {
         btn.addEventListener("click", () => {
           const offcanvasEl = document.getElementById("offcanvasUser");
-          if (offcanvasEl && offcanvasEl.classList.contains("show")) {
-            const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
+          if (offcanvasEl && offcanvasEl.open) {
+            const offcanvas = bootstrap.Drawer.getInstance(offcanvasEl);
             if (offcanvas) offcanvas.hide();
           }
           window.startOnboarding();
@@ -684,8 +684,9 @@
         toast.className = 'toast show';
         toast.style.minWidth = '300px';
         toast.style.maxWidth = '90vw';
-        toast.style.backgroundColor = '#343a40';  // Bootstrap dark bg
-        toast.style.color = 'white';
+        // The inverse theme: dark on a light page, light on a dark one.
+        toast.style.backgroundColor = 'var(--bs-inverse-bg)';
+        toast.style.color = 'var(--bs-inverse-contrast)';
         toast.style.padding = '1rem';
         toast.style.borderRadius = '0.375rem';
         toast.style.boxShadow = '0 0.125rem 0.25rem rgba(0, 0, 0, 0.075)';
@@ -702,7 +703,7 @@
             <div>
                 Let's start with a brief onboarding to help you get familiar with the interface.
             </div>
-            <button id="welcome-toast-close" style="margin-top:1rem; background:#007bff; border:none; color:white; padding:0.375rem 0.75rem; border-radius:0.25rem; cursor:pointer;">
+            <button id="welcome-toast-close" type="button" class="btn-solid theme-primary mt-5">
                 Start Onboarding
             </button>
         `;
@@ -736,13 +737,17 @@
 </script>
 
 <style>
+  /* Bootstrap's "custom" layer: after its components, before its utilities,
+     so utility classes still win over these rules. */
+  @layer custom {
   /* Additional CSS for spared elements on overlay */
   .spared-element {
     position: relative !important;
     /* Raise z-index higher to help ensure highlight is below toasts */
     z-index: 5800 !important;
-    box-shadow: 0 0 15px 3px #007bff !important;
+    box-shadow: 0 0 15px 3px var(--bs-primary-base) !important;
     border-radius: 4px;
     transition: box-shadow 0.3s ease-in-out;
+  }
   }
 </style>

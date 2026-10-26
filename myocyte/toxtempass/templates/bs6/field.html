@@ -1,0 +1,29 @@
+{% comment %}
+One form field in Bootstrap 6 markup, rendered by toxtempass/templatetags/bs6.py.
+`kind` is check, switch, floating, own_label or default.
+{% endcomment %}
+<div class="{{ wrapper_class }}">
+{% if kind == "check" %}
+  {{ widget_html }}
+  <label for="{{ field.id_for_label }}"{% if label_class %} class="{{ label_class }}"{% endif %}>{{ field.label }}</label>
+{% elif kind == "switch" %}
+  <div class="switch">{{ widget_html }}</div>
+  <label for="{{ field.id_for_label }}"{% if label_class %} class="{{ label_class }}"{% endif %}>{{ field.label }}</label>
+{% elif kind == "floating" %}
+  <div class="form-floating">
+    <label for="{{ field.id_for_label }}"{% if label_class %} class="{{ label_class }}"{% endif %}>{{ field.label }}</label>
+    {{ widget_html }}
+  </div>
+{% elif kind == "own_label" %}
+  {{ widget_html }}
+{% else %}
+  <label for="{{ field.id_for_label }}" class="form-label{% if label_class %} {{ label_class }}{% endif %}">{{ field.label }}</label>
+  {{ widget_html }}
+{% endif %}
+{% if field.errors %}
+  <div id="{{ field.auto_id }}_error">
+    {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+  </div>
+{% endif %}
+{% if field.help_text %}<div id="{{ field.auto_id }}_helptext" class="form-text">{{ field.help_text|safe }}</div>{% endif %}
+</div>

@@ -297,7 +297,7 @@ class MultipleFileInput(forms.ClearableFileInput):
         # Inline progress bar and filename display (optional inline display)
         inline_progress_html = mark_safe(
             """
-            <div class="progress mt-2" style="height: 20px; display:none;" id="uploadProgressContainer">
+            <div class="progress mt-3" style="height: 20px; display:none;" id="uploadProgressContainer">
               <div
                 class="progress-bar progress-bar-striped progress-bar-animated"
                 role="progressbar"
@@ -317,14 +317,12 @@ class MultipleFileInput(forms.ClearableFileInput):
         # Bootstrap modal for centralized upload progress
         modal_html = mark_safe(
             """
-            <div class="modal fade" id="uploadProgressModal" tabindex="-1" aria-labelledby="uploadProgressModalLabel" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered" role="document">
-                <div class="modal-content">
-                  <div class="modal-header">
-                    <h5 class="modal-title" id="uploadProgressModalLabel">File Upload Progress</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <dialog class="dialog dialog-scrollable" id="uploadProgressModal" aria-labelledby="uploadProgressModalLabel">
+                  <div class="dialog-header">
+                    <h5 class="dialog-title" id="uploadProgressModalLabel">File Upload Progress</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
                   </div>
-                  <div class="modal-body">
+                  <div class="dialog-body">
                     <div class="progress" style="height: 25px;">
                       <div
                         class="progress-bar progress-bar-striped progress-bar-animated"
@@ -337,11 +335,9 @@ class MultipleFileInput(forms.ClearableFileInput):
                         0%
                       </div>
                     </div>
-                    <div id="uploadProgressFilenameModal" class="small mt-2 text-truncate"></div>
+                    <div id="uploadProgressFilenameModal" class="small mt-3 text-truncate"></div>
                   </div>
-                </div>
-              </div>
-            </div>
+            </dialog>
             """
         )
 
@@ -374,9 +370,9 @@ class StartingForm(forms.Form):
             button_url_names=[],
             button_labels=[],
             button_classes=[
-                "d-flex align-items-center btn btn-outline-secondary",
-                "d-flex align-items-center btn btn-outline-secondary disabled",
-                "d-flex align-items-center btn btn-outline-danger rounded-end disabled",
+                "d-flex align-items-center btn-outline theme-secondary",
+                "d-flex align-items-center btn-outline theme-secondary disabled",
+                "d-flex align-items-center btn-outline theme-danger rounded-end disabled",
             ],
             label=QuestionSet._meta.verbose_name,  # Use the verbose name of the model
         ),
@@ -390,9 +386,9 @@ class StartingForm(forms.Form):
             button_url_names=["create_investigation", "", ""],
             button_labels=["Create", "Modify", "Delete"],
             button_classes=[
-                "d-flex align-items-center btn btn-outline-secondary",
-                "d-flex align-items-center btn btn-outline-secondary disabled",
-                "d-flex align-items-center btn btn-outline-danger rounded-end disabled",
+                "d-flex align-items-center btn-outline theme-secondary",
+                "d-flex align-items-center btn-outline theme-secondary disabled",
+                "d-flex align-items-center btn-outline theme-danger rounded-end disabled",
             ],
         ),
     )
@@ -404,9 +400,9 @@ class StartingForm(forms.Form):
             button_url_names=["create_study", "", ""],
             button_labels=["Create", "Modify", "Delete"],
             button_classes=[
-                "d-flex align-items-center btn btn-outline-secondary",
-                "d-flex align-items-center btn btn-outline-secondary disabled",
-                "d-flex align-items-center btn btn-outline-danger rounded-end disabled",
+                "d-flex align-items-center btn-outline theme-secondary",
+                "d-flex align-items-center btn-outline theme-secondary disabled",
+                "d-flex align-items-center btn-outline theme-danger rounded-end disabled",
             ],
         ),
     )
@@ -418,9 +414,9 @@ class StartingForm(forms.Form):
             button_url_names=["create_assay", "", ""],
             button_labels=["Create", "Modify", "Delete"],
             button_classes=[
-                "d-flex align-items-center btn btn-outline-secondary",
-                "d-flex align-items-center btn btn-outline-secondary disabled",
-                "d-flex align-items-center btn btn-outline-danger rounded-end disabled",
+                "d-flex align-items-center btn-outline theme-secondary",
+                "d-flex align-items-center btn-outline theme-secondary disabled",
+                "d-flex align-items-center btn-outline theme-danger rounded-end disabled",
             ],
         ),
     )
@@ -457,7 +453,7 @@ class StartingForm(forms.Form):
             """
         Optional: allow the development team to use your uploaded context files to
          benchmark and improve automated pre-population of ToxTemp questionnaires.
-        <a class="link-secondary"
+        <a class="fg-secondary"
            data-bs-toggle="collapse"
            href="#consentDetails"
            role="button"
@@ -696,7 +692,8 @@ class AssayAnswerForm(forms.Form):
             raise PermissionDenied("You do not have access to this assay.")
         super().__init__(*args, **kwargs)
 
-        accepted_files = ",".join(config.IMAGE_ACCEPT_FILES + config.TEXT_ACCEPT_FILES)
+        accepted = config.IMAGE_ACCEPT_FILES + config.TEXT_ACCEPT_FILES
+        accepted_files = ",".join(accepted)
         self.fields["file_upload"] = MultipleFileField(
             widget=MultipleFileInput(
                 attrs={
@@ -708,7 +705,8 @@ class AssayAnswerForm(forms.Form):
             required=False,
             help_text=(
                 "Context documents for update of selected answers. "
-                f"Supported formats: {accepted_files}."
+                # Spaces let the list wrap; one long word widens the dialog.
+                f"Supported formats: {', '.join(accepted)}."
                 f" Max size: {config.max_size_mb} MB per file."
             ),
         )
@@ -757,11 +755,7 @@ class AssayAnswerForm(forms.Form):
                     accepted_field_name = f"accepted_{question.id}"
                     self.fields[accepted_field_name] = forms.BooleanField(
                         widget=forms.CheckboxInput(
-                            attrs={
-                                "class": "form-check-input",
-                                "role": "switch",
-                                "type": "checkbox",
-                            }
+                            attrs={"role": "switch"}
                         ),
                         label="Accepted",
                         required=False,
@@ -1014,11 +1008,11 @@ class WorkspaceForm(forms.ModelForm):
 class WorkspaceMemberForm(forms.Form):
     user = forms.ModelChoiceField(
         queryset=Person.objects.all(),
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
     role = forms.ChoiceField(
         choices=WorkspaceRole.choices,
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
 
     def __init__(self, *args, **kwargs):
@@ -1029,7 +1023,7 @@ class WorkspaceMemberForm(forms.Form):
 class WorkspaceInvestigationForm(forms.Form):
     investigation = forms.ModelChoiceField(
         queryset=Investigation.objects.none(),
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
 
     def __init__(self, *args, user=None, **kwargs):

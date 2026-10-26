@@ -5,22 +5,22 @@
 {% block canonical %}<link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'signup' %}">{% endblock %}
 
 {% block content %}
-{% load django_bootstrap5 %}
+{% load bs6 %}
 
-<div class="row justify-content-center px-3">
-  <div class="col-lg-4 card my-3 py-2 mx-3 ">
+<div class="row justify-content-center px-5">
+  <div class="lg:col-4 card my-5 py-3 mx-5">
    
-    <h1 class="fs-2">Sign up</h1>
-    <p class="text-body-secondary">Create a free beta account to draft ToxTemp answers from your own documents. The maintainers admit new accounts, and each one comes with a read-only demo assay. <a href="{% url 'about' %}">Learn more</a></p>
+    <h1 class="fs-3xl">Sign up</h1>
+    <p class="fg-secondary">Create a free beta account to draft ToxTemp answers from your own documents. The maintainers admit new accounts, and each one comes with a read-only demo assay. <a href="{% url 'about' %}">Learn more</a></p>
     {% if form.orcid_id.value %}
     {% else %}
-    <div class="d-grid gap-2 ">
-      <a class="btn d-flex align-items-center justify-content-center btn-outline-secondary" href="{% url 'orcid_login' %}">
-        <img class="h-75 pe-2" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="ORCID" >
+    <div class="d-grid gap-3">
+      <a class="d-flex align-items-center justify-content-center btn-outline theme-secondary" href="{% url 'orcid_login' %}">
+        <img class="h-75 pe-3" src="{% static 'toxtempass/img/ORCID-iD_icon_vector.svg' %}" alt="ORCID" >
         Signup with ORCID
       </a>
     </div>
-    <div class="form-text mb-3">If you have an ORCID iD please link it now.</div>
+    <div class="form-text mb-5">If you have an ORCID iD please link it now.</div>
     {% endif %}
     <form method="post" action="{{action}}" novalidate>
       <div id="non-field-errors"></div>
@@ -31,7 +31,7 @@
       {# Shown below the organization once it matched no ROR record. #}
       <div id="organization-not-in-ror" hidden>{% bootstrap_field form.organization_not_in_ror %}</div>
       <datalist id="ror-organization-suggestions"></datalist>
-      <button type="submit" class="btn w-100 btn-primary">Sign Up</button>
+      <button type="submit" class="w-100 btn-solid theme-primary">Sign Up</button>
     </form>
   </div>
 </div>
@@ -46,7 +46,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
   // Offer "not in ROR" once the organization matched no ROR record.
   const notInRor = document.getElementById("organization-not-in-ror");
-  const orgField = orgInput.closest(".mb-3");
+  const orgField = orgInput.closest(".form-field");
   if (notInRor && orgField) orgField.after(notInRor);
   orgInput.form.addEventListener("form-errors", function(event) {
     const messages = (event.detail.errors || {}).organization || [];

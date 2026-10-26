@@ -1,7 +1,7 @@
 {# Account tab: deleting the account. Loaded when the section opens; see user_offcanvas.html. #}
-<div class="mb-3">
+<div class="mb-5">
     <div class="d-grid">
-        <a class="btn btn-sm btn-outline-secondary" href="{% url 'account_export' %}">
+        <a class="btn-sm btn-outline theme-secondary" href="{% url 'account_export' %}">
             <i class="bi bi-download me-1"></i>Download all your ToxTemps
         </a>
     </div>
@@ -11,23 +11,25 @@
 </div>
 
 {% if blockers.owned_workspaces %}
-<div class="alert alert-warning py-2 px-3 small mb-0">
-    You still own {{ blockers.owned_workspaces|length }} workspace{{ blockers.owned_workspaces|length|pluralize }} with other members:
-    {% for workspace in blockers.owned_workspaces %}<strong>{{ workspace.name }}</strong>{% if not forloop.last %}, {% endif %}{% endfor %}.
-    Workspaces cannot be handed over, so delete them yourself first, after checking what the other members lose.
-    <button type="button" class="btn btn-link btn-sm p-0 align-baseline js-show-workspaces">Go to Workspaces</button>
+<div class="alert theme-warning py-3 px-5 small mb-0">
+    <div>
+        You still own {{ blockers.owned_workspaces|length }} workspace{{ blockers.owned_workspaces|length|pluralize }} with other members:
+        {% for workspace in blockers.owned_workspaces %}<strong>{{ workspace.name }}</strong>{% if not forloop.last %}, {% endif %}{% endfor %}.
+        Workspaces cannot be handed over, so delete them yourself first, after checking what the other members lose.
+        <button type="button" class="btn btn-link btn-sm p-0 align-baseline js-show-workspaces">Go to Workspaces</button>
+    </div>
 </div>
 {% elif blockers.superuser %}
-<div class="alert alert-warning py-2 px-3 small mb-0">
+<div class="alert theme-warning py-3 px-5 small mb-0">
     Maintainer accounts cannot delete themselves. Ask another maintainer to remove your account in the admin.
 </div>
 {% elif blockers.question_sets %}
-<div class="alert alert-warning py-2 px-3 small mb-0">
+<div class="alert theme-warning py-3 px-5 small mb-0">
     You created versions of the ToxTemp question set, which have to stay. Ask a maintainer to delete your account.
 </div>
 {% else %}
 <p class="small mb-1">Deleting your account removes:</p>
-<ul class="small mb-2">
+<ul class="small mb-3">
     <li>the {{ summary.assay_count }} ToxTemp{{ summary.assay_count|pluralize }} in investigations you own, with their answers, and those investigations and studies</li>
     {% if summary.has_demo %}
     <li>your copy of the read-only demo ToxTemp</li>
@@ -41,21 +43,21 @@
     <li>the {{ summary.document_count }} document{{ summary.document_count|pluralize }} you shared with us</li>
     <li>your workspace memberships and settings</li>
 </ul>
-<p class="small text-muted mb-2">Studies and ToxTemps you created in other people's investigations stay with those investigations.</p>
+<p class="small fg-secondary mb-3">Studies and ToxTemps you created in other people's investigations stay with those investigations.</p>
 <form class="js-delete-account-form" data-url="{% url 'account_delete' %}" novalidate>
-    <div class="form-floating mb-2">
-        <input type="password" class="form-control" id="account-delete-password" name="password" placeholder="Current password" autocomplete="current-password" required>
+    <div class="form-floating mb-3">
         <label for="account-delete-password">Current password</label>
+        <input type="password" class="form-control" id="account-delete-password" name="password" placeholder=" " autocomplete="current-password" required>
     </div>
-    <div class="form-check small mb-2">
-        <input class="form-check-input" type="checkbox" id="account-delete-confirm" name="confirm" value="1" required>
-        <label class="form-check-label" for="account-delete-confirm">
+    <div class="form-field small mb-3">
+        <input class="check" type="checkbox" id="account-delete-confirm" name="confirm" value="1" required>
+        <label for="account-delete-confirm">
             I understand that this deletes my account and my data for good. It cannot be undone, and copies in backups are gone within {{ backup_retention_days }} days.
         </label>
     </div>
     <div class="d-grid">
-        <button type="submit" class="btn btn-sm btn-danger">Delete my account</button>
+        <button type="submit" class="btn-sm btn-solid theme-danger">Delete my account</button>
     </div>
-    <div class="small mt-2 js-form-result" hidden></div>
+    <div class="small mt-3 js-form-result" hidden></div>
 </form>
 {% endif %}

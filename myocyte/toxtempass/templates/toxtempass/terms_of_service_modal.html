@@ -1,20 +1,16 @@
 <!-- Terms of Service Modal -->
-<div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="termsModalLabel">Terms of Service</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<dialog class="dialog dialog-scrollable dialog-lg" id="termsModal" aria-labelledby="termsModalLabel">
+        <div class="dialog-header">
+          <h5 class="dialog-title" id="termsModalLabel">Terms of Service</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
         </div>
-        <div class="modal-body" data-lazy-src="{% url 'terms_of_service' %}?partial=1" data-lazy-page="{% url 'terms_of_service' %}">
-          <div class="d-flex justify-content-center py-5">
-            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading…</span></div>
+        <div class="dialog-body" data-lazy-src="{% url 'terms_of_service' %}?partial=1" data-lazy-page="{% url 'terms_of_service' %}">
+          <div class="d-flex justify-content-center py-12">
+            <div class="spinner-border fg-primary" role="status"><span class="visually-hidden">Loading…</span></div>
           </div>
         </div>
-        <div class="modal-footer">
+        <div class="dialog-footer">
           <a class="btn btn-link me-auto" href="{% url 'terms_of_service' %}" target="_blank" rel="noopener">Open as page</a>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn-solid theme-secondary" data-bs-dismiss="dialog">Close</button>
         </div>
-      </div>
-    </div>
-  </div>
+  </dialog>

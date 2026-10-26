@@ -184,4 +184,11 @@ def test_cards_carry_the_token_names_for_the_sharing_warning(setup):
         request=request,
     )
     assert 'data-token-name="reporting server"' in html
-    assert 'id="addAssayApiWarning"' in html
+    # The warning the cards' token names fill lives in the add-investigation
+    # dialog, rendered outside the workspace list.
+    dialogs = render_to_string(
+        "toxtempass/base_extras/workspaces/workspace_modals.html",
+        ws_views.get_workspace_list(request),
+        request=request,
+    )
+    assert 'id="addAssayApiWarning"' in dialogs

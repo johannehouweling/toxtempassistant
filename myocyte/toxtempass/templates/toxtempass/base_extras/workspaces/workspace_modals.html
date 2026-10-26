@@ -1,97 +1,89 @@
   <!-- Modal: Add member by email -->
-  <div class="modal fade" id="addMemberModal" tabindex="-1" aria-hidden="true" style="z-index: 1200;">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Add member to workspace</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  <dialog class="dialog dialog-scrollable" id="addMemberModal">
+        <div class="dialog-header">
+          <h5 class="dialog-title">Add member to workspace</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
         </div>
-        <div class="modal-body">
-          <div class="mb-3">
+        <div class="dialog-body">
+          <div class="mb-5">
             <label for="memberEmail" class="form-label">User email</label>
             <input type="email" class="form-control" id="memberEmail" placeholder="user@example.com">
           </div>
-          <div class="mb-3">
+          <div class="mb-5">
             <label for="memberRole" class="form-label">Role</label>
-            <select id="memberRole" class="form-select">
+            <select id="memberRole" class="form-control">
               <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
           </div>
-          <div id="addMemberError" class="text-danger small" style="display:none"></div>
+          <div id="addMemberError" class="fg-danger small" style="display:none"></div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" id="confirmAddMember" class="btn btn-primary">Add member</button>
+        <div class="dialog-footer">
+          <button type="button" class="btn-solid theme-secondary" data-bs-dismiss="dialog">Cancel</button>
+          <button type="button" id="confirmAddMember" class="btn-solid theme-primary">Add member</button>
         </div>
-      </div>
-    </div>
-  </div>
+  </dialog>
 
   <!-- (createWorkspaceModal removed; New Workspace now creates an inline card) -->
 
   <!-- Modal: Add investigation to workspace -->
-  <div class="modal fade" id="addAssayModal" tabindex="-1" aria-hidden="true" style="z-index: 1200;">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-            <div class="modal-header">
-          <h5 class="modal-title">Add investigation to workspace</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  <dialog class="dialog dialog-scrollable" id="addAssayModal">
+            <div class="dialog-header">
+          <h5 class="dialog-title">Add investigation to workspace</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
         </div>
-        <div class="modal-body">
-            <div class="mb-3">
+        <div class="dialog-body">
+            <div class="mb-5">
             <label for="selectAssay" class="form-label">Choose investigation</label>
-            <select id="selectAssay" class="form-select">
+            <select id="selectAssay" class="form-control">
               <option value="">-- select --</option>
               {% for a in accessible_investigations %}
                 <option value="{{ a.id }}">{{ a.title }}</option>
               {% endfor %}
             </select>
           </div>
-          <div id="addAssayApiWarning" class="alert alert-warning small" style="display:none">
+          <div id="addAssayApiWarning" class="alert theme-warning small" style="display:none">
             <i class="bi bi-hdd-network-fill"></i>
-            This workspace has API access (<span id="addAssayApiTokens"></span>). Servers using
-            these tokens will be able to read this investigation, read-only. They see the
-            authors of its ToxTemps by name (name, organization, ORCID iD, never an email
-            address) unless a person has switched that off under Privacy. You can remove
-            the investigation again at any time.
+            <div>
+              This workspace has API access (<span id="addAssayApiTokens"></span>). Servers using
+              these tokens will be able to read this investigation, read-only. They see the
+              authors of its ToxTemps by name (name, organization, ORCID iD, never an email
+              address) unless a person has switched that off under Privacy. You can remove
+              the investigation again at any time.
+            </div>
           </div>
-          <div id="addAssayError" class="text-danger small" style="display:none"></div>
+          <div id="addAssayError" class="fg-danger small" style="display:none"></div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" id="confirmAddAssay" class="btn btn-primary">Add investigation</button>
+        <div class="dialog-footer">
+          <button type="button" class="btn-solid theme-secondary" data-bs-dismiss="dialog">Cancel</button>
+          <button type="button" id="confirmAddAssay" class="btn-solid theme-primary">Add investigation</button>
         </div>
-      </div>
-    </div>
-  </div>
+  </dialog>
 
   <!-- Modal: API tokens for reading a workspace from an external server -->
-  <div class="modal fade" id="apiTokensModal" tabindex="-1" aria-hidden="true" style="z-index: 1200;">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Workspace settings</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  <dialog class="dialog dialog-scrollable" id="apiTokensModal">
+        <div class="dialog-header">
+          <h5 class="dialog-title">Workspace settings</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="dialog" aria-label="Close"></button>
         </div>
-        <div class="modal-body">
-          <div class="text-uppercase fw-semibold mb-2 section-label">API access</div>
-          <p class="small text-muted">
+        <div class="dialog-body">
+          <div class="text-uppercase fw-semibold mb-3 section-label">API access</div>
+          <p class="small fg-secondary">
             A token lets an external server read, and only read, the investigations shared into this workspace.
             It keeps working if you leave the workspace. Send it as <code>Authorization: Bearer &lt;token&gt;</code>
             to <code>/api/preview/assays/</code> (preview: may change).
             <a href="{% url 'api_docs' %}" target="_blank" rel="noopener">API documentation</a>,
             where you can try every call.
           </p>
-          <div id="apiTokenList" class="mb-3"></div>
-          <div id="apiTokenSecret" class="alert alert-warning" style="display:none">
+          <div id="apiTokenList" class="mb-5"></div>
+          <div id="apiTokenSecret" class="alert theme-warning flex-column" style="display:none">
             <div class="small mb-1">Copy this token now. It will not be shown again.</div>
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-3">
               <code id="apiTokenSecretValue" class="user-select-all text-break flex-grow-1"></code>
-              <button type="button" id="copyApiToken" class="btn btn-sm btn-outline-secondary flex-shrink-0" title="Copy token" aria-label="Copy token"><i class="bi bi-clipboard"></i></button>
+              <button type="button" id="copyApiToken" class="btn-sm btn-outline theme-secondary flex-shrink-0" title="Copy token" aria-label="Copy token"><i class="bi bi-clipboard"></i></button>
             </div>
           </div>
-          <div class="row g-2">
+          <div class="row g-3">
             <div class="col-7">
               <input type="text" class="form-control" id="apiTokenName" maxlength="100" placeholder="Name, e.g. reporting server" aria-label="Token name">
             </div>
@@ -100,12 +92,10 @@
               <div class="form-text">days valid</div>
             </div>
           </div>
-          <div id="apiTokenError" class="text-danger small mt-2" style="display:none"></div>
+          <div id="apiTokenError" class="fg-danger small mt-3" style="display:none"></div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="button" id="createApiToken" class="btn btn-primary">Create token</button>
+        <div class="dialog-footer">
+          <button type="button" class="btn-solid theme-secondary" data-bs-dismiss="dialog">Close</button>
+          <button type="button" id="createApiToken" class="btn-solid theme-primary">Create token</button>
         </div>
-      </div>
-    </div>
-  </div>
+  </dialog>

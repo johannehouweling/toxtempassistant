@@ -1,38 +1,30 @@
-{% load django_bootstrap5 %}
+{% load bs6 %}
 {% load extras %}
 
-<div 
-    class="modal fade" 
-    id="updateModal" 
-    tabindex="-1" 
-    aria-labelledby="updateModalLabel" 
-    aria-hidden="true"
-  >
-    <div class="modal-dialog">
-      <div class="modal-content">
+<dialog class="dialog dialog-scrollable" id="updateModal" aria-labelledby="updateModalLabel">
         <!-- Modal Header -->
-        <div class="modal-header">
-          <h5 class="modal-title" id="updateModalLabel">Update Selected Questions</h5>
+        <div class="dialog-header">
+          <h5 class="dialog-title" id="updateModalLabel">Update Selected Questions</h5>
           <button 
             type="button" 
             class="btn-close" 
-            data-bs-dismiss="modal" 
+            data-bs-dismiss="dialog" 
             aria-label="Close"
           ></button>
         </div>        
         <!-- Modal Body -->
-        <div class="modal-body">
+        <div class="dialog-body">
           <!-- Dynamic Title for Selected Questions -->
-          <h6 id="selectedQuestionsTitle" class="mb-3" style="display: none;">
+          <h6 id="selectedQuestionsTitle" class="mb-5" style="display: none;">
             Question(s) Selected for Update:
           </h6>
           
           <!-- Container for Selected Questions or Info Text -->
           <div id="selectedQuestionsContainer">
-            <ul id="selectedQuestionsList" class="list-group mb-3" style="display: none;">
+            <ul id="selectedQuestionsList" class="list-group mb-5" style="display: none;">
               <!-- Dynamically populated list items will appear here -->
             </ul>
-            <div id="noSelectionInfo" class="alert alert-info" role="alert" style="display: none;">
+            <div id="noSelectionInfo" class="alert theme-info" role="alert" style="display: none;">
               You need to select at least one question for updating before proceeding.
             </div>
           </div>
@@ -43,24 +35,24 @@
           {% bootstrap_field form.extract_images placeholder="" %}
 
           <!-- Optional: Info about file requirement -->
-          <div id="fileUploadInfo" class="alert alert-info mt-3" role="alert" style="display: none;">
+          <div id="fileUploadInfo" class="alert theme-info mt-5" role="alert" style="display: none;">
             Please select a file to proceed.
           </div>
         </div>
         
         <!-- Modal Footer -->
-        <div class="modal-footer">
+        <div class="dialog-footer">
           <button 
             type="button" 
-            class="btn btn-secondary" 
-            data-bs-dismiss="modal"
+            class="btn-solid theme-secondary" 
+            data-bs-dismiss="dialog"
             id="cancelButton"
           >
             Cancel
           </button>
           <button 
             type="submit" 
-            class="btn btn-primary"
+            class="btn-solid theme-primary"
             data-bs-toggle="tooltip" data-bs-placement="top"
             data-bs-custom-class="tooltip"
             data-bs-title="Saving will apply all unsaved form changes and overwrite the selected questions (see above). You can use the History feature to restore the previous state if needed. Press Cancel to abort." 
@@ -70,7 +62,7 @@
             Save
             <!-- Spinner Element -->
             <div 
-              class="spinner-border spinner-border-sm ms-2" 
+              class="spinner-border spinner-sm ms-3" 
               role="status" 
               id="okButtonSpinner" 
               style="display: none;"
@@ -79,9 +71,7 @@
             </div>
           </button>
         </div>
-      </div>
-    </div>
-  </div>
+  </dialog>
 
   {% include "toxtempass/_file_accumulator.html" with input_id="fileUpload" prefix="fileUpload" %}
 
@@ -136,7 +126,7 @@
       }
       
       // Event listener for when the modal is about to be shown
-      updateModal.addEventListener('show.bs.modal', function (event) {
+      updateModal.addEventListener('show.bs.dialog', function (event) {
         // Clear any previous content
         selectedQuestionsList.innerHTML = '';
         selectedQuestionsList.style.display = 'none';
@@ -160,7 +150,7 @@
             
             // Create a new list item
             var li = document.createElement('li');
-            li.classList.add('list-group-item', 'bg-light', 'overflow-x-hidden', 'text-nowrap', 'graceful-clip');
+            li.classList.add('list-group-item', 'bg-2', 'overflow-x-hidden', 'text-nowrap', 'graceful-clip');
             li.textContent = labelText;
             
             // Append the list item to the unordered list
@@ -180,7 +170,7 @@
       });
       
       // Event listener for when the modal is fully hidden (after closing animation)
-      updateModal.addEventListener('hidden.bs.modal', function (event) {
+      updateModal.addEventListener('hidden.bs.dialog', function (event) {
         // Clear the upload field and accumulated file badges
         fileUploadAccumulatorClear();
         fileUploadInfo.style.display = 'none';
@@ -197,7 +187,7 @@
       allCheckboxes.forEach(function(checkbox) {
         checkbox.addEventListener('change', function() {
           // If the modal is open, update the "Save" button state
-          if (updateModal.classList.contains('show')) {
+          if (updateModal.open) {
             updateSaveButtonState();
             
             // Update the list of selected questions in the modal
@@ -210,7 +200,7 @@
                 var questionLabel = document.querySelector('label[for="id_question_' + x + '"]');
                 var labelText = questionLabel ? questionLabel.textContent.trim() : 'Unknown Question';
                 var li = document.createElement('li');
-                li.classList.add('list-group-item', 'bg-light', 'overflow-x-hidden', 'text-nowrap', 'graceful-clip');
+                li.classList.add('list-group-item', 'bg-2', 'overflow-x-hidden', 'text-nowrap', 'graceful-clip');
                 li.textContent = labelText;
                 selectedQuestionsList.appendChild(li);
               });
@@ -228,7 +218,7 @@
       // (file added, removed via badge ×, or cleared on modal close).
       // The 'change' event itself is handled by _file_accumulator.html.
       fileUpload.addEventListener('fileAccumulator:changed', function() {
-        if (updateModal.classList.contains('show')) {
+        if (updateModal.open) {
           updateSaveButtonState();
         }
       });

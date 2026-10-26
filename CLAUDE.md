@@ -155,7 +155,7 @@ Recognized tag keys include `tier`, `residency`, `provider`, `direct-from-azure`
 
 Object-level permissions go through `django-guardian`. The abstract `AccessibleModel` (in `models.py`) implements recursive `is_accessible_by(user, perm_prefix)` — if the user lacks direct permission, it walks `get_parent()` (Assay → Study → Investigation). `Assay.is_accessible_by` additionally checks `WorkspaceInvestigation` membership: if the parent investigation is shared into a workspace the user belongs to, the assay is accessible — but `delete` is restricted to the assay creator or the investigation owner.
 
-`Person.preferences` is a JSONField holding multiple semantically distinct keys (beta state, tour progress, llm pref). All writes must go through `utilities.update_prefs_atomic(user, mutate)`, which serialises with `SELECT FOR UPDATE` — the naive read-modify-write pattern races and clobbers other keys.
+`Person.preferences` is a JSONField holding multiple semantically distinct keys (beta state, tour progress, llm pref, colour mode). All writes must go through `utilities.update_prefs_atomic(user, mutate)`, which serialises with `SELECT FOR UPDATE` — the naive read-modify-write pattern races and clobbers other keys.
 
 ### Workspace ownership model
 
@@ -254,7 +254,7 @@ Every email goes through `toxtempass/notifications.py` and starts as an `EmailLo
 
 ### Account and privacy (user menu)
 
-The user menu has four tabs: Workspaces, Account, Settings (only with a real model choice, or for staff) and Privacy. Their endpoints live in `toxtempass/account.py`, the rules in `toxtempass/privacy.py`.
+The user menu has four tabs: Workspaces, Settings (appearance, the model choice when there is a real one, staff links), Account and Privacy. Their endpoints live in `toxtempass/account.py`, the rules in `toxtempass/privacy.py`.
 
 * **Email changes** keep the current address until the link sent to `Person.pending_email` is followed; the current address gets a notice.
 * **Shared documents.** "Stop sharing" sets `FileAsset.status = withdrawn`. From then on nothing may read the file: every reader of stored files (admin ZIP download, benchmarking, stats) must filter on `status="available"`. After `Config._file_withdrawal_grace_hours` the periodic job deletes it (the `post_delete` signal removes the MinIO object) and writes a `FileWithdrawal` record. Answers are unaffected.
@@ -278,6 +278,16 @@ Selectors and help text for the in-app tour live in `Config.user_onboarding_help
 
 `Assay.status_context` accumulates user-visible error/info messages; `utilities.add_status_context()` truncates to `Config.status_error_max_len` while preserving the most recent entry. Full tracebacks go to the rotating file handler at `myocyte/logs/django-errors.log` (volume-mounted; survives container rebuilds). Correlation IDs in `status_context` point back to entries in that log.
 
+### Front end (Bootstrap 6)
+
+The UI is Bootstrap 6 (currently `6.0.0-alpha.1`). Class names follow v6: responsive prefixes (`md:d-none`, `lg:col-4`), colours as `fg-*`/`bg-*`, buttons and badges as a variant plus a theme (`btn-solid theme-primary`), `dialog`/`drawer`/`menu` instead of modal/offcanvas/dropdown, native `<dialog>` and `<details>` markup. The spacing scale differs from v5: `-5` is 1rem, `-3` is .5rem.
+
+* **CSS is our own build.** `scss/bootstrap.scss` configures Bootstrap's Sass (`@use ... with`) and adds the "orange" theme colour for the RISK-HUNT3R breakdown; `npm run build:css` (from `myocyte/`) compiles it and runs Bootstrap's PostCSS step that adds the `--bs-` prefix, into the committed `toxtempass/static/toxtempass/bootstrap.min.css`. Customise Bootstrap there, not with CSS on top.
+* **JS comes from the CDN** as an ES module, pinned by the import map in `base.html` with its hash; keep its version equal to `package.json`. v6 has no `window.bootstrap`, so a small module in `base.html` sets it for the inline scripts. Modules run after the page is parsed, so inline code may only touch `bootstrap.*` from `DOMContentLoaded` or later.
+* **Light and dark mode** follow the OS unless the user picks Light or Dark under Settings → Appearance (`Person.preferences["color_mode"]`, `account.set_color_mode`; "system" is stored as no key). `base.html` renders the choice as `data-color-mode` on `<html>`, and a script at the top of the page turns it, or `prefers-color-scheme` for system, into `data-bs-theme` before the stylesheet loads (some v6 rules, like the `<select>` chevron, only react to the attribute). So never hard-code a colour: use the tokens (`var(--bs-fg-body)`, `--bs-bg-1`, `--bs-border-color`, `--bs-primary-bg`) or `fg-*`/`bg-*` classes, and `color-mix()` for transparency. Artwork made for a light background (the partner logos) sits in a `data-bs-theme="light"` panel.
+* **Page CSS goes in `@layer custom { … }`** inside each `<style>` block. Bootstrap 6's styles are in cascade layers and its utilities are not `!important`, so unlayered CSS would beat every utility class.
+* **Forms** render through `{% load bs6 %}` (`toxtempass/templatetags/bs6.py`), which stands in for django-bootstrap5 with the same tag names until a django-bootstrap6 exists. It supports only the options the templates use and raises on anything else.
+
 ### Server housekeeping (disk space)
 
 The legacy server once ran out of disk because old images were never removed. After a healthy legacy deploy, `deploy.yml` runs `prune-old-images.sh`, which keeps the deployed tag plus the two newest older versions of each of our images (always at least one, however old) for rollback, then removes dangling images and the build cache.
@@ -293,4 +303,4 @@ Required for any run (see `.env.dummy` for the full list): `SECRET_KEY`, `ALLOWE
 - Don't run `git add .` blindly — `.env`, `db.sqlite3`, and `backups/` live in the tree and are gitignored, but new untracked artifacts can slip in.
 - Workspace cards exist twice: rendered by the server (`workspace_card_*.html`) and built in the browser (`workspace_js.html`, for a workspace just created). Keep their markup in step (column wrapper, owner chip with the key, settings cogwheel), and never put Django tags inside the script's HTML strings: they run once, when the page loads, not when the card is built. `test_workspace_invitations.py` renders the script and checks this.
 - the central location for app specific constants are registered in /myocyte/toxtempass/__init__.py Config function.
-- Avoid using custom CSS defintions. Use bootstrap5 boiler plate classes whenever possible. For example use `fs-1` to `fs-7` instead of changing font-size as CSS. 
+- Avoid using custom CSS defintions. Use Bootstrap 6 utility classes whenever possible. For example use `fs-xs` to `fs-6xl` instead of changing font-size as CSS. 

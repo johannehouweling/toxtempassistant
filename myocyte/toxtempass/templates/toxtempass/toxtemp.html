@@ -25,23 +25,23 @@
 {% block content %}
 {% toxtemp_sections as sections %}
 <div class="row justify-content-center">
-  <div class="col-lg-10 col-xl-9">
+  <div class="lg:col-10 xl:col-9">
 
-    <header class="mb-5">
-      <p class="small text-body-secondary mb-1">Template by Krebs et al. (2019), <em>ALTEX</em></p>
-      <h1 class="fs-2 mb-3">ToxTemp: the 77 questions for describing cell-based test methods</h1>
+    <header class="mb-12">
+      <p class="small fg-secondary mb-1">Template by Krebs et al. (2019), <em>ALTEX</em></p>
+      <h1 class="fs-3xl mb-5">ToxTemp: the 77 questions for describing cell-based test methods</h1>
 
-      <div class="border border-primary-subtle bg-primary-subtle text-primary-emphasis rounded p-3 mb-4" role="note" id="source">
-        <p class="fw-semibold mb-2">The ToxTemp template was developed by Krebs et al. It is not the work of the ToxTempAssistant team.</p>
-        <p class="mb-2">
+      <div class="border border-subtle-primary bg-subtle-primary fg-emphasis-primary rounded p-5 mb-7" role="note" id="source">
+        <p class="fw-semibold mb-3">The ToxTemp template was developed by Krebs et al. It is not the work of the ToxTempAssistant team.</p>
+        <p class="mb-3">
           Krebs, A., Waldmann, T., Wilks, M. F., van Vugt-Lussenburg, B. M. A., van der Burg, B., et al. (2019).
           Template for the description of cell-based toxicological test methods to allow evaluation and regulatory
           use of the data. <em>ALTEX</em>, 36(4), 682–699.
-          <a class="link-primary" href="{{ config.reference_toxtemp }}" target="_blank" rel="noopener noreferrer">https://doi.org/10.14573/altex.1909271</a>
+          <a class="fg-primary" href="{{ config.reference_toxtemp }}" target="_blank" rel="noopener noreferrer">https://doi.org/10.14573/altex.1909271</a>
         </p>
         <p class="small mb-0">
           The questions, notes and examples below are reproduced from that article and its supplementary material
-          under the <a class="link-primary" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0 license</a>.
+          under the <a class="fg-primary" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0 license</a>.
           We changed the formatting and left out notes that repeat the question. ToxTempAssistant is a separate
           tool that helps you draft answers to these questions.
         </p>
@@ -58,8 +58,8 @@
       </p>
     </header>
 
-    <nav class="mb-5" aria-labelledby="contents-title">
-      <h2 class="fs-5" id="contents-title">Sections</h2>
+    <nav class="mb-12" aria-labelledby="contents-title">
+      <h2 class="fs-lg" id="contents-title">Sections</h2>
       <ul class="list-unstyled mb-0">
         {% for section in sections %}
         <li class="py-1"><a href="#section-{{ forloop.counter }}">{{ section.title }}</a></li>
@@ -68,25 +68,25 @@
     </nav>
 
     {% for section in sections %}
-    <section class="mb-5" id="section-{{ forloop.counter }}">
-      <h2 class="fs-4 border-bottom pb-2 mb-3">{{ section.title }}</h2>
+    <section class="mb-12" id="section-{{ forloop.counter }}">
+      <h2 class="fs-xl border-bottom pb-3 mb-5">{{ section.title }}</h2>
       {% with notes=section.title|guidance_paragraphs %}{% if notes %}
-      <div class="small text-body-secondary border-start border-3 ps-3 mb-4">
+      <div class="small fg-secondary border-start border-3 ps-5 mb-7">
         {% for paragraph in notes %}<p class="mb-1">{{ paragraph }}</p>{% endfor %}
       </div>
       {% endif %}{% endwith %}
 
       {% for sub in section.subsections %}
-      <article class="mb-4" id="{{ sub.title|slugify }}">
-        <h3 class="fs-6 fw-semibold mb-1">{{ sub.title }}</h3>
-        <p class="mb-2">{{ sub.question }}</p>
+      <article class="mb-7" id="{{ sub.title|slugify }}">
+        <h3 class="fs-md fw-semibold mb-1">{{ sub.title }}</h3>
+        <p class="mb-3">{{ sub.question }}</p>
         {% if sub.subquestions %}
-        <ul class="mb-2">
+        <ul class="mb-3">
           {% for subquestion in sub.subquestions %}<li>{{ subquestion.question }}</li>{% endfor %}
         </ul>
         {% endif %}
         {% with notes=sub.title|guidance_paragraphs %}{% if notes %}
-        <div class="small text-body-secondary border-start border-3 ps-3">
+        <div class="small fg-secondary border-start border-3 ps-5">
           {% for paragraph in notes %}<p class="mb-1">{{ paragraph }}</p>{% endfor %}
         </div>
         {% endif %}{% endwith %}
@@ -95,8 +95,8 @@
     </section>
     {% endfor %}
 
-    <footer class="border-top pt-4 mb-5">
-      <p class="small text-body-secondary">
+    <footer class="border-top pt-7 mb-12">
+      <p class="small fg-secondary">
         Source: Krebs et al. (2019), <em>ALTEX</em> 36(4), 682–699,
         <a href="{{ config.reference_toxtemp }}" target="_blank" rel="noopener noreferrer">doi:10.14573/altex.1909271</a>,
         licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>.

@@ -99,54 +99,52 @@ class AssayTable(tables.Table):
         <div class="btn-group" role="group">
             {% if record.status == LLMStatus.SCHEDULED.value %}
                 <div class="btn-group" role="group" data-assay-id="{{ record.id }}" data-assay-status="{{ record.status }}" data-bs-toggle="tooltip" title="Processing scheduled. Refresh the page to see updates.">
-                    <button class="btn btn-sm btn-outline-secondary" disabled>
+                    <button class="btn-sm btn-outline theme-secondary" disabled>
                         <span class="d-flex">
                             <i class="bi bi-hourglass"></i>
-                            <span class="ms-1 d-none d-lg-inline">Sched.</span>
+                            <span class="ms-1 d-none lg:d-inline">Sched.</span>
                         </span>
                     </button>
                 </div>
             {% elif record.status == LLMStatus.BUSY.value %}
                 <div class="btn-group" role="group" data-assay-id="{{ record.id }}" data-assay-status="{{ record.status }}" data-bs-toggle="tooltip" title="Processing ongoing ({{record.number_processed_answers}}/{{record.get_n_answers}}). Refresh the page to see updates.">
-                    <button class="btn btn-sm btn-outline-secondary" disabled>
-                            <span class="spinner-grow spinner-grow-sm" aria-hidden="true"></span>
-                            <span role="status" class="d-lg-inline d-none">Busy</span>
+                    <button class="btn-sm btn-outline theme-secondary" disabled>
+                            <span class="spinner-grow spinner-sm" aria-hidden="true"></span>
+                            <span role="status" class="lg:d-inline d-none">Busy</span>
                     </button>
                 </div>
             {% elif record.status == LLMStatus.ERROR.value %}
-                <a class="btn btn-sm btn-outline-danger" data-assay-id="{{ record.id }}" data-assay-status="{{ record.status }}" href="{% url 'answer_assay_questions' record.id %}">
+                <a class="btn-sm btn-outline theme-danger" data-assay-id="{{ record.id }}" data-assay-status="{{ record.status }}" href="{% url 'answer_assay_questions' record.id %}">
                     <span data-bs-toggle="tooltip" title="Processing failed">
                         <i class="bi bi-bug"></i>
-                        <span class="ms-1 d-none d-lg-inline">Error</span>
+                        <span class="ms-1 d-none lg:d-inline">Error</span>
                     </span>
                 </a>
             {% else %}
-                <a class="btn btn-sm btn-outline-primary" data-assay-id="{{ record.id }}" data-assay-status="{{ record.status }}" href="{% url 'answer_assay_questions' record.id %}">
+                <a class="btn-sm btn-outline theme-primary" data-assay-id="{{ record.id }}" data-assay-status="{{ record.status }}" href="{% url 'answer_assay_questions' record.id %}">
                     <i class="bi bi-eye"></i>
-                    <span class="ms-1 d-none d-lg-inline">View</span>
+                    <span class="ms-1 d-none lg:d-inline">View</span>
                 </a>
             {% endif %}
-            {# Menu before its toggle (Bootstrap finds it as the previous sibling) so the toggle is the group's last child and keeps its rounded right corners. #}
-            <ul class="dropdown-menu dropdown-menu-end">
-                {% comment %}Route exports through feedback_export() so the feedback modal gates them here too — same path the editing page (answer.html) uses; the partial is included once on overview.html. The toggle is never disabled: Delete lives in this menu and must stay reachable for errored/busy/scheduled assays, so only the export items are disabled.{% endcomment %}
-                <li><h6 class="dropdown-header">Export</h6></li>
-                {% for export_type in export_types %}
-                <li><a class="dropdown-item{% if record.status in export_blocked %} disabled{% endif %}" {% if record.status in export_blocked %}aria-disabled="true" {% endif %}href="#" onclick="feedback_export('{% url 'export_assay' assay_id=record.id export_type=export_type %}', {{ record.id }}); return false;">{{ export_type|upper }}</a></li>
-                {% endfor %}
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                    <a class="dropdown-item text-danger js-delete-link"
-                       href="#"
-                       role="button"
-                       data-delete-url="{% url 'delete_assay' record.id %}?from=overview"
-                       data-confirm-msg="Are you sure you want to delete this assay and associated data? This action cannot be undone.">
-                        <i class="bi bi-trash me-2" aria-hidden="true"></i>Delete
-                    </a>
-                </li>
-            </ul>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions">
+            {# Menu right after its toggle, as Bootstrap 6 expects: the group then squares the View link's right corners and keeps the toggle's. #}
+            <button type="button" class="btn-sm btn-outline theme-secondary" data-bs-toggle="menu" data-bs-placement="bottom-end" aria-expanded="false" aria-label="More actions">
                 <i class="bi bi-three-dots" aria-hidden="true"></i>
             </button>
+            <div class="menu">
+                {% comment %}Route exports through feedback_export() so the feedback modal gates them here too — same path the editing page (answer.html) uses; the partial is included once on overview.html. The toggle is never disabled: Delete lives in this menu and must stay reachable for errored/busy/scheduled assays, so only the export items are disabled.{% endcomment %}
+                <h6 class="menu-header">Export</h6>
+                {% for export_type in export_types %}
+                <a class="menu-item{% if record.status in export_blocked %} disabled{% endif %}" {% if record.status in export_blocked %}aria-disabled="true" {% endif %}href="#" onclick="feedback_export('{% url 'export_assay' assay_id=record.id export_type=export_type %}', {{ record.id }}); return false;">{{ export_type|upper }}</a>
+                {% endfor %}
+                <hr class="menu-divider">
+                <a class="menu-item fg-danger js-delete-link"
+                   href="#"
+                   role="button"
+                   data-delete-url="{% url 'delete_assay' record.id %}?from=overview"
+                   data-confirm-msg="Are you sure you want to delete this assay and associated data? This action cannot be undone.">
+                    <i class="bi bi-trash me-3" aria-hidden="true"></i>Delete
+                </a>
+            </div>
         </div>
         """,
         extra_context={
@@ -156,7 +154,10 @@ class AssayTable(tables.Table):
         },
         verbose_name="Actions",
         orderable=False,
-        attrs={"th": {"class": "no-link-header"}, "td": {"class": "align-middle"}},
+        attrs={
+            "th": {"class": "no-link-header text-end"},
+            "td": {"class": "align-middle text-end"},
+        },
     )
 
     def render_investigation(self, record) -> SafeText:
@@ -164,9 +165,9 @@ class AssayTable(tables.Table):
         if record.study.investigation.shared_in_workspaces.exists():
             return format_html(
                 '<span class="d-inline-flex align-items-center flex-wrap gap-1">{}'
-                '<button type="button" class="btn btn-link p-0 border-0 d-inline-flex align-items-center text-body" data-bs-toggle="offcanvas" data-bs-target="#offcanvasUser" aria-label="View workspaces sharing this investigation">'
+                '<button type="button" class="btn btn-link p-0 border-0 d-inline-flex align-items-center fg-body" data-bs-toggle="drawer" data-bs-target="#offcanvasUser" aria-label="View workspaces sharing this investigation">'
                 '<span class="d-inline-flex align-items-center p-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Shared in workspace: {}">'
-                '<span class="bi pill px-1 rounded bg-secondary-subtle bi-share"></span>'
+                '<span class="bi pill px-1 rounded bg-subtle-secondary bi-share"></span>'
                 "</span>"
                 "</button>"
                 "</span>",
@@ -187,7 +188,7 @@ class AssayTable(tables.Table):
         viewed = AssayView.objects.filter(assay=record, user=request.user).exists()
         if not viewed:
             return mark_safe(
-                '<i class="bi bi-dot text-primary fs-3"></i><span class="visually-hidden">New</span>'
+                '<i class="bi bi-dot fg-primary fs-2xl"></i><span class="visually-hidden">New</span>'
             )
         return ""
 
@@ -202,7 +203,7 @@ class AssayTable(tables.Table):
         if latest:
             return localtime(latest).strftime("%Y-%m-%d")
         else:
-            return mark_safe('<span class="text-muted">Never</span>')
+            return mark_safe('<span class="fg-secondary">Never</span>')
 
     def render_progress(self, value, record: Assay) -> SafeText:  # noqa: ANN001
         """Render the progress bar based on the number of answers."""
@@ -221,7 +222,7 @@ class AssayTable(tables.Table):
         )
         return format_html(
             """
-                <div class="progress border bg-white">
+                <div class="progress border bg-body">
                 <div class="progress-bar bg-primary"
                     role="progressbar"
                     style="width: {pct_a}%;"
@@ -255,7 +256,7 @@ class AssayTable(tables.Table):
         """Render admin-only estimated LLM cost with Bootstrap5 popover breakdown."""
         cost_rows = list(AssayCost.objects.filter(assay=record))
         if not cost_rows:
-            return mark_safe('<span class="text-muted">—</span>')
+            return mark_safe('<span class="fg-secondary">—</span>')
 
         # Determine whether all rows share the same cost unit (safe to sum).
         units = {r.cost_unit for r in cost_rows}
@@ -273,15 +274,15 @@ class AssayTable(tables.Table):
             in_str = f"{r.input_tokens:,}"
             cached = r.cache_read_tokens + r.cache_write_tokens
             if cached:
-                in_str += f"&nbsp;in<br><span class='text-muted'>{cached:,}&nbsp;cached</span>"
+                in_str += f"&nbsp;in<br><span class='fg-secondary'>{cached:,}&nbsp;cached</span>"
             else:
                 in_str += "&nbsp;in"
             out_str = f"{r.output_tokens:,}"
             breakdown_rows.append(
-                f"<tr><td class='pe-2 text-break'><code>{escape(r.model_key)}</code></td>"
-                f"<td class='pe-2 text-break'>{escape(r.model_id)}</td>"
-                f"<td class='pe-2 text-nowrap'>{in_str}</td>"
-                f"<td class='pe-2 text-nowrap'>{out_str}&nbsp;out</td>"
+                f"<tr><td class='pe-3 text-break'><code>{escape(r.model_key)}</code></td>"
+                f"<td class='pe-3 text-break'>{escape(r.model_id)}</td>"
+                f"<td class='pe-3 text-nowrap'>{in_str}</td>"
+                f"<td class='pe-3 text-nowrap'>{out_str}&nbsp;out</td>"
                 f"<td class='text-nowrap'><b>{cost_str}</b></td></tr>"
             )
         popover_content = (
@@ -309,11 +310,11 @@ class AssayTable(tables.Table):
             ' data-bs-toggle="popover"'
             ' data-bs-trigger="focus"'
             ' data-bs-placement="left"'
-            ' data-bs-custom-class="mw-100"'
+            ' data-bs-custom-class="max-w-100"'
             ' data-bs-html="true"'
             ' data-bs-title="Cost breakdown"'
             ' data-bs-content="{content}"'
-            ' class="badge bg-secondary text-decoration-underline cursor-pointer"'
+            ' class="badge theme-secondary text-decoration-underline cursor-pointer"'
             ' style="cursor:pointer">'
             "{total}"
             "</span>",
@@ -372,7 +373,7 @@ class BetaUserTable(tables.Table):
     )
     action = tables.TemplateColumn(
         template_code="""
-        <button class="btn btn-sm toggle-admit-btn {% if record.preferences and record.preferences.beta_admitted %}btn-danger{% else %}btn-success{% endif %}"
+        <button class="btn-solid btn-sm toggle-admit-btn {% if record.preferences and record.preferences.beta_admitted %}theme-danger{% else %}theme-success{% endif %}"
                 data-person-id="{{ record.id }}"
                 data-admit="{% if record.preferences and record.preferences.beta_admitted %}0{% else %}1{% endif %}">
             {% if record.preferences and record.preferences.beta_admitted %}Revoke{% else %}Admit{% endif %}
@@ -380,7 +381,10 @@ class BetaUserTable(tables.Table):
         """,
         verbose_name="Action",
         orderable=False,
-        attrs={"td": {"class": "align-middle"}, "th": {"class": "no-link-header"}},
+        attrs={
+            "td": {"class": "align-middle text-end"},
+            "th": {"class": "no-link-header text-end"},
+        },
     )
 
     def render_requested_at(self, value, record: Person) -> SafeText:  # noqa: ANN001

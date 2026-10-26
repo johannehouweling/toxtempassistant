@@ -38,29 +38,29 @@
 </script>{% endblock %}
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-lg-10 col-xl-9">
+  <div class="lg:col-10 xl:col-9">
 
-    <section class="mb-5">
-      <h1 class="fs-2 mb-3">About ToxTempAssistant</h1>
-      <p class="lead">
+    <section class="mb-12">
+      <h1 class="fs-3xl mb-5">About ToxTempAssistant</h1>
+      <p class="fs-lg fw-light">
         ToxTempAssistant drafts ToxTemp descriptions of cell-based toxicological test methods from the
         documents you already have: protocols, SOPs, publications and lab notes. For each of the 77 ToxTemp
         questions, a large language model drafts an answer where your documents contain the information and
         cites its sources; you fill the gaps, review, edit and export the result.
       </p>
-      <div class="d-flex flex-wrap gap-2">
+      <div class="d-flex flex-wrap gap-3">
         {% if user.is_authenticated %}
-          <a class="btn btn-primary" href="{% url 'overview' %}">Go to your assays</a>
+          <a class="btn-solid theme-primary" href="{% url 'overview' %}">Go to your assays</a>
         {% else %}
-          <a class="btn btn-primary" href="{% url 'signup' %}">Sign up for the beta</a>
-          <a class="btn btn-outline-primary" href="{% url 'overview' %}">Log in</a>
+          <a class="btn-solid theme-primary" href="{% url 'signup' %}">Sign up for the beta</a>
+          <a class="btn-outline theme-primary" href="{% url 'overview' %}">Log in</a>
         {% endif %}
-        <a class="btn btn-outline-secondary" href="{{ config.reference_toxtempassistant_paper }}" target="_blank" rel="noopener noreferrer">Read the paper</a>
+        <a class="btn-outline theme-secondary" href="{{ config.reference_toxtempassistant_paper }}" target="_blank" rel="noopener noreferrer">Read the paper</a>
       </div>
     </section>
 
-    <section class="mb-5">
-      <h2 class="fs-4">Why ToxTemp, and why it takes so long</h2>
+    <section class="mb-12">
+      <h2 class="fs-xl">Why ToxTemp, and why it takes so long</h2>
       <p>
         New Approach Methodologies (NAMs), such as human cell-based assays, can only support chemical safety
         assessment when they are documented transparently and completely. Most NAMs developed in academic labs
@@ -79,13 +79,13 @@
       </p>
     </section>
 
-    <section class="mb-5">
-      <h2 class="fs-4 mb-3">How it works</h2>
-      <ol class="list-unstyled row row-cols-1 row-cols-md-2 g-3">
+    <section class="mb-12">
+      <h2 class="fs-xl mb-5">How it works</h2>
+      <ol class="list-unstyled row row-cols-1 md:row-cols-2 g-5">
         <li class="col">
           <div class="card h-100">
             <div class="card-body">
-              <h3 class="card-title fs-6"><span class="badge text-bg-primary me-2">1</span>Upload your documents</h3>
+              <h3 class="card-title fs-md"><span class="badge theme-primary me-3">1</span>Upload your documents</h3>
               <p class="card-text">
                 Give the assay a name and a short description of its purpose, test system and endpoint, then upload
                 your context documents. Images inside PDF and Word files can be extracted as extra context.
@@ -96,7 +96,7 @@
         <li class="col">
           <div class="card h-100">
             <div class="card-body">
-              <h3 class="card-title fs-6"><span class="badge text-bg-primary me-2">2</span>Get draft answers</h3>
+              <h3 class="card-title fs-md"><span class="badge theme-primary me-3">2</span>Get draft answers</h3>
               <p class="card-text">
                 The model drafts answers from the information in your documents and cites the document behind each
                 statement. Where your documents don’t cover a question, it replies “Answer not found in documents.”
@@ -108,7 +108,7 @@
         <li class="col">
           <div class="card h-100">
             <div class="card-body">
-              <h3 class="card-title fs-6"><span class="badge text-bg-primary me-2">3</span>Review and refine</h3>
+              <h3 class="card-title fs-md"><span class="badge theme-primary me-3">3</span>Review and refine</h3>
               <p class="card-text">
                 For most people, correcting a draft is quicker than writing from scratch. Edit and accept answers
                 one by one, regenerate a single answer with extra instructions, and share the assay with colleagues
@@ -120,7 +120,7 @@
         <li class="col">
           <div class="card h-100">
             <div class="card-body">
-              <h3 class="card-title fs-6"><span class="badge text-bg-primary me-2">4</span>Export</h3>
+              <h3 class="card-title fs-md"><span class="badge theme-primary me-3">4</span>Export</h3>
               <p class="card-text">
                 Download the finished ToxTemp as PDF, Word, HTML, Markdown, JSON, XML or LaTeX. The model and its
                 parameters are recorded in the export metadata.
@@ -131,19 +131,17 @@
       </ol>
     </section>
 
-    <section class="mb-5">
-      <h2 class="fs-4 mb-3">See it in action</h2>
-      <div class="ratio ratio-16x9 mb-2">
-        <iframe src="https://video.edu.nl/videos/embed/mXiqzVCSYytLb4i2YgT7a6" title="ToxTempAssistant tutorial video (version 2.16.2)" loading="lazy" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-      </div>
-      <p class="small text-body-secondary">
+    <section class="mb-12">
+      <h2 class="fs-xl mb-5">See it in action</h2>
+      <iframe class="ratio-16x9 w-100 border-0 mb-3" src="https://video.edu.nl/videos/embed/mXiqzVCSYytLb4i2YgT7a6" title="ToxTempAssistant tutorial video (version 2.16.2)" loading="lazy" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      <p class="small fg-secondary">
         This demo shows version 2.16.2, so the current version may look slightly different.
         <a href="https://video.edu.nl/w/mXiqzVCSYytLb4i2YgT7a6" target="_blank" rel="noopener noreferrer">Watch on PeerTube</a>.
       </p>
     </section>
 
-    <section class="mb-5">
-      <h2 class="fs-4">The 77 ToxTemp questions</h2>
+    <section class="mb-12">
+      <h2 class="fs-xl">The 77 ToxTemp questions</h2>
       <p>The questions are kept word for word from the original template and grouped into 11 sections:</p>
       <ol>
         <li>Overview</li>
@@ -161,8 +159,8 @@
       <p><a href="{% url 'toxtemp_questions' %}">Read all 77 questions, with the template’s notes and examples</a></p>
     </section>
 
-    <section class="mb-5">
-      <h2 class="fs-4">How accurate is it?</h2>
+    <section class="mb-12">
+      <h2 class="fs-xl">How accurate is it?</h2>
       <p>
         We evaluated ToxTempAssistant (v1.3.1) in a <strong>peer-reviewed study</strong>, published in
         <a href="{{ config.reference_toxtempassistant_paper }}" target="_blank" rel="noopener noreferrer"><em>Evidence-Based Toxicology</em> (2026)</a>,
@@ -189,7 +187,7 @@
           </tbody>
         </table>
       </div>
-      <p class="small text-body-secondary">
+      <p class="small fg-secondary">
         Completeness: share of answerable questions the model answered. Precision: share of those answers that
         were correct. Specificity: share of questions correctly declined for out-of-scope documents. Accuracy:
         correct answers and correct refusals combined.
@@ -204,8 +202,8 @@
       </p>
     </section>
 
-    <section class="mb-5">
-      <h2 class="fs-4">Your data</h2>
+    <section class="mb-12">
+      <h2 class="fs-xl">Your data</h2>
       <ul>
         <li><strong>EU data residency:</strong> answers are generated by gpt-4o-mini, hosted by Microsoft in the EU through Azure AI Foundry.</li>
         <li>Your investigations, studies and assays are visible only to you, unless you share an investigation with colleagues through a workspace.</li>
@@ -214,8 +212,8 @@
       </ul>
     </section>
 
-    <section class="mb-5">
-      <h2 class="fs-4">Getting access</h2>
+    <section class="mb-12">
+      <h2 class="fs-xl">Getting access</h2>
       <p>
         ToxTempAssistant is in public beta. Sign up with your email address or ORCID iD; the maintainers admit new
         accounts. Every new account comes with a read-only demo assay, so you can explore a finished draft before
@@ -228,24 +226,23 @@
       </p>
     </section>
 
-    <section class="mb-5">
-      <h2 class="fs-4 mb-3">Frequently asked questions</h2>
-      <div class="accordion" id="faqAccordion">
+    <section class="mb-12">
+      <h2 class="fs-xl mb-5">Frequently asked questions</h2>
+      <div class="accordion">
         {% for question, answer in faq %}
-        <div class="accordion-item">
-          <h3 class="accordion-header">
-            <button class="accordion-button collapsed fs-6" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.counter }}" aria-expanded="false" aria-controls="faq{{ forloop.counter }}">{{ question }}</button>
-          </h3>
-          <div id="faq{{ forloop.counter }}" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
-            <div class="accordion-body">{{ answer }}</div>
-          </div>
-        </div>
+        <details class="accordion-item" name="faq" id="faq{{ forloop.counter }}">
+          <summary class="accordion-header fs-md">
+            <h3 class="fs-md fw-normal m-0">{{ question }}</h3>
+            <svg class="accordion-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 5 6 6 6-6"/></svg>
+          </summary>
+          <div class="accordion-body">{{ answer }}</div>
+        </details>
         {% endfor %}
       </div>
     </section>
 
-    <section class="mb-5">
-      <h2 class="fs-4">Team and funding</h2>
+    <section class="mb-12">
+      <h2 class="fs-xl">Team and funding</h2>
       <p>
         ToxTempAssistant was conceived at the 4th VHP4Safety Hackathon and is developed by Jente Houweling
         (RIVM; Maastricht University) and Matthias Arras, with Egon Willighagen, Danyel Jennen and Chris Evelo
@@ -258,16 +255,16 @@
       </p>
     </section>
 
-    <section class="mb-5" id="how-to-cite">
-      <h2 class="fs-4">How to cite</h2>
+    <section class="mb-12" id="how-to-cite">
+      <h2 class="fs-xl">How to cite</h2>
       <p>If ToxTempAssistant helps your work, please cite:</p>
-      <blockquote class="border-start border-3 ps-3 text-body-secondary">
+      <blockquote class="border-start border-3 ps-5 fg-secondary">
         Houweling, J. M., Arras, M. M. L., Willighagen, E. L., Jennen, D. G. J., Evelo, C. T., &amp; Kienhuis, A. S. (2026).
         ToxTempAssistant: using large language models to standardise cell-based toxicological test method descriptions.
         <em>Evidence-Based Toxicology</em>, 4(1).
         <a href="{{ config.reference_toxtempassistant_paper }}" target="_blank" rel="noopener noreferrer"><img src="{{ config.reference_toxtempassistant_paper_svg }}" alt="DOI: 10.1080/2833373X.2026.2638036" class="align-text-bottom"></a>
       </blockquote>
-      <p class="small text-body-secondary">
+      <p class="small fg-secondary">
         Please also consider citing <a href="{{ config.reference_toxtemp }}" target="_blank" rel="noopener noreferrer">ToxTemp (Krebs et al., 2019)</a>.
       </p>
       <p>
