@@ -81,9 +81,9 @@
      so utility classes still win over these rules. */
   @layer custom {
     /* Ensure both icon spans are positioned so they overlap, if needed */
+    /* No display here: the button's own inline-flex puts the icon beside the email. */
     .orcid-icon-container {
       position: relative;
-      display: inline-block;
     }
   
     /* Apply the transition to both icons */
