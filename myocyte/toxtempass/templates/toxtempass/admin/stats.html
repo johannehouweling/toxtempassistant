@@ -16,7 +16,7 @@ CSS, and the structure below still uses Bootstrap's grid and spacing. These
 rules are the page's visual language — display type, the ink card, the stacked
 progress bars — which Bootstrap has no vocabulary for. Everything is scoped
 under .readout so it cannot reach any other page, and every colour is a Bootstrap
-CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the theme.
+CSS variable (--bs-primary-bg, --bs-border-color, ...) so the page follows the theme.
 {% endcomment %}
 
 {% block title %}Usage stats — ToxTempAssistant{% endblock %}
@@ -26,21 +26,21 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
 
 <style>
   /* Ships only with this page, so the body rule cannot affect the rest of the app. */
-  body { background: var(--bs-tertiary-bg); }
+  body { background: var(--bs-bg-2); }
 
   .readout {
     /* Every colour is a Bootstrap CSS variable, so the page follows the app's
        theme. Blue is $primary — the header's bg-primary — and the lighter blue
        is that same primary at half opacity, never a second hue. */
-    --ink:   var(--bs-body-color);
-    --ink-2: var(--bs-secondary-color);
+    --ink:   var(--bs-fg-body);
+    --ink-2: var(--bs-secondary-fg);
     --ink-3: var(--bs-gray-500);
     --rule:  var(--bs-border-color);
-    --panel: var(--bs-body-bg);
-    --brand:       var(--bs-primary);
-    --accent:      var(--bs-primary);
-    --accent-soft: rgba(var(--bs-primary-rgb), .5);
-    --on-brand:    var(--bs-white-rgb);
+    --panel: var(--bs-bg-body);
+    --brand:       var(--bs-primary-bg);
+    --accent:      var(--bs-primary-bg);
+    --accent-soft: color-mix(in oklab, var(--bs-primary-bg) 50%, transparent);
+    --on-brand:    var(--bs-white);
     font-size: .9375rem;
     line-height: 1.55;
     color: var(--ink);
@@ -70,10 +70,10 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
   .readout .stat { background: var(--panel); border: 1px solid var(--rule);
                    border-radius: 4px; padding: 1.375rem 1.5rem; height: 100%; }
   .readout .stat-label { color: var(--ink-2); font-size: .875rem; margin-top: .5rem; }
-  .readout .stat-brand { background: var(--brand); border-color: var(--brand); color: rgb(var(--on-brand));
+  .readout .stat-brand { background: var(--brand); border-color: var(--brand); color: var(--on-brand);
                        display: flex; flex-direction: column; }
   .readout .stat-brand .stat-label,
-  .readout .stat-brand .unit { color: rgba(var(--on-brand), .88); }
+  .readout .stat-brand .unit { color: color-mix(in oklab, var(--on-brand) 88%, transparent); }
 
   /* Panels for the detail sections below the cards. */
   .readout .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
@@ -101,9 +101,9 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
   .readout .b3 { background: var(--rule); }
   /* On the brand card the same three bands become a white ramp, so the most
      important one (complete) is the highest-contrast. */
-  .readout .stat-brand .b1 { background: rgb(var(--on-brand)); }
-  .readout .stat-brand .b2 { background: rgba(var(--on-brand), .48); }
-  .readout .stat-brand .b3 { background: rgba(var(--on-brand), .2); }
+  .readout .stat-brand .b1 { background: var(--on-brand); }
+  .readout .stat-brand .b2 { background: color-mix(in oklab, var(--on-brand) 48%, transparent); }
+  .readout .stat-brand .b3 { background: color-mix(in oklab, var(--on-brand) 20%, transparent); }
   .readout .key { display: inline-flex; align-items: baseline; gap: .4rem; font-size: .8125rem; }
   .readout .key::before { content: ""; width: .55rem; height: .55rem; border-radius: 2px;
                           background: currentColor; flex: none; transform: translateY(.05rem); }
@@ -113,31 +113,31 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
   .readout .key.b3 { color: var(--rule); background: none; }
   .readout .key > span { color: var(--ink-2); }
   .readout .key > span b { font-weight: 600; color: var(--ink); }
-  .readout .stat-brand .key.b1 { color: rgb(var(--on-brand)); }
-  .readout .stat-brand .key.b2 { color: rgba(var(--on-brand), .48); }
-  .readout .stat-brand .key.b3 { color: rgba(var(--on-brand), .2); }
-  .readout .stat-brand .key > span { color: rgba(var(--on-brand), .88); }
-  .readout .stat-brand .key > span b { color: rgb(var(--on-brand)); }
+  .readout .stat-brand .key.b1 { color: var(--on-brand); }
+  .readout .stat-brand .key.b2 { color: color-mix(in oklab, var(--on-brand) 48%, transparent); }
+  .readout .stat-brand .key.b3 { color: color-mix(in oklab, var(--on-brand) 20%, transparent); }
+  .readout .stat-brand .key > span { color: color-mix(in oklab, var(--on-brand) 88%, transparent); }
+  .readout .stat-brand .key > span b { color: var(--on-brand); }
 
   /* Tables are Bootstrap's own .table; numeric columns only keep their digits
      aligned (text-end and text-nowrap do the rest). */
   .readout td.text-end { font-variant-numeric: tabular-nums; }
-  /* Bootstrap 5.3 paints table text in --bs-emphasis-color (pure black); body
-     colour for cells and the secondary colour for headers reads softer. */
-  .readout .table { --bs-table-color: var(--bs-body-color); }
-  .readout .table thead { --bs-table-color: var(--bs-secondary-color); }
+  /* Body colour for cells and the secondary colour for headers reads softer
+     than Bootstrap's table text colour. */
+  .readout .table { --bs-table-color: var(--bs-fg-body); }
+  .readout .table thead { --bs-table-color: var(--bs-secondary-fg); }
 
   .readout .seg a { border: 1px solid var(--rule); color: var(--ink-2); background: var(--panel); padding: .25rem .7rem; font-size: .8125rem; text-decoration: none; }
   .readout .seg a + a { border-left: 0; }
   .readout .seg a:first-child { border-radius: 4px 0 0 4px; }
   .readout .seg a:last-child { border-radius: 0 4px 4px 0; }
-  .readout .seg a[aria-current="page"] { background: var(--brand); border-color: var(--brand); color: rgb(var(--on-brand)); }
+  .readout .seg a[aria-current="page"] { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
   /* Sits in the same control as the range tabs but reads as secondary: no
      label, icon only, and it never takes the selected state. */
   .readout .seg-refresh { color: var(--ink-3); padding-inline: .55rem; }
   .readout .seg-refresh:hover { color: var(--brand); }
   .readout .seg a:hover { color: var(--ink); }
-  .readout .seg a[aria-current="page"]:hover { color: rgb(var(--on-brand)); }
+  .readout .seg a[aria-current="page"]:hover { color: var(--on-brand); }
   .readout a:focus-visible, .readout .seg a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 
@@ -509,17 +509,30 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
   // resolved once here: primary carries every single-series chart, and
   // Bootstrap's pink joins it only where a second series shares the axis —
   // vivid beside blue, legible as label text on white, and not a warning hue.
-  // ponytail: fade() parses 6-digit hex, which Bootstrap 5.3 emits for these two.
+  // Bootstrap 6 writes its colours as oklch(), light-dark() and color-mix(), so
+  // each one is painted as an element's colour (which settles light-dark() for
+  // the current mode) and read back as rgb from a 1px canvas.
   const css = getComputedStyle(document.documentElement);
   const bs = (name) => css.getPropertyValue(`--bs-${name}`).trim();
-  const P = {
-    series: [bs('primary'), bs('pink')],
-    ink: bs('body-color'),
-    ink2: bs('secondary-color'),
-    grid: bs('border-color'),
-    surface: bs('body-bg'),
+  const probe = document.body.appendChild(document.createElement('span'));
+  const px = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  const colour = (name) => {
+    probe.style.color = `var(--bs-${name})`;
+    px.clearRect(0, 0, 1, 1);
+    px.fillStyle = getComputedStyle(probe).color;
+    px.fillRect(0, 0, 1, 1);
+    const [r, g, b] = px.getImageData(0, 0, 1, 1).data;
+    return `rgb(${r}, ${g}, ${b})`;
   };
-  Chart.defaults.font.family = bs('font-sans-serif');
+  const P = {
+    series: [colour('primary-bg'), colour('pink-500')],
+    ink: colour('fg-body'),
+    ink2: colour('secondary-fg'),
+    grid: colour('border-color'),
+    surface: colour('bg-body'),
+  };
+  probe.remove();
+  Chart.defaults.font.family = bs('body-font-family');
   Chart.defaults.font.size = 12;
   Chart.defaults.color = P.ink2;
   Chart.defaults.maintainAspectRatio = false;
@@ -539,19 +552,19 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
   // ToxTemps series is filled: two translucent areas over each other mix blue
   // and pink into a muddy tone. Monotone interpolation so a cumulative curve
   // can never dip below a value it already reached.
-  function fade(hex, top, bottom) {
+  function fade(rgb, top, bottom) {
     return (ctx) => {
       const area = ctx.chart.chartArea;
-      if (!area) return rgba(hex, top);
+      if (!area) return rgba(rgb, top);
       const g = ctx.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
-      g.addColorStop(0, rgba(hex, top));
-      g.addColorStop(1, rgba(hex, bottom));
+      g.addColorStop(0, rgba(rgb, top));
+      g.addColorStop(1, rgba(rgb, bottom));
       return g;
     };
   }
-  function rgba(hex, a) {
-    const n = parseInt(hex.slice(1), 16);
-    return `rgba(${n >> 16 & 255}, ${n >> 8 & 255}, ${n & 255}, ${a})`;
+  function rgba(rgb, a) {
+    const [r, g, b] = rgb.match(/\d+/g);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
   }
 
   // The final value of each series, drawn on the curve. A growth chart's
@@ -566,7 +579,7 @@ CSS variable (--bs-primary, --bs-border-color, ...) so the page follows the them
         if (!last) return;
         const text = Number(ds.data[ds.data.length - 1]).toLocaleString();
         c.save();
-        c.font = `600 15px ${bs('font-sans-serif')}`;
+        c.font = `600 15px ${bs('body-font-family')}`;
         const w = c.measureText(text).width;
         c.fillStyle = P.surface;
         c.beginPath();
