@@ -20,6 +20,17 @@
     <meta property="og:image:alt" content="The ToxTempAssistant assay overview on a phone, next to a microscope and petri dishes">
     <meta name="twitter:card" content="summary_large_image">
     {% block extra_head %}{% endblock %}
+    <script>
+      // Bootstrap 6 follows the OS colour scheme through CSS, but a few of its rules
+      // (the <select> chevron) only react to data-bs-theme, so mirror the OS setting
+      // there. Runs before the stylesheet loads, so the page never flashes light.
+      (function () {
+        const dark = window.matchMedia("(prefers-color-scheme: dark)");
+        const apply = () => document.documentElement.setAttribute("data-bs-theme", dark.matches ? "dark" : "light");
+        apply();
+        dark.addEventListener("change", apply);
+      })();
+    </script>
     {# Our build of Bootstrap 6 from scss/bootstrap.scss (adds the "orange" theme colour). #}
     <link rel="stylesheet" href="{% static 'toxtempass/bootstrap.min.css' %}">
     {# Bootstrap 6 is an ES module and no longer sets window.bootstrap. The import #}
@@ -113,10 +124,10 @@
   </style>
 <body data-url-name="{{ current_url_name }}">
         <header class="md:sticky-top">
-            <div class="card bg-white border-0">
+            <div class="card bg-body border-0">
                 <div class="card m-5 border-0 d-flex align-items-center flex-row bg-primary" style="height:100px;">           
                     <h2 class="m-5 fg-white fs-3xl" id="id_headline"><a href="{%url 'overview'%}" class="text-decoration-none fg-white"><i class="bi bi-clipboard-heart me-3"></i><b>ToxTemp</b>Assistant</a></h2>
-                    <span class="badge d-none md:d-block theme-warning" data-bs-toggle="tooltip" data-bs-custom-class="header-tooltip" title="This app is still in beta. Features may change."><a class="text-decoration-none fg-black" href="https://github.com/johannehouweling/ToxTempAssistant/releases">{{config.version}}</a></span>
+                    <span class="badge d-none md:d-block theme-warning" data-bs-toggle="tooltip" data-bs-custom-class="header-tooltip" title="This app is still in beta. Features may change."><a class="text-decoration-none fg-reset" href="https://github.com/johannehouweling/ToxTempAssistant/releases">{{config.version}}</a></span>
                     {% if user.is_authenticated %} 
                     <span class="btn-outline theme-inverse orcid-icon-container ms-auto fs-md me-5" data-bs-theme="dark" id="id_user_menu" tabindex="0" role="button" data-bs-toggle="drawer" href="#offcanvasUser">
                         <i class="bi bi-person-badge"></i>

@@ -219,7 +219,7 @@ class AssayTable(tables.Table):
         )
         return format_html(
             """
-                <div class="progress border bg-white">
+                <div class="progress border bg-body">
                 <div class="progress-bar bg-primary"
                     role="progressbar"
                     style="width: {pct_a}%;"

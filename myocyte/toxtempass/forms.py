@@ -692,7 +692,8 @@ class AssayAnswerForm(forms.Form):
             raise PermissionDenied("You do not have access to this assay.")
         super().__init__(*args, **kwargs)
 
-        accepted_files = ",".join(config.IMAGE_ACCEPT_FILES + config.TEXT_ACCEPT_FILES)
+        accepted = config.IMAGE_ACCEPT_FILES + config.TEXT_ACCEPT_FILES
+        accepted_files = ",".join(accepted)
         self.fields["file_upload"] = MultipleFileField(
             widget=MultipleFileInput(
                 attrs={
@@ -704,7 +705,8 @@ class AssayAnswerForm(forms.Form):
             required=False,
             help_text=(
                 "Context documents for update of selected answers. "
-                f"Supported formats: {accepted_files}."
+                # Spaces let the list wrap; one long word widens the dialog.
+                f"Supported formats: {', '.join(accepted)}."
                 f" Max size: {config.max_size_mb} MB per file."
             ),
         )

@@ -33,12 +33,12 @@
     }
     
     ::-webkit-scrollbar-thumb {
-        background: rgba(0, 0, 0, 0.5); /* Semi-transparent thumb */
+        background: color-mix(in oklab, var(--bs-fg-body) 50%, transparent); /* Semi-transparent thumb */
         border-radius: 4px; /* Rounded corners for thumb */
     }
     
     ::-webkit-scrollbar-thumb:hover {
-        background: rgba(0, 0, 0, 0.7); /* Darker thumb on hover */
+        background: color-mix(in oklab, var(--bs-fg-body) 70%, transparent); /* Darker thumb on hover */
     }
     
     /* Custom styles to ensure active state overrides any other text classes */
@@ -165,7 +165,7 @@
 
             </form>
         </main>
-        <nav class="fixed-bottom card border-0 bg-white" style="z-index: unset;">
+        <nav class="fixed-bottom card border-0 bg-body" style="z-index: unset;">
           <div class="container">
             <!-- Progress bar -->
             {% with percentanswers=assay.get_n_accepted_answers|intdivperc:assay.get_n_answers %}

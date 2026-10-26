@@ -2,14 +2,14 @@
   "name": "toxtempass-theme",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "description": "ToxTempAssistant's build of Bootstrap 6 (compiled to static/toxtempass/bootstrap.min.css).",
   "scripts": {
-    "build:css": "sass --quiet-deps --load-path=node_modules --style=compressed --no-source-map scss/bootstrap.scss toxtempass/static/toxtempass/bootstrap.min.css && postcss --no-map --replace toxtempass/static/toxtempass/bootstrap.min.css"
+    "build:css": "sass --quiet-deps --load-path=node_modules --style=expanded --no-charset --no-source-map scss/bootstrap.scss | postcss --no-map | lightningcss --minify -o toxtempass/static/toxtempass/bootstrap.min.css"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.21",
     "bootstrap": "6.0.0-alpha.1",
+    "lightningcss-cli": "^1.30.0",
     "postcss": "^8.5.28",
     "postcss-cli": "^12.0.0",
     "postcss-prefix-custom-properties": "^0.1.0",

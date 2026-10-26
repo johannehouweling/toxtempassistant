@@ -61,7 +61,7 @@ react (e.g. refresh a Save button).
                 nameSpan.textContent = f.name;
                 var btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = 'btn-close fg-white scale-75';
+                btn.className = 'btn-close scale-75';
                 btn.setAttribute('aria-label', 'Remove ' + f.name);
                 btn.addEventListener('click', function() { removeFile(f); });
                 tag.appendChild(nameSpan);
