@@ -134,7 +134,7 @@
         <header class="md:sticky-top">
             <div class="card bg-body border-0">
                 <div class="card m-5 border-0 d-flex align-items-center flex-row bg-primary" style="height:100px;">           
-                    <h2 class="m-5 fg-white fs-3xl" id="id_headline"><a href="{%url 'overview'%}" class="text-decoration-none fg-white"><i class="bi bi-clipboard-heart me-3"></i><b>ToxTemp</b>Assistant</a></h2>
+                    <h2 class="m-3 sm:m-5 fg-white fs-3xl" id="id_headline"><a href="{%url 'overview'%}" class="text-decoration-none fg-white"><i class="bi bi-clipboard-heart me-3"></i><b>ToxTemp</b><wbr>Assistant</a></h2>
                     <span class="badge d-none md:d-block theme-warning" data-bs-toggle="tooltip" data-bs-custom-class="header-tooltip" title="This app is still in beta. Features may change."><a class="text-decoration-none fg-reset" href="https://github.com/johannehouweling/ToxTempAssistant/releases">{{config.version}}</a></span>
                     {% if user.is_authenticated %} 
                     <span class="btn-outline theme-inverse orcid-icon-container ms-auto fs-md me-5" data-bs-theme="dark" id="id_user_menu" tabindex="0" role="button" data-bs-toggle="drawer" href="#offcanvasUser">
@@ -156,9 +156,10 @@
                     </span>
                     {% elif current_url_name == 'about' %}
                     {# Phones only get "Log in", so the button fits next to the logo. #}
-                    <a class="btn-outline theme-inverse ms-auto me-5" data-bs-theme="dark" href="{% url 'overview' %}"><span class="d-none sm:d-inline">Sign up / </span>Log in</a>
+                    <a class="btn-outline theme-inverse ms-auto me-3 sm:me-5" data-bs-theme="dark" href="{% url 'overview' %}"><span class="d-none sm:d-inline">Sign up / </span>Log in</a>
                     {% else %}
-                    <a class="btn-outline theme-inverse ms-auto me-5" data-bs-theme="dark" href="{% url 'about' %}">About</a>
+                    {# Phones get an info icon: the word does not fit next to the logo. #}
+                    <a class="btn-outline theme-inverse ms-auto me-3 sm:me-5" data-bs-theme="dark" href="{% url 'about' %}" aria-label="About" title="About"><i class="bi bi-info-circle sm:d-none" aria-hidden="true"></i><span class="d-none sm:d-inline">About</span></a>
                     {%endif%}
                 </div>
             </div>
