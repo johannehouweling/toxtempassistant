@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v3.64.1 (2026-10-27)
+
+### Bug Fixes
+
+- **ui**: Header fits on phones; ORCID logo and user icon aligned
+  ([`6ed9ea9`](https://github.com/johannehouweling/toxtempassistant/commit/6ed9ea9324152b839556aa5e1520025806fe466b))
+
+### Code Style
+
+- **ui**: Dim only the ORCID logo, not the ORCID line
+  ([`35bfab2`](https://github.com/johannehouweling/toxtempassistant/commit/35bfab2d166abdd99d303ae360bf8cd30ed1c415))
+
+- **ui**: Header fits on phones for logged-out visitors
+  ([`508a6af`](https://github.com/johannehouweling/toxtempassistant/commit/508a6afb1839b13eacd96d53a772fa03b9604902))
+
+- **ui**: Quieter ORCID line in the header button
+  ([`afade87`](https://github.com/johannehouweling/toxtempassistant/commit/afade877ed3faa14d90b95a99f4c087e9e3bffb4))
+
+- **ui**: User icon level with the email in the header button
+  ([`aab3571`](https://github.com/johannehouweling/toxtempassistant/commit/aab3571b8b0ff56485aae4f84b0bce067adb0053))
+
+### Testing
+
+- **ui**: Pin the phone header for visitors
+  ([`4b8dc06`](https://github.com/johannehouweling/toxtempassistant/commit/4b8dc0644b06a877b2bb7d529bd6c60e69f3b5e1))
+
+
 ## v3.64.0 (2026-10-26)
 
 ### Bug Fixes
