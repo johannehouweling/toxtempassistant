@@ -73,6 +73,20 @@ def test_about_page_header_links_to_login_instead_of_itself():
 
 
 @pytest.mark.django_db
+def test_header_fits_on_phones_for_visitors():
+    """Phones get an info icon for About, and the title may break, so both fit."""
+    html = Client().get(reverse("login")).content.decode()
+    header = html.split("</header>")[0]
+    about = header[header.index(f'href="{reverse("about")}"') :]
+    about = about[: about.index("</a>")]
+    # Screen readers still hear "About"; the word itself shows from sm up.
+    assert 'aria-label="About"' in about
+    assert '<i class="bi bi-info-circle sm:d-none" aria-hidden="true"></i>' in about
+    assert '<span class="d-none sm:d-inline">About</span>' in about
+    assert "<b>ToxTemp</b><wbr>Assistant" in header
+
+
+@pytest.mark.django_db
 def test_about_page_does_not_publish_the_maintainer_email():
     """The address stays off public pages; logged-in users find it in the user menu."""
     html = Client().get(reverse("about")).content.decode()
