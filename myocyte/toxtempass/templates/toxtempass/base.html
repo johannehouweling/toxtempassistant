@@ -142,9 +142,9 @@
                         <div class="d-none lg:d-block">
                           {{ user.email }}
                           {% if user.orcid_id %}
-                          {# Secondary to the email: smaller and dimmed, logo and number alike. #}
-                          <div class="d-flex align-items-center gap-1 fs-sm opacity-75">
-                              <div class="position-relative d-inline-flex">
+                          <div class="d-flex align-items-center gap-1">
+                              {# The logo is a solid white image; dimmed, it matches the grey button text. #}
+                              <div class="position-relative d-inline-flex opacity-75">
                                 <span class="svg-normal">
                                     <img style="height:1em" src="{% static 'toxtempass/img/ORCID-iD_icon_reversed_vector.svg' %}" alt="ORCID">
                                 </span>
