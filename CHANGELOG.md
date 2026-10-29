@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.64.2 (2026-10-29)
+
+### Chores
+
+- Update python packages
+  ([`a866ba3`](https://github.com/johannehouweling/toxtempassistant/commit/a866ba35ffe07e44a824fb0a0fe22dfb1d81e363))
+
+
 ## v3.64.1 (2026-10-27)
 
 ### Bug Fixes
