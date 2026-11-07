@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.64.3 (2026-11-07)
+
+### Bug Fixes
+
+- **seo**: Drop the signup form from the sitemap
+  ([`9686ef4`](https://github.com/johannehouweling/toxtempassistant/commit/9686ef4472495d7801ca76287f54ddb47861fc66))
+
+
 ## v3.64.2 (2026-10-29)
 
 ### Chores
