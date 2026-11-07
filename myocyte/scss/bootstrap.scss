@@ -35,6 +35,28 @@
     ),
   )
 );
+@use "sass:map";
+@use "bootstrap/scss/config";
+@use "bootstrap/scss/functions";
+@use "bootstrap/scss/mixins/utilities";
+
+// Bootstrap makes the font-size utilities (.fs-*) only for all screens. We also
+// want them per breakpoint (`sm:fs-3xl`), e.g. a smaller headline on the
+// narrowest phones. Generated from Bootstrap's own font-size scale and utility
+// mixin; xs is skipped because the plain .fs-* classes already cover it.
+@layer utilities {
+  @include utilities.generate-utilities-loop(
+    (
+      "font-size": (
+        property: font-size,
+        class: fs,
+        responsive: true,
+        values: functions.map-get-nested(config.$font-sizes, "font-size"),
+      ),
+    ),
+    map.remove(config.$breakpoints, "xs")
+  );
+}
 
 // Bootstrap 6.0.0-alpha.1 hides a closed dialog with visibility instead of
 // display: none, but leaves it in the page at the browser's position: absolute,

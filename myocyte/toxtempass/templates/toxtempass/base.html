@@ -28,6 +28,14 @@
       (function () {
         const root = document.documentElement;
         const dark = window.matchMedia("(prefers-color-scheme: dark)");
+        {% if not user.is_authenticated %}
+        // Visitors have no Settings tab; the footer's menu keeps their choice in
+        // this browser (localStorage, never sent to the server, so no cookie).
+        try {
+          const stored = localStorage.getItem("color-mode");
+          if (stored === "light" || stored === "dark") root.dataset.colorMode = stored;
+        } catch (e) {}
+        {% endif %}
         const apply = () => {
           const mode = root.dataset.colorMode;
           const fixed = mode === "light" || mode === "dark";
@@ -35,7 +43,7 @@
         };
         apply();
         dark.addEventListener("change", apply);
-        // The Settings tab switches the mode in place.
+        // The Settings tab (and the visitors' footer menu) switches the mode in place.
         window.setColorMode = (mode) => { root.dataset.colorMode = mode; apply(); };
       })();
     </script>
@@ -134,7 +142,7 @@
         <header class="md:sticky-top">
             <div class="card bg-body border-0">
                 <div class="card m-5 border-0 d-flex align-items-center flex-row bg-primary" style="height:100px;">           
-                    <h2 class="m-3 sm:m-5 fg-white fs-3xl" id="id_headline"><a href="{%url 'overview'%}" class="text-decoration-none fg-white"><i class="bi bi-clipboard-heart me-3"></i><b>ToxTemp</b><wbr>Assistant</a></h2>
+                    <h2 class="m-3 sm:m-5 fg-white fs-2xl sm:fs-3xl" id="id_headline"><a href="{%url 'overview'%}" class="text-decoration-none fg-white"><i class="bi bi-clipboard-heart me-3"></i><b>ToxTemp</b><wbr>Assistant</a></h2>
                     <span class="badge d-none md:d-block theme-warning" data-bs-toggle="tooltip" data-bs-custom-class="header-tooltip" title="This app is still in beta. Features may change."><a class="text-decoration-none fg-reset" href="https://github.com/johannehouweling/ToxTempAssistant/releases">{{config.version}}</a></span>
                     {% if user.is_authenticated %} 
                     <span class="btn-outline theme-inverse orcid-icon-container align-items-start ms-auto fs-md me-5" data-bs-theme="dark" id="id_user_menu" tabindex="0" role="button" data-bs-toggle="drawer" href="#offcanvasUser">
@@ -231,6 +239,44 @@
                 <p class="small fg-secondary text-center mt-3 mb-0">
                     ToxTempAssistant is open source (AGPL-3.0) and developed within <a class="fg-reset" href="https://vhp4safety.nl/" target="_blank" rel="noopener noreferrer">VHP4Safety</a>. The ToxTemp template is by Krebs et al. (2019).
                 </p>
+                {# Visitors have no Settings tab, so they choose the colour mode here. #}
+                <div class="d-flex justify-content-center mt-3">
+                    <button type="button" class="btn-link fg-secondary fs-sm px-1 gap-1" id="id_visitor_color_mode" data-bs-toggle="menu" data-bs-placement="top" aria-expanded="false" aria-label="Colour mode" title="Colour mode">
+                        <i class="bi bi-circle-half js-visitor-color-mode-icon" aria-hidden="true"></i><i class="bi bi-chevron-expand fs-xs" aria-hidden="true"></i>
+                    </button>
+                    <div class="menu">
+                        {% for value, label, icon in color_mode_choices %}
+                        <button type="button" class="menu-item js-visitor-color-mode" data-mode="{{ value }}" data-icon="{{ icon }}">
+                            <i class="bi {{ icon }} menu-item-icon" aria-hidden="true"></i>{{ label }}<i class="bi bi-check2 menu-item-check" aria-hidden="true"></i>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                <script>
+                  (function () {
+                    const items = document.querySelectorAll(".js-visitor-color-mode");
+                    const icon = document.querySelector(".js-visitor-color-mode-icon");
+                    const show = (mode) => {
+                      items.forEach((item) => {
+                        const on = item.dataset.mode === mode;
+                        item.classList.toggle("selected", on);
+                        item.setAttribute("aria-pressed", on);
+                        if (on) icon.className = "bi " + item.dataset.icon + " js-visitor-color-mode-icon";
+                      });
+                    };
+                    show(document.documentElement.dataset.colorMode);
+                    items.forEach((item) => item.addEventListener("click", () => {
+                      const mode = item.dataset.mode;
+                      window.setColorMode(mode);
+                      show(mode);
+                      // "system" is the default, so it clears the stored choice.
+                      try {
+                        if (mode === "system") localStorage.removeItem("color-mode");
+                        else localStorage.setItem("color-mode", mode);
+                      } catch (e) {}
+                    }));
+                  })();
+                </script>
             </div>
         </footer>
         {% endif %}

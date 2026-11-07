@@ -1,4 +1,7 @@
-"""Light, dark or system colour mode: chosen in the Settings tab, applied by base.html."""
+"""Light, dark or system colour mode.
+
+Chosen in the Settings tab (visitors: the footer menu) and applied by base.html.
+"""
 
 import pytest
 from django.urls import reverse
@@ -52,6 +55,26 @@ def test_visitors_follow_their_system_and_cannot_save_a_mode(client):
     assert 'data-color-mode="system"' in client.get(reverse("about")).content.decode()
     response = client.post(reverse(URL), {"mode": "dark"})
     assert response.status_code == 302
+
+
+@pytest.mark.django_db
+def test_visitors_pick_a_mode_in_the_footer_and_it_stays_in_their_browser(client):
+    html = client.get(reverse("about")).content.decode()
+    footer = html.split("<footer")[1].split("</footer>")[0]
+    assert 'id="id_visitor_color_mode"' in footer
+    for mode in config._color_modes:
+        assert f'data-mode="{mode}"' in footer
+    # Kept in localStorage, not a cookie, so nothing is sent to the server.
+    assert 'localStorage.getItem("color-mode")' in html
+    assert "document.cookie" not in html
+
+
+@pytest.mark.django_db
+def test_logged_in_users_get_no_menu_and_ignore_the_browser_choice(client):
+    client.force_login(PersonFactory(preferences={"color_mode": "light"}))
+    html = client.get(reverse("overview")).content.decode()
+    assert 'id="id_visitor_color_mode"' not in html
+    assert "localStorage" not in html.split("</head>")[0]
 
 
 @pytest.mark.django_db
