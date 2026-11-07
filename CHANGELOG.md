@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v3.64.4 (2026-11-07)
+
+### Bug Fixes
+
+- **ui**: Visitors can switch colour mode; smaller headline on phones
+  ([`aa30724`](https://github.com/johannehouweling/toxtempassistant/commit/aa307246f8b718275d5d6332df6e3d17930b6665))
+
+
 ## v3.64.3 (2026-11-07)
 
 ### Bug Fixes
