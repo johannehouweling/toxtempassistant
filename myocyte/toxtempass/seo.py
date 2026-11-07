@@ -36,8 +36,9 @@ PAGE_LASTMOD = {
     "overview": date(2026, 9, 12),
     "about": date(2026, 9, 12),
     "toxtemp_questions": date(2026, 9, 12),
-    "signup": date(2026, 9, 12),
 }
+# Signup stays crawlable but is not listed: a bare form is thin content, and the
+# landing page links to it.
 
 
 class StaticViewSitemap(Sitemap):

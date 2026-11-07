@@ -57,12 +57,12 @@ def test_robots_txt():
 
 
 def test_sitemap_lists_public_pages():
-    """The sitemap lists the landing page and the signup page."""
+    """The sitemap lists the landing page but not the signup form."""
     response = Client().get("/sitemap.xml")
     assert response.status_code == 200
     body = response.content.decode()
     assert "<loc>http://testserver/</loc>" in body
-    assert f"<loc>http://testserver{reverse('signup')}</loc>" in body
+    assert f"<loc>http://testserver{reverse('signup')}</loc>" not in body
 
 
 def test_sitemap_gives_every_page_a_lastmod():
@@ -85,7 +85,7 @@ def test_link_preview_image_exists_at_1200_by_630():
 
 @pytest.mark.django_db
 def test_signup_page_has_heading_and_description():
-    """Signup is in the sitemap, so it needs its own <h1> and meta description."""
+    """Signup can still be found by search, so it needs its own <h1> and description."""
     html = Client().get(reverse("signup")).content.decode()
     assert html.count("<h1") == 1
     assert "Create a free ToxTempAssistant beta account" in html
