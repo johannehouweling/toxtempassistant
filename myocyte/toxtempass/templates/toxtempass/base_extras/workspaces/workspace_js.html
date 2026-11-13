@@ -501,18 +501,25 @@
             data.workspace_assay_id || "",
           );
 
-          pill.innerHTML = `
-          <span class="assay-text">${escapeHtml(title)}</span>
-          ${
-            canRemove
-              ? `
-            <button type="button" class="btn btn-link p-0 m-0 min-h-0 lh-1 fg-secondary btn-remove-assay" data-assay-id="${assayId}"
-                    aria-label="Remove investigation ${escapeHtml(title)}" title="Remove investigation ${escapeHtml(title)}">
-              <i class="bi bi-x"></i>
-            </button>`
-              : ``
+          const assayText = document.createElement("span");
+          assayText.className = "assay-text";
+          assayText.textContent = title;
+          pill.appendChild(assayText);
+
+          if (canRemove) {
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.className =
+              "btn btn-link p-0 m-0 min-h-0 lh-1 fg-secondary btn-remove-assay";
+            removeBtn.setAttribute("data-assay-id", assayId);
+            removeBtn.setAttribute("aria-label", `Remove investigation ${title}`);
+            removeBtn.setAttribute("title", `Remove investigation ${title}`);
+
+            const icon = document.createElement("i");
+            icon.className = "bi bi-x";
+            removeBtn.appendChild(icon);
+            pill.appendChild(removeBtn);
           }
-        `;
 
           const addBtn = wrap.querySelector(".btn-add-assay");
           if (addBtn) wrap.insertBefore(pill, addBtn);
